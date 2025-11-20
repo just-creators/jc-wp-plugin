@@ -250,20 +250,36 @@ function jc_handle_send_application( $request ) {
         return new WP_Error( 'not_on_server', 'User ist nicht auf dem temporären Server', array( 'status' => 400 ) );
     }
     
-    // Prüfe ob Bewerbung bereits an Bot gesendet wurde
     global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-    $existing = $wpdb->get_row( $wpdb->prepare(
-        "SELECT id, forum_post_id FROM {$table} WHERE discord_id = %s",
+    $temp_table = $wpdb->prefix . 'jc_discord_applications_temp';
+    $main_table = $wpdb->prefix . 'jc_discord_applications';
+    
+    // Hole Bewerbung aus temporärer Tabelle
+    $temp_application = $wpdb->get_row( $wpdb->prepare(
+        "SELECT * FROM {$temp_table} WHERE discord_id = %s",
         $discord_id
     ) );
     
-    if ( ! $existing ) {
-        return new WP_Error( 'not_found', 'Bewerbung nicht gefunden', array( 'status' => 404 ) );
+    if ( ! $temp_application ) {
+        return new WP_Error( 'not_found', 'Bewerbung nicht gefunden oder abgelaufen', array( 'status' => 404 ) );
     }
     
-    if ( ! empty( $existing->forum_post_id ) ) {
-        // Bereits gesendet
+    // Prüfe ob bereits abgelaufen
+    if ( strtotime( $temp_application->expires_at ) < time() ) {
+        // Abgelaufen, löschen
+        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
+        return new WP_Error( 'expired', 'Bewerbung ist abgelaufen. Bitte starte eine neue Bewerbung.', array( 'status' => 410 ) );
+    }
+    
+    // Prüfe ob bereits in Haupttabelle vorhanden
+    $existing = $wpdb->get_row( $wpdb->prepare(
+        "SELECT id, forum_post_id FROM {$main_table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+    
+    if ( $existing && ! empty( $existing->forum_post_id ) ) {
+        // Bereits verarbeitet
+        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
         return array(
             'success' => true,
             'message' => 'Bewerbung wurde bereits verarbeitet',
@@ -272,26 +288,49 @@ function jc_handle_send_application( $request ) {
     }
     
     // Bewerbung an Bot senden
-    $bot_result = jc_send_application_to_bot( $params );
+    $bot_data = array(
+        'discord_id' => $temp_application->discord_id,
+        'discord_name' => $temp_application->discord_name,
+        'applicant_name' => $temp_application->applicant_name,
+        'age' => $temp_application->age,
+        'social_channels' => json_decode( $temp_application->social_channels, true ),
+        'social_activity' => $temp_application->social_activity,
+        'motivation' => $temp_application->motivation,
+        'database_id' => null // Wird nach Insert gesetzt
+    );
+    
+    $bot_result = jc_send_application_to_bot( $bot_data );
     
     if ( $bot_result['success'] && isset( $bot_result['data']['post_id'] ) ) {
-        $wpdb->update( 
-            $table, 
-            array( 'forum_post_id' => $bot_result['data']['post_id'] ), 
-            array( 'id' => $existing->id ), 
-            array( '%s' ), 
-            array( '%d' ) 
-        );
+        // Von temporärer Tabelle in Haupttabelle verschieben
+        $inserted = $wpdb->insert( $main_table, array(
+            'discord_id' => $temp_application->discord_id,
+            'discord_name' => $temp_application->discord_name,
+            'applicant_name' => $temp_application->applicant_name,
+            'age' => $temp_application->age,
+            'social_channels' => $temp_application->social_channels,
+            'social_activity' => $temp_application->social_activity,
+            'motivation' => $temp_application->motivation,
+            'forum_post_id' => $bot_result['data']['post_id'],
+            'status' => 'pending'
+        ), array('%s','%s','%s','%s','%s','%s','%s','%s','%s') );
         
-        // Session aufräumen
-        unset( $_SESSION['jc_pending_application'] );
-        unset( $_SESSION['jc_discord_user'] );
-        
-        return array(
-            'success' => true,
-            'message' => 'Bewerbung erfolgreich verarbeitet',
-            'post_id' => $bot_result['data']['post_id']
-        );
+        if ( $inserted ) {
+            // Temporäre Bewerbung löschen
+            $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
+            
+            // Session aufräumen
+            unset( $_SESSION['jc_pending_application'] );
+            unset( $_SESSION['jc_discord_user'] );
+            
+            return array(
+                'success' => true,
+                'message' => 'Bewerbung erfolgreich verarbeitet',
+                'post_id' => $bot_result['data']['post_id']
+            );
+        } else {
+            return new WP_Error( 'db_error', 'Fehler beim Speichern in Haupttabelle', array( 'status' => 500 ) );
+        }
     }
     
     return new WP_Error( 'bot_error', $bot_result['message'] ?? 'Fehler beim Senden an Bot', array( 'status' => 500 ) );
@@ -406,10 +445,27 @@ add_action( 'init', function() {
         @session_start();
     }
 }, 1 );
+// Cleanup für abgelaufene temporäre Bewerbungen
+add_action( 'jc_cleanup_temp_applications', function() {
+    global $wpdb;
+    $temp_table = $wpdb->prefix . 'jc_discord_applications_temp';
+    $now = current_time( 'mysql' );
+    
+    $deleted = $wpdb->query( $wpdb->prepare(
+        "DELETE FROM {$temp_table} WHERE expires_at < %s",
+        $now
+    ) );
+    
+    if ( $deleted > 0 ) {
+        error_log( "JC Cleanup: {$deleted} abgelaufene temporäre Bewerbungen gelöscht" );
+    }
+});
 register_activation_hook( __FILE__, function() {
     global $wpdb;
-    $table_name = $wpdb->prefix . 'jc_discord_applications';
     $charset_collate = $wpdb->get_charset_collate();
+    
+    // Haupttabelle für Bewerbungen
+    $table_name = $wpdb->prefix . 'jc_discord_applications';
     $sql = "CREATE TABLE $table_name (
         id mediumint(9) NOT NULL AUTO_INCREMENT,
         discord_id varchar(64) NOT NULL UNIQUE,
@@ -428,6 +484,30 @@ register_activation_hook( __FILE__, function() {
     ) $charset_collate;";
     require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
     dbDelta( $sql );
+    
+    // Temporäre Tabelle für Pending-Bewerbungen (vor Discord-Join)
+    $temp_table_name = $wpdb->prefix . 'jc_discord_applications_temp';
+    $sql_temp = "CREATE TABLE $temp_table_name (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        discord_id varchar(64) NOT NULL UNIQUE,
+        discord_name varchar(255) NOT NULL,
+        applicant_name varchar(255) NOT NULL,
+        age varchar(20) DEFAULT '',
+        social_channels text DEFAULT '',
+        social_activity varchar(255) DEFAULT '',
+        motivation text DEFAULT '',
+        created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        expires_at datetime NOT NULL,
+        PRIMARY KEY (id),
+        KEY discord_id (discord_id),
+        KEY expires_at (expires_at)
+    ) $charset_collate;";
+    dbDelta( $sql_temp );
+    
+    // Cron Job für Cleanup
+    if ( ! wp_next_scheduled( 'jc_cleanup_temp_applications' ) ) {
+        wp_schedule_event( time(), 'hourly', 'jc_cleanup_temp_applications' );
+    }
 });
 // ========================================
 // DISCORD OAUTH2
@@ -1416,11 +1496,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                    
                     if ( empty( $validation_errors ) ) {
                         global $wpdb;
-                        $table = $wpdb->prefix . 'jc_discord_applications';
+                        $temp_table = $wpdb->prefix . 'jc_discord_applications_temp';
                         
                         $social_channels_json = wp_json_encode( $social_channels );
                         
-                        $inserted = $wpdb->insert( $table, array(
+                        // Bewerbung in temporäre Tabelle speichern (20 Minuten Gültigkeit)
+                        $expires_at = date( 'Y-m-d H:i:s', time() + (20 * 60) ); // 20 Minuten
+                        
+                        $inserted = $wpdb->insert( $temp_table, array(
                             'discord_id' => $discord_id,
                             'discord_name' => $discord_display,
                             'applicant_name' => $applicant_name,
@@ -1428,11 +1511,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             'social_channels' => $social_channels_json,
                             'social_activity' => $social_activity,
                             'motivation' => $motivation,
-                            'status' => 'pending'
+                            'expires_at' => $expires_at
                         ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
                         
                         if ( $inserted ) {
-                            // Bewerbung in DB gespeichert, jetzt auf Discord-Join warten
+                            // Bewerbung in temporärer DB gespeichert, jetzt auf Discord-Join warten
                             $form_submitted = true;
                             $waiting_for_discord = true;
                             $application_data = array(
@@ -1443,7 +1526,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 'social_channels' => $social_channels,
                                 'social_activity' => $social_activity,
                                 'motivation' => $motivation,
-                                'database_id' => $wpdb->insert_id
+                                'temp_id' => $wpdb->insert_id
                             );
                             // In Session speichern für späteren Bot-Call
                             $_SESSION['jc_pending_application'] = $application_data;
@@ -1495,7 +1578,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     const discordId = '<?php echo esc_js( $discord_id ); ?>';
                     const applicationData = <?php echo wp_json_encode( $application_data ); ?>;
                     let checkCount = 0;
-                    const maxChecks = 300; // 5 Minuten (300 * 1 Sekunde)
+                    const maxChecks = 600; // 20 Minuten (600 * 2 Sekunden)
                     
                     function checkDiscordJoin() {
                         checkCount++;

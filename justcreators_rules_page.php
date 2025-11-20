@@ -639,23 +639,205 @@ function jc_rules_api_auth( $request ) {
 function jc_rules_styles() {
     ?>
     <style>
-        .jc-wrap { max-width: 900px; margin: 40px auto; padding: 40px 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .jc-card { background: #2a2c36; padding: 40px; border-radius: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
-        .jc-h { font-size: 28px; font-weight: 700; color: #fff; margin: 0 0 20px 0; line-height: 1.3; }
-        .jc-label { display: block; color: #dcddde; font-weight: 600; margin: 20px 0 8px; font-size: 14px; }
-        .jc-input { width: 100%; padding: 14px 18px; background: #1e1f26; border: 2px solid #3a3c46; border-radius: 8px; color: #fff; font-size: 16px; transition: all 0.3s; box-sizing: border-box; font-family: inherit; }
-        .jc-input:focus { border-color: #5865F2; outline: none; box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.15); }
-        .jc-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 32px; background: #5865F2; color: #fff; border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer; text-decoration: none; transition: all 0.3s; }
-        .jc-btn:hover { background: #4752c4; transform: translateY(-2px); color: #fff; text-decoration: none; }
-        .jc-rule-box { background: rgba(88, 101, 242, 0.08); padding: 25px; border-radius: 10px; border-left: 4px solid #5865F2; margin-bottom: 20px; }
-        .jc-rule-box h3 { margin: 0 0 15px 0; font-size: 18px; }
-        .jc-rule-box ul { color: #a0a8b8; line-height: 2; margin: 0; padding-left: 25px; }
-        .jc-rule-box ul li strong { color: #dcddde; }
-        .jc-msg { padding: 18px 24px; border-radius: 10px; margin: 20px 0; font-weight: 600; font-size: 15px; }
-        .jc-success { background: rgba(74, 222, 128, 0.12); color: #4ade80; border-left: 4px solid #4ade80; }
-        .jc-error { background: rgba(244, 67, 54, 0.12); color: #f44336; border-left: 4px solid #f44336; }
-        .jc-input:invalid {background-color: #3a3c46 !important; /* dein grauer Hintergrund */border-color: #5a5e69 !important;    /* dezente graue Border */
-}
+        @keyframes jc-fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes jc-slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes jc-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        @keyframes jc-shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        
+        .jc-wrap { 
+            max-width: 900px; 
+            margin: 40px auto; 
+            padding: 40px 20px; 
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+        
+        .jc-card { 
+            background: linear-gradient(135deg, #2a2c36 0%, #1e1f26 100%); 
+            padding: 40px; 
+            border-radius: 14px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.8s ease-out 0.2s both;
+        }
+        
+        .jc-h { 
+            font-size: 32px; 
+            font-weight: 700; 
+            color: #fff; 
+            margin: 0 0 20px 0; 
+            line-height: 1.3;
+            animation: jc-slideIn 0.6s ease-out;
+        }
+        
+        .jc-label { 
+            display: block; 
+            color: #dcddde; 
+            font-weight: 600; 
+            margin: 20px 0 8px; 
+            font-size: 15px;
+        }
+        
+        .jc-input { 
+            width: 100%; 
+            padding: 14px 18px; 
+            background: #1e1f26 !important; 
+            border: 2px solid #3a3c46 !important; 
+            border-radius: 8px; 
+            color: #ffffff !important; 
+            font-size: 16px; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            box-sizing: border-box; 
+            font-family: inherit;
+            -webkit-text-fill-color: #ffffff !important;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .jc-input::placeholder {
+            color: #8a8f9b !important;
+            opacity: 0.7;
+        }
+        
+        .jc-input:focus { 
+            border-color: #5865F2 !important; 
+            outline: none !important; 
+            box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2) !important;
+            transform: translateY(-1px);
+            background: #1e1f26 !important;
+        }
+        
+        .jc-input:invalid {
+            background-color: #1e1f26 !important;
+            border-color: #3a3c46 !important;
+        }
+        
+        .jc-input:valid {
+            background-color: #1e1f26 !important;
+            border-color: #3a3c46 !important;
+        }
+        
+        .jc-btn { 
+            display: inline-flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 10px; 
+            padding: 14px 32px; 
+            background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%); 
+            color: #fff; 
+            border: none; 
+            border-radius: 8px; 
+            font-weight: 700; 
+            font-size: 16px; 
+            cursor: pointer; 
+            text-decoration: none; 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .jc-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .jc-btn:hover::before {
+            left: 100%;
+        }
+        
+        .jc-btn:hover { 
+            background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%); 
+            transform: translateY(-2px); 
+            color: #fff; 
+            text-decoration: none;
+            box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6);
+        }
+        
+        .jc-rule-box { 
+            background: rgba(88, 101, 242, 0.08); 
+            padding: 25px; 
+            border-radius: 10px; 
+            border-left: 4px solid #5865F2; 
+            margin-bottom: 20px;
+            animation: jc-slideIn 0.5s ease-out;
+            transition: all 0.3s ease;
+        }
+        
+        .jc-rule-box:hover {
+            background: rgba(88, 101, 242, 0.12);
+            transform: translateX(5px);
+        }
+        
+        .jc-rule-box h3 { 
+            margin: 0 0 15px 0; 
+            font-size: 18px;
+            animation: jc-fadeIn 0.4s ease-out;
+        }
+        
+        .jc-rule-box ul { 
+            color: #a0a8b8; 
+            line-height: 2; 
+            margin: 0; 
+            padding-left: 25px;
+        }
+        
+        .jc-rule-box ul li { 
+            animation: jc-fadeIn 0.4s ease-out;
+        }
+        
+        .jc-rule-box ul li strong { 
+            color: #dcddde; 
+        }
+        
+        .jc-msg { 
+            padding: 18px 24px; 
+            border-radius: 10px; 
+            margin: 20px 0; 
+            font-weight: 600; 
+            font-size: 15px;
+            animation: jc-fadeIn 0.4s ease-out;
+        }
+        
+        .jc-success { 
+            background: rgba(74, 222, 128, 0.12); 
+            color: #4ade80; 
+            border-left: 4px solid #4ade80; 
+        }
+        
+        .jc-error { 
+            background: rgba(244, 67, 54, 0.12); 
+            color: #f44336; 
+            border-left: 4px solid #f44336; 
+        }
+        
+        input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            accent-color: #5865F2;
+            border-radius: 4px;
+        }
 
         @media (max-width: 768px) {
             .jc-wrap { padding: 20px 15px; }
