@@ -272,13 +272,16 @@ function jc_rules_login_screen() {
     ?>
     <div class="jc-wrap">
         <div class="jc-card" style="text-align: center;">
-            <div style="font-size: 64px; margin-bottom: 20px;">🔒</div>
-            <h2 class="jc-h">Regeln & Richtlinien</h2>
-            <p style="color: #a0a8b8; line-height: 1.8; margin: 20px 0 30px;">
+            <div style="font-size: 64px; margin-bottom: 20px; animation: jc-pulse 2s infinite;">🔒</div>
+            <h2 class="jc-h" style="justify-content: center;">Regeln & Richtlinien</h2>
+            <p style="color: #a0a8b8; line-height: 1.8; margin: 20px 0 30px; font-size: 16px;">
                 Diese Seite ist nur für <strong style="color: #5865F2;">akzeptierte JustCreators Bewerber</strong> zugänglich.<br>
                 Bitte melde dich mit deinem Discord Account an.
             </p>
             <a class="jc-btn" href="<?php echo esc_url( $auth_url ); ?>">
+                <svg style="width: 24px; height: 24px; fill: #fff;" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/>
+                </svg>
                 Mit Discord anmelden
             </a>
         </div>
@@ -290,10 +293,10 @@ function jc_rules_no_application( $discord_name ) {
     ?>
     <div class="jc-wrap">
         <div class="jc-card" style="text-align: center;">
-            <div style="font-size: 64px; margin-bottom: 20px;">📝</div>
-            <h2 class="jc-h">Keine Bewerbung gefunden</h2>
-            <p style="color: #a0a8b8; margin: 20px 0;">
-                Hallo <strong><?php echo $discord_name; ?></strong>,<br>
+            <div style="font-size: 64px; margin-bottom: 20px; animation: jc-pulse 2s infinite;">📝</div>
+            <h2 class="jc-h" style="justify-content: center;">Keine Bewerbung gefunden</h2>
+            <p style="color: #a0a8b8; margin: 20px 0; font-size: 16px; line-height: 1.8;">
+                Hallo <strong style="color: #f0f0f0;"><?php echo $discord_name; ?></strong>,<br>
                 wir konnten keine Bewerbung von dir finden.
             </p>
             <a href="<?php echo home_url( '/bewerbung' ); ?>" class="jc-btn">
@@ -309,21 +312,21 @@ function jc_rules_not_accepted( $app, $discord_name ) {
     <div class="jc-wrap">
         <div class="jc-card" style="text-align: center;">
             <?php if ( $app->status === 'pending' ): ?>
-                <div style="font-size: 64px; margin-bottom: 20px;">⏳</div>
-                <h2 class="jc-h">Bewerbung wird geprüft</h2>
-                <p style="color: #ffa500; font-size: 16px; margin: 20px 0;">
-                    Hallo <strong><?php echo $discord_name; ?></strong>,<br>
+                <div style="font-size: 64px; margin-bottom: 20px; animation: jc-pulse 2s infinite;">⏳</div>
+                <h2 class="jc-h" style="justify-content: center;">Bewerbung wird geprüft</h2>
+                <p style="color: #ffa500; font-size: 16px; margin: 20px 0; line-height: 1.8;">
+                    Hallo <strong style="color: #f0f0f0;"><?php echo $discord_name; ?></strong>,<br>
                     deine Bewerbung wird gerade geprüft.<br>
                     Wir melden uns innerhalb von 1-2 Tagen!
                 </p>
             <?php else: ?>
                 <div style="font-size: 64px; margin-bottom: 20px;">😔</div>
-                <h2 class="jc-h">Bewerbung abgelehnt</h2>
-                <p style="color: #f44336; font-size: 16px; margin: 20px 0;">
+                <h2 class="jc-h" style="justify-content: center;">Bewerbung abgelehnt</h2>
+                <p style="color: #f44336; font-size: 16px; margin: 20px 0; line-height: 1.8;">
                     Leider wurde deine Bewerbung nicht angenommen.
                 </p>
             <?php endif; ?>
-            <a href="<?php echo home_url( '/' ); ?>" class="jc-btn" style="background: rgba(88, 101, 242, 0.2); border: 2px solid #5865F2;">
+            <a href="<?php echo home_url( '/' ); ?>" class="jc-btn" style="background: rgba(88, 101, 242, 0.2) !important; border: 2px solid #5865F2 !important;">
                 🏠 Zur Startseite
             </a>
         </div>
@@ -342,8 +345,8 @@ function jc_rules_form( $discord_name, $member ) {
             </p>
             
             <!-- REGELN -->
-            <div style="background: rgba(0,0,0,0.3); padding: 35px; border-radius: 12px; margin: 30px 0;">
-                <h2 style="color: #5865F2; margin: 0 0 25px 0; font-size: 24px; text-align: center;">
+            <div style="background: rgba(0,0,0,0.3); padding: 35px; border-radius: 12px; margin: 30px 0; animation: jc-fadeIn 0.6s ease-out;">
+                <h2 style="color: #5865F2; margin: 0 0 25px 0; font-size: 24px; text-align: center; font-weight: 700;">
                     📜 JustCreators Season 2 - Regeln
                 </h2>
                 
@@ -387,7 +390,7 @@ function jc_rules_form( $discord_name, $member ) {
             <form method="POST" style="margin-top: 40px;">
                 <?php wp_nonce_field( 'jc_rules_action' ); ?>
                 
-                <div style="background: rgba(88, 101, 242, 0.08); padding: 25px; border-radius: 10px; border: 1px solid rgba(88, 101, 242, 0.2); margin-bottom: 25px;">
+                <div style="background: rgba(88, 101, 242, 0.08); padding: 25px; border-radius: 10px; border: 1px solid rgba(88, 101, 242, 0.2); margin-bottom: 25px; animation: jc-fadeIn 0.6s ease-out;">
                     <label class="jc-label" style="margin-top: 0;">
                         🎮 Dein Minecraft Name (Java Edition) *
                         <input 
@@ -401,18 +404,18 @@ function jc_rules_form( $discord_name, $member ) {
                             value="<?php echo esc_attr( $member->minecraft_name ?? '' ); ?>" 
                             style="margin-top: 10px;"
                         />
-                        <small style="color: #8a8f9b; display: block; margin-top: 10px; line-height: 1.5;">
-                            ⚠️ <strong>Wichtig:</strong> Gib genau den Namen deines Minecraft Java Accounts an!<br>
+                        <small style="color: #a0a8b8; display: block; margin-top: 10px; line-height: 1.5; font-size: 14px;">
+                            ⚠️ <strong style="color: #dcddde;">Wichtig:</strong> Gib genau den Namen deines Minecraft Java Accounts an!<br>
                             Dieser wird auf die Whitelist gesetzt.
                         </small>
                     </label>
                 </div>
                 
-                <label style="display: flex; align-items: flex-start; gap: 15px; margin: 25px 0; cursor: pointer; padding: 20px; background: rgba(244, 67, 54, 0.08); border-radius: 10px; border: 1px solid rgba(244, 67, 54, 0.2);">
+                <label style="display: flex; align-items: flex-start; gap: 15px; margin: 25px 0; cursor: pointer; padding: 20px; background: rgba(244, 67, 54, 0.08); border-radius: 10px; border: 1px solid rgba(244, 67, 54, 0.2); transition: all 0.3s ease; animation: jc-fadeIn 0.6s ease-out;">
                     <input type="checkbox" name="accept_rules" required style="width: 24px; height: 24px; cursor: pointer; margin-top: 2px; flex-shrink: 0;" />
                     <span style="color: #dcddde; font-size: 15px; line-height: 1.7;">
                         <strong style="color: #f44336; font-size: 16px;">Ich habe die Regeln vollständig gelesen und akzeptiere sie</strong><br>
-                        <small style="color: #a0a8b8;">
+                        <small style="color: #a0a8b8; font-size: 14px;">
                             Ich verpflichte mich, die Content-Pflichten einzuhalten und die Regeln zu respektieren.<br>
                             Bei Regelverstößen kann meine Teilnahme beendet werden.
                         </small>
@@ -433,25 +436,25 @@ function jc_rules_discord_invite( $member, $discord_name ) {
     ?>
     <div class="jc-wrap">
         <div class="jc-card" style="text-align: center;">
-            <div style="font-size: 72px; margin-bottom: 20px;">🎉</div>
-            <h1 class="jc-h" style="font-size: 36px;">Willkommen im Projekt!</h1>
+            <div style="font-size: 72px; margin-bottom: 20px; animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);">🎉</div>
+            <h1 class="jc-h" style="font-size: 36px; justify-content: center;">Willkommen im Projekt!</h1>
             <p style="color: #a0a8b8; font-size: 17px; line-height: 1.8; margin: 20px 0 30px;">
-                Danke <strong style="color: #fff;"><?php echo $discord_name; ?></strong>, dass du JustCreators unterstützt!
+                Danke <strong style="color: #f0f0f0;"><?php echo $discord_name; ?></strong>, dass du JustCreators unterstützt!
             </p>
             
             <!-- Profil Info -->
-            <div style="background: rgba(88, 101, 242, 0.08); padding: 30px; border-radius: 12px; border: 2px solid rgba(88, 101, 242, 0.3); margin-bottom: 30px;">
-                <h3 style="margin: 0 0 20px 0; color: #5865F2; font-size: 20px;">✅ Dein Profil</h3>
+            <div style="background: rgba(88, 101, 242, 0.08); padding: 30px; border-radius: 12px; border: 2px solid rgba(88, 101, 242, 0.3); margin-bottom: 30px; animation: jc-fadeIn 0.8s ease-out;">
+                <h3 style="margin: 0 0 20px 0; color: #5865F2; font-size: 20px; font-weight: 700;">✅ Dein Profil</h3>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-                    <div style="background: rgba(255,255,255,0.03); padding: 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: rgba(255,255,255,0.03); padding: 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); animation: jc-slideIn 0.5s ease-out;">
                         <div style="font-size: 13px; color: #a0a8b8; margin-bottom: 6px;">👤 Discord</div>
                         <div style="font-size: 18px; font-weight: 700; color: #dcddde;"><?php echo $discord_name; ?></div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); padding: 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: rgba(255,255,255,0.03); padding: 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); animation: jc-slideIn 0.5s ease-out 0.1s both;">
                         <div style="font-size: 13px; color: #a0a8b8; margin-bottom: 6px;">🎮 Minecraft</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #8a8f9b;"><?php echo esc_html( $member->minecraft_name ); ?></div>
+                        <div style="font-size: 18px; font-weight: 700; color: #dcddde;"><?php echo esc_html( $member->minecraft_name ); ?></div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); padding: 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                    <div style="background: rgba(255,255,255,0.03); padding: 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); animation: jc-slideIn 0.5s ease-out 0.2s both;">
                         <div style="font-size: 13px; color: #a0a8b8; margin-bottom: 6px;">📜 Regeln</div>
                         <div style="font-size: 18px; font-weight: 700; color: #4ade80;">✅ Akzeptiert</div>
                     </div>
@@ -459,8 +462,8 @@ function jc_rules_discord_invite( $member, $discord_name ) {
             </div>
             
             <!-- Discord Invite -->
-            <div style="background: rgba(88, 101, 242, 0.1); padding: 40px; border-radius: 12px; border: 2px solid rgba(88, 101, 242, 0.3); margin-bottom: 25px;">
-                <h3 style="color: #5865F2; margin: 0 0 15px 0; font-size: 24px;">📱 Nächster Schritt</h3>
+            <div style="background: rgba(88, 101, 242, 0.1); padding: 40px; border-radius: 12px; border: 2px solid rgba(88, 101, 242, 0.3); margin-bottom: 25px; animation: jc-fadeIn 0.8s ease-out 0.3s both;">
+                <h3 style="color: #5865F2; margin: 0 0 15px 0; font-size: 24px; font-weight: 700;">📱 Nächster Schritt</h3>
                 <p style="color: #dcddde; line-height: 1.8; margin-bottom: 30px; font-size: 16px;">
                     Klicke auf den Button, um dem <strong>JustCreators Discord Server</strong> beizutreten.<br>
                 </p>
@@ -471,14 +474,17 @@ function jc_rules_discord_invite( $member, $discord_name ) {
                     class="jc-btn" 
                     style="font-size: 18px; padding: 18px 36px; display: inline-flex; box-shadow: 0 6px 20px rgba(88, 101, 242, 0.3);"
                 >
+                    <svg style="width: 24px; height: 24px; fill: #fff;" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/>
+                    </svg>
                     Discord Server beitreten →
                 </a>
             </div>
             
             <!-- Info -->
-            <div style="background: rgba(74, 222, 128, 0.08); padding: 25px; border-radius: 10px; border-left: 4px solid #4ade80; text-align: left;">
-                <h3 style="color: #4ade80; margin: 0 0 15px 0; font-size: 18px;">📋 Was passiert als nächstes?</h3>
-                <ul style="color: #a0a8b8; line-height: 2; margin: 0; padding-left: 25px;">
+            <div style="background: rgba(74, 222, 128, 0.08); padding: 25px; border-radius: 10px; border-left: 4px solid #4ade80; text-align: left; animation: jc-fadeIn 0.8s ease-out 0.4s both;">
+                <h3 style="color: #4ade80; margin: 0 0 15px 0; font-size: 18px; font-weight: 700;">📋 Was passiert als nächstes?</h3>
+                <ul style="color: #a0a8b8; line-height: 2; margin: 0; padding-left: 25px; font-size: 15px;">
                     <li>Du trittst dem Discord Server bei</li>
                     <li>Du bekommst Zugriff auf alle Teilnehmer-Bereiche</li>
                     <li>Minecraft Server-IP und Details findest du im Discord</li>
@@ -654,152 +660,158 @@ function jc_rules_styles() {
             50% { opacity: 0.7; }
         }
         
-        @keyframes jc-shimmer {
-            0% { background-position: -1000px 0; }
-            100% { background-position: 1000px 0; }
+        @keyframes jc-success-pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
         }
         
         .jc-wrap { 
+            background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
             max-width: 900px; 
-            margin: 40px auto; 
-            padding: 40px 20px; 
-            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 50px auto; 
+            padding: 50px; 
+            border-radius: 16px;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
             animation: jc-fadeIn 0.6s ease-out;
         }
         
         .jc-card { 
-            background: linear-gradient(135deg, #2a2c36 0%, #1e1f26 100%); 
-            padding: 40px; 
-            border-radius: 14px; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-            animation: jc-fadeIn 0.8s ease-out 0.2s both;
+            background: #2a2c36 !important;
+            padding: 35px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.8s ease-out 0.2s both !important;
         }
         
         .jc-h { 
-            font-size: 32px; 
+            font-size: 28px;
             font-weight: 700; 
-            color: #fff; 
+            color: #f0f0f0; 
             margin: 0 0 20px 0; 
             line-height: 1.3;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             animation: jc-slideIn 0.6s ease-out;
         }
         
         .jc-label { 
-            display: block; 
-            color: #dcddde; 
-            font-weight: 600; 
-            margin: 20px 0 8px; 
-            font-size: 15px;
+            display: block !important;
+            color: #f0f0f0 !important; 
+            font-weight: 600 !important; 
+            margin: 20px 0 8px !important; 
+            font-size: 15px !important;
         }
         
         .jc-input { 
-            width: 100%; 
-            padding: 14px 18px; 
-            background: #1e1f26 !important; 
-            border: 2px solid #3a3c46 !important; 
-            border-radius: 8px; 
-            color: #ffffff !important; 
-            font-size: 16px; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-            box-sizing: border-box; 
-            font-family: inherit;
+            width: 100% !important;
+            padding: 14px !important;
+            margin-top: 8px !important;
+            background: #3a3c4a !important;
+            border: 2px solid #4a4c5a !important;
+            border-radius: 10px !important;
+            color: #ffffff !important;
             -webkit-text-fill-color: #ffffff !important;
-            -webkit-appearance: none;
-            appearance: none;
+            font-family: inherit !important;
+            font-size: 15px !important;
+            transition: all 0.3s ease !important;
+            box-sizing: border-box !important;
         }
         
         .jc-input::placeholder {
-            color: #8a8f9b !important;
-            opacity: 0.7;
+            color: #a0a8b8 !important;
         }
         
         .jc-input:focus { 
-            border-color: #5865F2 !important; 
-            outline: none !important; 
+            outline: none !important;
+            border-color: #5865F2 !important;
             box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2) !important;
             transform: translateY(-1px);
-            background: #1e1f26 !important;
         }
         
         .jc-input:invalid {
-            background-color: #1e1f26 !important;
-            border-color: #3a3c46 !important;
+            background-color: #3a3c4a !important;
+            border-color: #4a4c5a !important;
         }
         
         .jc-input:valid {
-            background-color: #1e1f26 !important;
-            border-color: #3a3c46 !important;
+            background-color: #3a3c4a !important;
+            border-color: #4a4c5a !important;
         }
         
         .jc-btn { 
-            display: inline-flex; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 10px; 
-            padding: 14px 32px; 
-            background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%); 
-            color: #fff; 
-            border: none; 
-            border-radius: 8px; 
-            font-weight: 700; 
-            font-size: 16px; 
-            cursor: pointer; 
-            text-decoration: none; 
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
-            position: relative;
-            overflow: hidden;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 12px !important;
+            padding: 14px 28px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%) !important;
+            color: #fff !important;
+            text-decoration: none !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            border: none !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4) !important;
+            position: relative !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
         }
         
         .jc-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
+            content: '' !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: -100% !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
+            transition: left 0.5s !important;
         }
         
         .jc-btn:hover::before {
-            left: 100%;
+            left: 100% !important;
         }
         
         .jc-btn:hover { 
-            background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%); 
-            transform: translateY(-2px); 
-            color: #fff; 
-            text-decoration: none;
-            box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6);
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6) !important;
+            background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%) !important;
+            color: #fff !important;
+            text-decoration: none !important;
         }
         
         .jc-rule-box { 
-            background: rgba(88, 101, 242, 0.08); 
-            padding: 25px; 
-            border-radius: 10px; 
-            border-left: 4px solid #5865F2; 
-            margin-bottom: 20px;
+            background: rgba(88, 101, 242, 0.08) !important;
+            padding: 25px !important;
+            border-radius: 10px !important;
+            border-left: 4px solid #5865F2 !important;
+            margin-bottom: 20px !important;
             animation: jc-slideIn 0.5s ease-out;
-            transition: all 0.3s ease;
+            transition: all 0.3s ease !important;
         }
         
         .jc-rule-box:hover {
-            background: rgba(88, 101, 242, 0.12);
-            transform: translateX(5px);
+            background: rgba(88, 101, 242, 0.12) !important;
+            transform: translateX(5px) !important;
         }
         
         .jc-rule-box h3 { 
-            margin: 0 0 15px 0; 
-            font-size: 18px;
+            margin: 0 0 15px 0 !important;
+            font-size: 18px !important;
+            color: #dcddde !important;
             animation: jc-fadeIn 0.4s ease-out;
         }
         
         .jc-rule-box ul { 
-            color: #a0a8b8; 
-            line-height: 2; 
-            margin: 0; 
-            padding-left: 25px;
+            color: #a0a8b8 !important;
+            line-height: 2 !important;
+            margin: 0 !important;
+            padding-left: 25px !important;
         }
         
         .jc-rule-box ul li { 
@@ -807,42 +819,49 @@ function jc_rules_styles() {
         }
         
         .jc-rule-box ul li strong { 
-            color: #dcddde; 
+            color: #dcddde !important;
         }
         
         .jc-msg { 
-            padding: 18px 24px; 
-            border-radius: 10px; 
-            margin: 20px 0; 
-            font-weight: 600; 
-            font-size: 15px;
+            padding: 18px 24px !important;
+            border-radius: 10px !important;
+            margin: 20px 0 !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
             animation: jc-fadeIn 0.4s ease-out;
         }
         
         .jc-success { 
-            background: rgba(74, 222, 128, 0.12); 
-            color: #4ade80; 
-            border-left: 4px solid #4ade80; 
+            background: rgba(74, 222, 128, 0.12) !important;
+            color: #4ade80 !important;
+            border-left: 4px solid #4ade80 !important;
         }
         
         .jc-error { 
-            background: rgba(244, 67, 54, 0.12); 
-            color: #f44336; 
-            border-left: 4px solid #f44336; 
+            background: rgba(244, 67, 54, 0.12) !important;
+            color: #f44336 !important;
+            border-left: 4px solid #f44336 !important;
         }
         
         input[type="checkbox"] {
-            width: 24px;
-            height: 24px;
-            cursor: pointer;
-            accent-color: #5865F2;
-            border-radius: 4px;
+            width: 24px !important;
+            height: 24px !important;
+            cursor: pointer !important;
+            accent-color: #5865F2 !important;
+            border-radius: 4px !important;
         }
 
         @media (max-width: 768px) {
-            .jc-wrap { padding: 20px 15px; }
-            .jc-card { padding: 25px 20px; }
-            .jc-h { font-size: 24px; }
+            .jc-wrap { 
+                padding: 30px 20px !important;
+                margin: 20px auto !important;
+            }
+            .jc-card { 
+                padding: 25px 20px !important;
+            }
+            .jc-h { 
+                font-size: 24px !important;
+            }
         }
     </style>
     <?php
