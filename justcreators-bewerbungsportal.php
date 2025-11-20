@@ -2224,52 +2224,52 @@ function jc_admin_bewerbungen_page() {
     $accepted = count(array_filter($rows, function($r) { return $r->status === 'accepted'; }));
     $rejected = count(array_filter($rows, function($r) { return $r->status === 'rejected'; }));
    
-    echo '<div class="wrap">';
-    echo '<h1 style="display: flex; align-items: center; gap: 10px;">🎮 Bewerbungen <span class="count">(' . $total . ')</span></h1>';
-   
+    echo '<div class="wrap jc-admin-wrap">';
+    echo '<h1 class="jc-admin-title">🎮 Bewerbungen <span class="jc-count-badge">' . $total . '</span></h1>';
+    
     // Statistik-Boxen
-    echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin: 20px 0 30px 0;">';
-   
-    echo '<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px; border-radius: 12px; color: #fff; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">';
-    echo '<div style="font-size: 42px; font-weight: 700; margin-bottom: 8px;">' . $total . '</div>';
-    echo '<div style="font-size: 15px; opacity: 0.9;">📊 Gesamt</div>';
+    echo '<div class="jc-stats-grid">';
+    
+    echo '<div class="jc-stat-card jc-stat-total">';
+    echo '<div class="jc-stat-number">' . $total . '</div>';
+    echo '<div class="jc-stat-label">📊 Gesamt</div>';
     echo '</div>';
-   
-    echo '<div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 25px; border-radius: 12px; color: #fff; box-shadow: 0 4px 15px rgba(240, 147, 251, 0.3);">';
-    echo '<div style="font-size: 42px; font-weight: 700; margin-bottom: 8px;">⏳ ' . $pending . '</div>';
-    echo '<div style="font-size: 15px; opacity: 0.9;">In Bearbeitung</div>';
+    
+    echo '<div class="jc-stat-card jc-stat-pending">';
+    echo '<div class="jc-stat-number">⏳ ' . $pending . '</div>';
+    echo '<div class="jc-stat-label">In Bearbeitung</div>';
     echo '</div>';
-   
-    echo '<div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 25px; border-radius: 12px; color: #fff; box-shadow: 0 4px 15px rgba(79, 172, 254, 0.3);">';
-    echo '<div style="font-size: 42px; font-weight: 700; margin-bottom: 8px;">✅ ' . $accepted . '</div>';
-    echo '<div style="font-size: 15px; opacity: 0.9;">Angenommen</div>';
+    
+    echo '<div class="jc-stat-card jc-stat-accepted">';
+    echo '<div class="jc-stat-number">✅ ' . $accepted . '</div>';
+    echo '<div class="jc-stat-label">Angenommen</div>';
     echo '</div>';
-   
-    echo '<div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); padding: 25px; border-radius: 12px; color: #fff; box-shadow: 0 4px 15px rgba(250, 112, 154, 0.3);">';
-    echo '<div style="font-size: 42px; font-weight: 700; margin-bottom: 8px;">❌ ' . $rejected . '</div>';
-    echo '<div style="font-size: 15px; opacity: 0.9;">Abgelehnt</div>';
+    
+    echo '<div class="jc-stat-card jc-stat-rejected">';
+    echo '<div class="jc-stat-number">❌ ' . $rejected . '</div>';
+    echo '<div class="jc-stat-label">Abgelehnt</div>';
     echo '</div>';
-   
+    
     echo '</div>';
    
     if ( empty( $rows ) ) {
-        echo '<div style="background:#fff;padding:60px;text-align:center;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">';
-        echo '<div style="font-size: 64px; margin-bottom: 20px;">📭</div>';
-        echo '<h2 style="color: #666; margin: 0 0 10px 0;">Keine Bewerbungen vorhanden</h2>';
-        echo '<p style="color: #999;">Sobald jemand sich bewirbt, erscheint die Bewerbung hier.</p>';
+        echo '<div class="jc-empty-state">';
+        echo '<div class="jc-empty-icon">📭</div>';
+        echo '<h2 class="jc-empty-title">Keine Bewerbungen vorhanden</h2>';
+        echo '<p class="jc-empty-desc">Sobald jemand sich bewirbt, erscheint die Bewerbung hier.</p>';
         echo '</div>';
     } else {
-        echo '<div style="background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">';
-        echo '<table class="wp-list-table widefat striped" style="border: none; margin: 0;"><thead><tr style="background: #f8f9fa;">';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">👤 Discord</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">📝 Name</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">🎂 Alter</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">🌐 Social</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">📊 Aktivität</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">💭 Motivation</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">📅 Datum</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600; min-width: 180px;">🏷️ Status</th>';
-        echo '<th style="padding: 15px 12px; font-weight: 600;">⚙️</th>';
+        echo '<div class="jc-table-wrapper">';
+        echo '<table class="jc-applications-table"><thead><tr>';
+        echo '<th>👤 Discord</th>';
+        echo '<th>📝 Name</th>';
+        echo '<th>🎂 Alter</th>';
+        echo '<th>🌐 Social</th>';
+        echo '<th>📊 Aktivität</th>';
+        echo '<th>💭 Motivation</th>';
+        echo '<th>📅 Datum</th>';
+        echo '<th class="jc-status-col">🏷️ Status</th>';
+        echo '<th>⚙️</th>';
         echo '</tr></thead><tbody>';
        
         foreach ( $rows as $r ) {
@@ -2295,30 +2295,31 @@ function jc_admin_bewerbungen_page() {
                 $social_display = esc_html( $r->social_channels );
             }
            
-            echo '<tr style="border-bottom: 1px solid #f0f0f1;">';
-            echo '<td style="padding: 15px 12px; vertical-align: top;"><strong style="color: #2c3e50;">' . esc_html( $r->discord_name ) . '</strong><br><small style="color: #95a5a6; font-family: monospace;">' . esc_html( $r->discord_id ) . '</small></td>';
-            echo '<td style="padding: 15px 12px; vertical-align: top;"><strong>' . esc_html( $r->applicant_name ) . '</strong></td>';
-            echo '<td style="padding: 15px 12px; vertical-align: top;">' . esc_html( $r->age ) . '</td>';
-            echo '<td style="padding: 15px 12px; vertical-align: top;"><small style="line-height: 1.6;">' . $social_display . '</small></td>';
-            echo '<td style="padding: 15px 12px; vertical-align: top;">' . esc_html( $r->social_activity ) . '</td>';
-            echo '<td style="padding: 15px 12px; vertical-align: top;"><div style="max-height: 80px; overflow: auto; font-size: 13px; line-height: 1.5; color: #555;">' . esc_html( substr($r->motivation, 0, 15) ) . (strlen($r->motivation) > 15 ? '...' : '') . '</div></td>';
-            echo '<td style="padding: 15px 12px; vertical-align: top;"><small style="color: #666;">' . esc_html( date_i18n( 'd.m.Y', strtotime( $r->created_at ) ) ) . '<br>' . esc_html( date_i18n( 'H:i', strtotime( $r->created_at ) ) ) . ' Uhr</small></td>';
-           
+            $status_class = 'jc-status-' . $r->status;
+            echo '<tr class="jc-table-row ' . $status_class . '">';
+            echo '<td class="jc-cell-discord"><strong class="jc-discord-name">' . esc_html( $r->discord_name ) . '</strong><br><small class="jc-discord-id">' . esc_html( $r->discord_id ) . '</small></td>';
+            echo '<td class="jc-cell-name"><strong>' . esc_html( $r->applicant_name ) . '</strong></td>';
+            echo '<td class="jc-cell-age">' . esc_html( $r->age ) . '</td>';
+            echo '<td class="jc-cell-social"><small>' . $social_display . '</small></td>';
+            echo '<td class="jc-cell-activity">' . esc_html( $r->social_activity ) . '</td>';
+            echo '<td class="jc-cell-motivation"><div class="jc-motivation-preview">' . esc_html( substr($r->motivation, 0, 15) ) . (strlen($r->motivation) > 15 ? '...' : '') . '</div></td>';
+            echo '<td class="jc-cell-date"><small>' . esc_html( date_i18n( 'd.m.Y', strtotime( $r->created_at ) ) ) . '<br>' . esc_html( date_i18n( 'H:i', strtotime( $r->created_at ) ) ) . ' Uhr</small></td>';
+            
             // STATUS ÄNDERN DROPDOWN
-            echo '<td style="padding: 15px 12px; vertical-align: top;">';
-            echo '<form method="POST" style="display: inline-block;">';
+            echo '<td class="jc-cell-status">';
+            echo '<form method="POST" class="jc-status-form">';
             wp_nonce_field( 'jc_change_status_' . $r->id );
             echo '<input type="hidden" name="application_id" value="' . esc_attr( $r->id ) . '" />';
-            echo '<select name="new_status" style="padding: 6px 10px; border-radius: 6px; border: 2px solid #ddd; font-weight: 600; margin-bottom: 5px; width: 100%;">';
+            echo '<select name="new_status" class="jc-status-select">';
             echo '<option value="pending" ' . selected( $r->status, 'pending', false ) . '>⏳ In Bearbeitung</option>';
             echo '<option value="accepted" ' . selected( $r->status, 'accepted', false ) . '>✅ Angenommen</option>';
             echo '<option value="rejected" ' . selected( $r->status, 'rejected', false ) . '>❌ Abgelehnt</option>';
-            echo '</select><br>';
-            echo '<button type="submit" name="jc_change_status" class="button button-primary button-small" style="width: 100%; font-weight: 600;">💾 Speichern</button>';
+            echo '</select>';
+            echo '<button type="submit" name="jc_change_status" class="jc-save-btn">💾 Speichern</button>';
             echo '</form>';
             echo '</td>';
-           
-            echo '<td style="padding: 15px 12px; vertical-align: top;"><a href="' . esc_url( $delete_url ) . '" class="button button-small" onclick="return confirm(\'⚠️ Wirklich löschen?\\n\\nDies entfernt auch den Discord Post!\');" style="background: #e74c3c; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; font-weight: 600; transition: all 0.3s;">🗑️</a></td>';
+            
+            echo '<td class="jc-cell-actions"><a href="' . esc_url( $delete_url ) . '" class="jc-delete-btn" onclick="return confirm(\'⚠️ Wirklich löschen?\\n\\nDies entfernt auch den Discord Post!\');">🗑️</a></td>';
             echo '</tr>';
         }
        
@@ -2330,20 +2331,316 @@ function jc_admin_bewerbungen_page() {
    
     // CSS für die Admin-Seite
     echo '<style>
-        .wp-list-table th {
-            border-bottom: 2px solid #e1e8ed !important;
+        @keyframes jc-fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .wp-list-table tbody tr:hover {
-            background-color: #f8f9fa !important;
+        
+        @keyframes jc-slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
         }
-        .button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        
+        .jc-admin-wrap {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, Helvetica, sans-serif;
+            background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+            padding: 30px;
+            margin: 20px 20px 0 0;
+            border-radius: 16px;
+            min-height: calc(100vh - 100px);
         }
-        select:focus {
+        
+        .jc-admin-title {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 32px;
+            font-weight: 700;
+            color: #f0f0f0;
+            margin: 0 0 30px 0;
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+        
+        .jc-count-badge {
+            background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 18px;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
+        }
+        
+        .jc-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin: 0 0 30px 0;
+        }
+        
+        .jc-stat-card {
+            background: #2a2c36;
+            padding: 25px;
+            border-radius: 14px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: jc-fadeIn 0.6s ease-out;
+            border-left: 4px solid;
+        }
+        
+        .jc-stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        }
+        
+        .jc-stat-total {
+            border-left-color: #5865F2;
+            background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, #2a2c36 100%);
+        }
+        
+        .jc-stat-pending {
+            border-left-color: #ffc107;
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, #2a2c36 100%);
+        }
+        
+        .jc-stat-accepted {
+            border-left-color: #4ade80;
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, #2a2c36 100%);
+        }
+        
+        .jc-stat-rejected {
+            border-left-color: #f44336;
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, #2a2c36 100%);
+        }
+        
+        .jc-stat-number {
+            font-size: 42px;
+            font-weight: 700;
+            color: #f0f0f0;
+            margin-bottom: 8px;
+        }
+        
+        .jc-stat-label {
+            font-size: 15px;
+            color: #a0a8b8;
+            font-weight: 600;
+        }
+        
+        .jc-empty-state {
+            background: #2a2c36;
+            padding: 60px;
+            text-align: center;
+            border-radius: 14px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+        
+        .jc-empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: jc-fadeIn 0.8s ease-out;
+        }
+        
+        .jc-empty-title {
+            color: #f0f0f0;
+            margin: 0 0 10px 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .jc-empty-desc {
+            color: #a0a8b8;
+            font-size: 16px;
+        }
+        
+        .jc-table-wrapper {
+            background: #2a2c36;
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.8s ease-out;
+        }
+        
+        .jc-applications-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0;
+        }
+        
+        .jc-applications-table thead {
+            background: rgba(88, 101, 242, 0.1);
+        }
+        
+        .jc-applications-table th {
+            padding: 18px 15px;
+            font-weight: 700;
+            color: #f0f0f0;
+            font-size: 14px;
+            text-align: left;
+            border-bottom: 2px solid rgba(88, 101, 242, 0.3);
+        }
+        
+        .jc-applications-table tbody tr {
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .jc-applications-table tbody tr:hover {
+            background: rgba(88, 101, 242, 0.05);
+            transform: scale(1.01);
+        }
+        
+        .jc-table-row.jc-status-pending {
+            border-left: 3px solid #ffc107;
+        }
+        
+        .jc-table-row.jc-status-accepted {
+            border-left: 3px solid #4ade80;
+        }
+        
+        .jc-table-row.jc-status-rejected {
+            border-left: 3px solid #f44336;
+        }
+        
+        .jc-applications-table td {
+            padding: 18px 15px;
+            vertical-align: top;
+            color: #dcddde;
+            font-size: 14px;
+        }
+        
+        .jc-cell-discord {
+            min-width: 200px;
+        }
+        
+        .jc-discord-name {
+            color: #f0f0f0;
+            font-size: 15px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .jc-discord-id {
+            color: #8a8f9b;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .jc-cell-name strong {
+            color: #f0f0f0;
+            font-size: 15px;
+        }
+        
+        .jc-cell-age {
+            color: #dcddde;
+        }
+        
+        .jc-cell-social small {
+            color: #a0a8b8;
+            line-height: 1.8;
+            display: block;
+        }
+        
+        .jc-cell-activity {
+            color: #dcddde;
+        }
+        
+        .jc-motivation-preview {
+            color: #a0a8b8;
+            font-size: 13px;
+            font-style: italic;
+        }
+        
+        .jc-cell-date small {
+            color: #8a8f9b;
+            font-size: 12px;
+        }
+        
+        .jc-status-col {
+            min-width: 180px;
+        }
+        
+        .jc-status-form {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .jc-status-select {
+            padding: 10px 12px;
+            background: #3a3c4a;
+            border: 2px solid #4a4c5a;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 13px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 35px;
+        }
+        
+        .jc-status-select:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+            border-color: #5865F2;
+            box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2);
+        }
+        
+        .jc-save-btn {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(88, 101, 242, 0.3);
+            width: 100%;
+        }
+        
+        .jc-save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.5);
+            background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%);
+        }
+        
+        .jc-delete-btn {
+            display: inline-block;
+            padding: 10px 14px;
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(244, 67, 54, 0.3);
+            cursor: pointer;
+        }
+        
+        .jc-delete-btn:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.5);
+            background: linear-gradient(135deg, #ff5252 0%, #f44336 100%);
+        }
+        
+        @media (max-width: 1200px) {
+            .jc-applications-table {
+                font-size: 12px;
+            }
+            
+            .jc-applications-table th,
+            .jc-applications-table td {
+                padding: 12px 10px;
+            }
         }
     </style>';
 }
