@@ -69,6 +69,18 @@ add_action('rest_api_init', function() {
         'callback' => 'jc_handle_status_sync',
         'permission_callback' => 'jc_verify_api_secret'
     ));
+    
+    register_rest_route('jc/v1', '/check-discord-join', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_check_discord_join',
+        'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
+    ));
+    
+    register_rest_route('jc/v1', '/send-application', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_send_application',
+        'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
+    ));
 });
 function jc_handle_status_sync( $request ) {
     $params = $request->get_json_params();
@@ -181,21 +193,108 @@ function jc_update_application_status( $discord_id, $status ) {
 function jc_get_application_status( $discord_id ) {
     global $wpdb;
     $table = $wpdb->prefix . 'jc_discord_applications';
-   
+    
     error_log( "JC DB: Fetching status for Discord ID: {$discord_id}" );
-   
+    
     $result = $wpdb->get_row( $wpdb->prepare(
         "SELECT status, applicant_name, created_at, forum_post_id FROM {$table} WHERE discord_id = %s",
         $discord_id
     ) );
-   
+    
     if ( $result ) {
         error_log( "JC DB: Found application with status: {$result->status}" );
     } else {
         error_log( "JC DB: No application found for Discord ID: {$discord_id}" );
     }
-   
+    
     return $result;
+}
+function jc_handle_check_discord_join( $request ) {
+    $params = $request->get_json_params();
+    
+    if ( empty( $params['discord_id'] ) ) {
+        return new WP_Error( 'missing_params', 'discord_id erforderlich', array( 'status' => 400 ) );
+    }
+    
+    $discord_id = sanitize_text_field( $params['discord_id'] );
+    
+    // Prüfe ob User in Session ist (Sicherheit)
+    if ( ! isset( $_SESSION['jc_discord_user'] ) || $_SESSION['jc_discord_user']['id'] !== $discord_id ) {
+        return new WP_Error( 'unauthorized', 'Nicht autorisiert', array( 'status' => 401 ) );
+    }
+    
+    $check_result = jc_check_user_on_temp_server( $discord_id );
+    
+    return array(
+        'success' => $check_result['success'],
+        'is_on_temp_server' => $check_result['is_on_temp_server']
+    );
+}
+function jc_handle_send_application( $request ) {
+    $params = $request->get_json_params();
+    
+    if ( empty( $params['discord_id'] ) ) {
+        return new WP_Error( 'missing_params', 'discord_id erforderlich', array( 'status' => 400 ) );
+    }
+    
+    $discord_id = sanitize_text_field( $params['discord_id'] );
+    
+    // Prüfe ob User in Session ist (Sicherheit)
+    if ( ! isset( $_SESSION['jc_discord_user'] ) || $_SESSION['jc_discord_user']['id'] !== $discord_id ) {
+        return new WP_Error( 'unauthorized', 'Nicht autorisiert', array( 'status' => 401 ) );
+    }
+    
+    // Prüfe ob User wirklich auf Temp-Server ist
+    $check_result = jc_check_user_on_temp_server( $discord_id );
+    if ( ! $check_result['success'] || ! $check_result['is_on_temp_server'] ) {
+        return new WP_Error( 'not_on_server', 'User ist nicht auf dem temporären Server', array( 'status' => 400 ) );
+    }
+    
+    // Prüfe ob Bewerbung bereits an Bot gesendet wurde
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+    $existing = $wpdb->get_row( $wpdb->prepare(
+        "SELECT id, forum_post_id FROM {$table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+    
+    if ( ! $existing ) {
+        return new WP_Error( 'not_found', 'Bewerbung nicht gefunden', array( 'status' => 404 ) );
+    }
+    
+    if ( ! empty( $existing->forum_post_id ) ) {
+        // Bereits gesendet
+        return array(
+            'success' => true,
+            'message' => 'Bewerbung wurde bereits verarbeitet',
+            'already_sent' => true
+        );
+    }
+    
+    // Bewerbung an Bot senden
+    $bot_result = jc_send_application_to_bot( $params );
+    
+    if ( $bot_result['success'] && isset( $bot_result['data']['post_id'] ) ) {
+        $wpdb->update( 
+            $table, 
+            array( 'forum_post_id' => $bot_result['data']['post_id'] ), 
+            array( 'id' => $existing->id ), 
+            array( '%s' ), 
+            array( '%d' ) 
+        );
+        
+        // Session aufräumen
+        unset( $_SESSION['jc_pending_application'] );
+        unset( $_SESSION['jc_discord_user'] );
+        
+        return array(
+            'success' => true,
+            'message' => 'Bewerbung erfolgreich verarbeitet',
+            'post_id' => $bot_result['data']['post_id']
+        );
+    }
+    
+    return new WP_Error( 'bot_error', $bot_result['message'] ?? 'Fehler beim Senden an Bot', array( 'status' => 500 ) );
 }
 // ========================================
 // ADMIN EINSTELLUNGEN
@@ -508,42 +607,73 @@ function jc_delete_discord_post( $post_id ) {
 function jc_test_bot_connection() {
     $api_url = jc_get_bot_api_url();
     $api_secret = jc_get_bot_api_secret();
-   
+    
     if ( empty( $api_url ) || empty( $api_secret ) ) {
         return array(
             'success' => false,
             'message' => '⚠️ Bot API URL oder Secret nicht konfiguriert'
         );
     }
-   
+    
     $response = wp_remote_get( $api_url . '/api/health', array(
         'headers' => array(
             'Authorization' => 'Bearer ' . $api_secret,
         ),
         'timeout' => 10
     ) );
-   
+    
     if ( is_wp_error( $response ) ) {
         return array(
             'success' => false,
             'message' => '❌ Bot nicht erreichbar: ' . $response->get_error_message()
         );
     }
-   
+    
     $response_code = wp_remote_retrieve_response_code( $response );
     $response_body = json_decode( wp_remote_retrieve_body( $response ), true );
-   
+    
     if ( $response_code === 200 && isset( $response_body['status'] ) ) {
         return array(
             'success' => true,
             'message' => '✅ Bot ist online und bereit! (' . $response_body['bot_username'] . ')'
         );
     }
-   
+    
     return array(
         'success' => false,
         'message' => '❌ Bot antwortet nicht korrekt (Code: ' . $response_code . ')'
     );
+}
+function jc_check_user_on_temp_server( $discord_id ) {
+    $api_url = jc_get_bot_api_url();
+    $api_secret = jc_get_bot_api_secret();
+    
+    if ( empty( $api_url ) || empty( $api_secret ) ) {
+        return array( 'success' => false, 'is_on_temp_server' => false );
+    }
+    
+    $response = wp_remote_get( $api_url . '/api/check-user/' . urlencode( $discord_id ), array(
+        'headers' => array(
+            'Authorization' => 'Bearer ' . $api_secret,
+        ),
+        'timeout' => 10
+    ) );
+    
+    if ( is_wp_error( $response ) ) {
+        return array( 'success' => false, 'is_on_temp_server' => false );
+    }
+    
+    $response_code = wp_remote_retrieve_response_code( $response );
+    $response_body = json_decode( wp_remote_retrieve_body( $response ), true );
+    
+    if ( $response_code === 200 && isset( $response_body['is_on_temp_server'] ) ) {
+        return array(
+            'success' => true,
+            'is_on_temp_server' => (bool) $response_body['is_on_temp_server']
+        );
+    }
+    
+    return array( 'success' => false, 'is_on_temp_server' => false );
 }
 // ========================================
 // BEWERBUNGSFORMULAR SHORTCODE
@@ -573,7 +703,18 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
         }
-       
+        
+        @keyframes jc-dot-bounce {
+            0%, 80%, 100% { 
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% { 
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
         .jc-bewerbung-wrap {
             background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
             color: #e1e3e8;
@@ -958,6 +1099,92 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2) !important;
         }
         
+        .jc-waiting-screen {
+            background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+            color: #e1e3e8;
+            padding: 50px;
+            border-radius: 16px;
+            max-width: 900px;
+            margin: 50px auto;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+        
+        .jc-waiting-content {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .jc-waiting-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: jc-pulse 2s infinite;
+        }
+        
+        .jc-waiting-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #f0f0f0;
+        }
+        
+        .jc-waiting-desc {
+            font-size: 17px;
+            color: #a0a8b8;
+            line-height: 1.8;
+            margin: 15px 0 30px;
+        }
+        
+        .jc-waiting-animation {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin: 30px 0;
+        }
+        
+        .jc-dot {
+            width: 12px;
+            height: 12px;
+            background: #5865F2;
+            border-radius: 50%;
+            animation: jc-dot-bounce 1.4s infinite ease-in-out;
+        }
+        
+        .jc-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        
+        .jc-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        
+        .jc-dot:nth-child(3) {
+            animation-delay: 0s;
+        }
+        
+        .jc-discord-invite-box {
+            margin: 30px 0;
+        }
+        
+        .jc-waiting-btn {
+            font-size: 18px;
+            padding: 16px 32px;
+            margin: 20px 0;
+        }
+        
+        .jc-waiting-hint {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(88, 101, 242, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid #5865F2;
+            color: #a0a8b8;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
         @media (max-width: 768px) {
             .jc-bewerbung-wrap {
                 padding: 30px 20px !important;
@@ -974,6 +1201,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
            
             .jc-social-field-group {
                 flex-direction: column !important;
+            }
+            
+            .jc-waiting-screen {
+                padding: 30px 20px !important;
+                margin: 20px auto !important;
+            }
+            
+            .jc-waiting-title {
+                font-size: 24px !important;
+            }
+            
+            .jc-waiting-icon {
+                font-size: 64px !important;
             }
         }
     </style>
@@ -1177,9 +1417,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     if ( empty( $validation_errors ) ) {
                         global $wpdb;
                         $table = $wpdb->prefix . 'jc_discord_applications';
-                       
+                        
                         $social_channels_json = wp_json_encode( $social_channels );
-                       
+                        
                         $inserted = $wpdb->insert( $table, array(
                             'discord_id' => $discord_id,
                             'discord_name' => $discord_display,
@@ -1190,9 +1430,12 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             'motivation' => $motivation,
                             'status' => 'pending'
                         ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
-                       
+                        
                         if ( $inserted ) {
-                            $bot_result = jc_send_application_to_bot( array(
+                            // Bewerbung in DB gespeichert, jetzt auf Discord-Join warten
+                            $form_submitted = true;
+                            $waiting_for_discord = true;
+                            $application_data = array(
                                 'discord_id' => $discord_id,
                                 'discord_name' => $discord_display,
                                 'applicant_name' => $applicant_name,
@@ -1201,14 +1444,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 'social_activity' => $social_activity,
                                 'motivation' => $motivation,
                                 'database_id' => $wpdb->insert_id
-                            ) );
-                           
-                            if ( $bot_result['success'] && isset( $bot_result['data']['post_id'] ) ) {
-                                $wpdb->update( $table, array( 'forum_post_id' => $bot_result['data']['post_id'] ), array( 'id' => $wpdb->insert_id ), array( '%s' ), array( '%d' ) );
-                            }
-                           
-                            $form_submitted = true;
-                            unset( $_SESSION['jc_discord_user'] );
+                            );
+                            // In Session speichern für späteren Bot-Call
+                            $_SESSION['jc_pending_application'] = $application_data;
                         }
                     }
                 }
@@ -1220,7 +1458,172 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 }
             }
            
-            if ( $form_submitted ) {
+            if ( $form_submitted && isset( $waiting_for_discord ) && $waiting_for_discord ) {
+                // Warte-Screen mit Animation
+                ?>
+                <div class="jc-waiting-screen">
+                    <div class="jc-waiting-content">
+                        <div class="jc-waiting-icon">🔗</div>
+                        <h2 class="jc-waiting-title">Warte auf Discord-Join</h2>
+                        <p class="jc-waiting-desc">
+                            Bitte join unserem temporären Discord-Server, damit wir deine Bewerbung weiterverarbeiten können.
+                        </p>
+                        
+                        <div class="jc-waiting-animation">
+                            <span class="jc-dot"></span>
+                            <span class="jc-dot"></span>
+                            <span class="jc-dot"></span>
+                        </div>
+                        
+                        <div class="jc-discord-invite-box">
+                            <a href="<?php echo esc_url( JC_TEMP_DISCORD_INVITE ); ?>" target="_blank" class="jc-discord-btn jc-waiting-btn">
+                                <svg class="jc-discord-logo" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/>
+                                </svg>
+                                Discord Server beitreten
+                            </a>
+                        </div>
+                        
+                        <p class="jc-waiting-hint">
+                            <small>💡 Tipp: Öffne den Link in einem neuen Tab und join dem Server. Diese Seite prüft automatisch, ob du beigetreten bist.</small>
+                        </p>
+                    </div>
+                </div>
+                
+                <script>
+                (function() {
+                    const discordId = '<?php echo esc_js( $discord_id ); ?>';
+                    const applicationData = <?php echo wp_json_encode( $application_data ); ?>;
+                    let checkCount = 0;
+                    const maxChecks = 300; // 5 Minuten (300 * 1 Sekunde)
+                    
+                    function checkDiscordJoin() {
+                        checkCount++;
+                        
+                        if (checkCount > maxChecks) {
+                            document.querySelector('.jc-waiting-content').innerHTML = `
+                                <div class="jc-waiting-icon" style="font-size: 64px;">⏱️</div>
+                                <h2 class="jc-waiting-title">Zeitüberschreitung</h2>
+                                <p class="jc-waiting-desc">
+                                    Die Wartezeit ist abgelaufen. Bitte lade die Seite neu und versuche es erneut.
+                                </p>
+                                <a href="<?php echo esc_url( remove_query_arg( 'jc_waiting' ) ); ?>" class="jc-discord-btn">
+                                    Seite neu laden
+                                </a>
+                            `;
+                            return;
+                        }
+                        
+                        fetch('<?php echo esc_url( rest_url( 'jc/v1/check-discord-join' ) ); ?>', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                discord_id: discordId
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.is_on_temp_server) {
+                                // User ist auf Temp-Server! Bewerbung an Bot senden
+                                sendApplicationToBot();
+                            } else {
+                                // Noch nicht auf Server, weiter warten
+                                setTimeout(checkDiscordJoin, 2000); // Alle 2 Sekunden prüfen
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error checking Discord join:', error);
+                            setTimeout(checkDiscordJoin, 3000); // Bei Fehler alle 3 Sekunden
+                        });
+                    }
+                    
+                    function sendApplicationToBot() {
+                        // Zeige "Verarbeite Bewerbung..." Nachricht
+                        document.querySelector('.jc-waiting-content').innerHTML = `
+                            <div class="jc-waiting-icon" style="font-size: 64px;">⚙️</div>
+                            <h2 class="jc-waiting-title">Verarbeite Bewerbung</h2>
+                            <p class="jc-waiting-desc">
+                                Perfekt! Du bist auf dem Server. Deine Bewerbung wird jetzt verarbeitet...
+                            </p>
+                            <div class="jc-waiting-animation">
+                                <span class="jc-dot"></span>
+                                <span class="jc-dot"></span>
+                                <span class="jc-dot"></span>
+                            </div>
+                        `;
+                        
+                        fetch('<?php echo esc_url( rest_url( 'jc/v1/send-application' ) ); ?>', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(applicationData)
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Erfolg! Zeige Erfolgsmeldung
+                                showSuccessMessage();
+                            } else {
+                                // Fehler
+                                document.querySelector('.jc-waiting-content').innerHTML = `
+                                    <div class="jc-error" style="margin: 20px 0;">
+                                        ❌ Fehler beim Verarbeiten der Bewerbung: ${data.message || 'Unbekannter Fehler'}
+                                    </div>
+                                    <a href="<?php echo esc_url( remove_query_arg( 'jc_waiting' ) ); ?>" class="jc-discord-btn">
+                                        Seite neu laden
+                                    </a>
+                                `;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error sending application:', error);
+                            document.querySelector('.jc-waiting-content').innerHTML = `
+                                <div class="jc-error" style="margin: 20px 0;">
+                                    ❌ Fehler beim Senden der Bewerbung. Bitte versuche es erneut.
+                                </div>
+                                <a href="<?php echo esc_url( remove_query_arg( 'jc_waiting' ) ); ?>" class="jc-discord-btn">
+                                    Seite neu laden
+                                </a>
+                            `;
+                        });
+                    }
+                    
+                    function showSuccessMessage() {
+                        document.querySelector('.jc-waiting-screen').innerHTML = `
+                            <div class="jc-success">
+                                <div class="jc-success-icon">
+                                    <svg viewBox="0 0 100 100">
+                                        <circle cx="50" cy="50" r="45"/>
+                                        <path d="M30 50 L45 65 L70 35" fill="none"/>
+                                    </svg>
+                                </div>
+                                <h3>🎉 Bewerbung erfolgreich!</h3>
+                                <p><strong>Vielen Dank für deine Bewerbung!</strong></p>
+                                <p>📬 Wir melden uns innerhalb von <strong>1-2 Tagen</strong> bei dir via Discord.</p>
+                            </div>
+                            <div style="margin-top: 30px; padding: 20px; background: rgba(88, 101, 242, 0.1); border-radius: 10px; border-left: 4px solid #5865F2;">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <span style="font-size: 24px;">🔗</span>
+                                    <strong style="font-size: 16px;">Temporärer Discord-Server</strong>
+                                </div>
+                                <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
+                                    Du bist bereits auf dem temporären Server!<br>
+                                    Sobald du dem Haupt-Server beitrittst, wirst du automatisch vom temporären Server entfernt.
+                                </p>
+                            </div>
+                        `;
+                    }
+                    
+                    // Starte Prüfung nach 2 Sekunden
+                    setTimeout(checkDiscordJoin, 2000);
+                })();
+                </script>
+                <?php
+            } elseif ( $form_submitted && ! isset( $waiting_for_discord ) ) {
+                // Fallback: Alte Erfolgsmeldung (sollte nicht mehr vorkommen)
                 ?>
                 <div class="jc-success">
                     <div class="jc-success-icon">
@@ -1232,18 +1635,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <h3>🎉 Bewerbung erfolgreich!</h3>
                     <p><strong>Vielen Dank für deine Bewerbung!</strong></p>
                     <p>📬 Wir melden uns innerhalb von <strong>1-2 Tagen</strong> bei dir via Discord.</p>
-                </div>
-                <div style="margin-top: 30px; padding: 20px; background: rgba(88, 101, 242, 0.1); border-radius: 10px; border-left: 4px solid #5865F2;">
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                        <span style="font-size: 24px;">🔗</span>
-                        <strong style="font-size: 16px;">Temporärer Discord-Server</strong>
-                    </div>
-                    <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                        Um Nachrichten vom Bot zu empfangen, join bitte unserem temporären Discord-Server: 
-                        <br><a href="<?php echo JC_TEMP_DISCORD_INVITE; ?>" target="_blank"><?php echo JC_TEMP_DISCORD_INVITE; ?></a>
-                        <br><br>
-                        Sobald du dem Haupt-Server beitrittst, wirst du automatisch vom temporären Server entfernt.
-                    </p>
                 </div>
                 <?php
             } else {
