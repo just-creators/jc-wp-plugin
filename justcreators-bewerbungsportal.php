@@ -2301,7 +2301,7 @@ function jc_admin_bewerbungen_page() {
             echo '<td style="padding: 15px 12px; vertical-align: top;">' . esc_html( $r->age ) . '</td>';
             echo '<td style="padding: 15px 12px; vertical-align: top;"><small style="line-height: 1.6;">' . $social_display . '</small></td>';
             echo '<td style="padding: 15px 12px; vertical-align: top;">' . esc_html( $r->social_activity ) . '</td>';
-            echo '<td style="padding: 15px 12px; vertical-align: top;"><div style="max-height: 80px; overflow: auto; font-size: 13px; line-height: 1.5; color: #555;">' . nl2br( esc_html( substr($r->motivation, 0, 150) ) ) . (strlen($r->motivation) > 150 ? '...' : '') . '</div></td>';
+            echo '<td style="padding: 15px 12px; vertical-align: top;"><div style="max-height: 80px; overflow: auto; font-size: 13px; line-height: 1.5; color: #555;">' . esc_html( substr($r->motivation, 0, 15) ) . (strlen($r->motivation) > 15 ? '...' : '') . '</div></td>';
             echo '<td style="padding: 15px 12px; vertical-align: top;"><small style="color: #666;">' . esc_html( date_i18n( 'd.m.Y', strtotime( $r->created_at ) ) ) . '<br>' . esc_html( date_i18n( 'H:i', strtotime( $r->created_at ) ) ) . ' Uhr</small></td>';
            
             // STATUS ÄNDERN DROPDOWN
