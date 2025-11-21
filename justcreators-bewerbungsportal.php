@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JustCreators Bewerbungsportal Pro
  * Description: Erweiterte Version mit Link-Validierung, Auto-Sync und Discord Tags
- * Version: 6.4 (Final Fix)
+ * Version: 6.7 (Validierung zählt keine Leerzeichen)
  * Author: JustCreators Team
  * License: GPL2
  */
@@ -440,10 +440,6 @@ function jc_bot_setup_page() {
 // ========================================
 // SESSION & DATABASE
 // ========================================
-
-// ##### FIX 1: Entferne den überflüssigen session_start() Block #####
-// Der doppelte add_action( 'init', ... 1 ) Block wurde hier entfernt.
-// Der korrekte Session-Start befindet sich bereits in Zeile 46.
 
 // Cleanup für abgelaufene temporäre Bewerbungen
 add_action( 'jc_cleanup_temp_applications', function() {
@@ -1445,12 +1441,16 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 <strong>Wir freuen uns auf die Zusammenarbeit! 🚀</strong>
                             </p>
                         </div>
+                        
+                        <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
+                            ✅ Akzeptiere die Regeln
+                        </a>
+                    <?php else: ?>
+                        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="jc-discord-btn" style="margin-top: 25px; background: #3a3c4a !important; box-shadow: none !important;">
+                            🏠 Zurück zur Startseite
+                        </a>
                     <?php endif; ?>
-                   
-                    <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
-                        ✅ Akzeptiere die Regeln
-                    </a>
-                </div>
+                    </div>
                
                 <?php
                 echo '</div></div>';
@@ -1509,10 +1509,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             $validation_errors[] = 'Deine Discord-Sitzung ist abgelaufen. Bitte lade die Seite neu und melde dich erneut an.';
                         } else {
                             
-                            // ##### START: KORRIGIERTE DATENBANK-LOGIK #####
+                            // ##### KORRIGIERTE DATENBANK-LOGIK (v6.4) #####
                             
                             // SCHRITT 1: Lösche eine eventuell vorhandene, alte temporäre Bewerbung
-                            // Dies behebt das "stille Fehlschlagen" bei doppelten Einsendungen.
                             $wpdb->delete(
                                 $temp_table,
                                 array( 'discord_id' => $discord_id ),
@@ -1520,7 +1519,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             );
                             
                             // SCHRITT 2: Füge die neue Bewerbung ein
-                            // Wir verwenden jetzt wieder $wpdb->insert, da $wpdb->replace nicht existiert.
                             $inserted = $wpdb->insert( $temp_table, array(
                                 'discord_id' => $discord_id,
                                 'discord_name' => $discord_display,
@@ -1531,8 +1529,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 'motivation' => $motivation,
                                 'expires_at' => $expires_at
                             ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
-                            
-                            // ##### ENDE: KORRIGIERTE DATENBANK-LOGIK #####
                             
                             if ( $inserted ) {
                                 error_log("JC: ✅ Neue temp Bewerbung für $discord_id gespeichert. Zeige Warte-Bildschirm.");
@@ -1915,6 +1911,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     return true;
                 }
                 
+                // ########## START: ANPASSUNG VALIDIERUNG (v6.7) ##########
                 // Validierung für Motivation
                 function validateMotivation() {
                     const motivationInput = document.getElementById('jc-motivation-input');
@@ -1923,10 +1920,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     if (!motivationInput || !motivationError) return true;
                     
                     const text = motivationInput.value;
-                    const length = text.length;
+                    // Entfernt ALLE Leerzeichen (auch zwischen Wörtern) vor dem Zählen
+                    const textWithoutSpaces = text.replace(/\s/g, ''); 
+                    const length = textWithoutSpaces.length; // Zählt nur "echte" Zeichen
                     
-                    // Wenn leer, keine Validierung (required wird vom Browser gehandhabt)
-                    if (text.trim() === '') {
+                    // Wenn nach dem Entfernen aller Leerzeichen leer
+                    if (length === 0) {
+                        if (motivationInput.hasAttribute('required')) {
+                             motivationError.textContent = '❌ Bitte gib eine Motivation ein.';
+                             motivationError.style.display = 'block';
+                             motivationInput.classList.add('error');
+                             return false;
+                        }
+                        // Falls es nicht required ist
                         motivationError.style.display = 'none';
                         motivationError.textContent = '';
                         motivationInput.classList.remove('error');
@@ -1943,12 +1949,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     } else {
                         // Zu wenig Zeichen
                         const remaining = 100 - length;
-                        motivationError.textContent = '❌ Bitte gib mindestens 100 Zeichen ein. (Noch ' + remaining + ' Zeichen)';
+                        // Angepasste Fehlermeldung
+                        motivationError.textContent = '❌ Bitte gib mindestens 100 Zeichen ein (Leerzeichen zählen nicht). (Noch ' + remaining + ' Zeichen)';
                         motivationError.style.display = 'block';
                         motivationInput.classList.add('error');
                         return false;
                     }
                 }
+                // ########## ENDE: ANPASSUNG VALIDIERUNG (v6.7) ##########
                 
                 // Validierung für Name
                 function validateName() {
@@ -2126,8 +2134,10 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         ageInput.addEventListener('change', validateAge);
                     }
                     
-                    // Motivation-Validierung nur beim Abschicken, nicht während des Tippens
-                    // (keine Event-Listener für input/blur/change)
+                    if (motivationInput) {
+                        motivationInput.addEventListener('input', validateMotivation);
+                        motivationInput.addEventListener('blur', validateMotivation);
+                    }
                     
                     // Form-Submit-Validierung
                     if (form) {
@@ -2405,15 +2415,17 @@ function jc_admin_bewerbungen_page() {
             margin: 0 0 30px 0;
         }
         
+        /* ########## START: ANPASSUNG ADMIN-BOXEN (v6.6) ########## */
         .jc-stat-card {
             background: #2a2c36;
-            padding: 25px;
+            padding: 15px 25px 20px 25px; /* Top-Padding weiter reduziert */
             border-radius: 14px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             animation: jc-fadeIn 0.6s ease-out;
             border-left: 4px solid;
         }
+        /* ########## ENDE: ANPASSUNG ADMIN-BOXEN ########## */
         
         .jc-stat-card:hover {
             transform: translateY(-5px);
@@ -2440,12 +2452,14 @@ function jc_admin_bewerbungen_page() {
             background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, #2a2c36 100%);
         }
         
+        /* ########## START: ANPASSUNG ADMIN-BOXEN (v6.6) ########## */
         .jc-stat-number {
             font-size: 42px;
             font-weight: 700;
             color: #f0f0f0;
-            margin-bottom: 8px;
+            margin-bottom: 2px; /* Von 4px auf 2px reduziert */
         }
+        /* ########## ENDE: ANPASSUNG ADMIN-BOXEN ########## */
         
         .jc-stat-label {
             font-size: 15px;
