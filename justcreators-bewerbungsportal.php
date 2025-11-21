@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JustCreators Bewerbungsportal Pro
  * Description: Erweiterte Version mit Link-Validierung, Auto-Sync und Discord Tags
- * Version: 6.2 (Fixed)
+ * Version: 6.4 (Final Fix)
  * Author: JustCreators Team
  * License: GPL2
  */
@@ -1457,7 +1457,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 return ob_get_clean();
             }
            
-            // FORMULAR-VERARBEITUNG (REST BLEIBT GLEICH)
+            // FORMULAR-VERARBEITUNG
             $form_submitted = false;
             $validation_errors = array();
            
@@ -1503,39 +1503,61 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         // Bewerbung in temporäre Tabelle speichern (20 Minuten Gültigkeit)
                         $expires_at = date( 'Y-m-d H:i:s', time() + (20 * 60) ); // 20 Minuten
                         
-                        // ##### FIX 2: Geändert von $wpdb->insert zu $wpdb->replace #####
-                        // Dies verhindert den Fehler, wenn ein User mit einer "hängenden"
-                        // Bewerbung in der temp-Tabelle es erneut versucht.
-                        $inserted = $wpdb->replace( $temp_table, array(
-                            'discord_id' => $discord_id,
-                            'discord_name' => $discord_display,
-                            'applicant_name' => $applicant_name,
-                            'age' => $age,
-                            'social_channels' => $social_channels_json,
-                            'social_activity' => $social_activity,
-                            'motivation' => $motivation,
-                            'expires_at' => $expires_at
-                        ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
-                        
-                        if ( $inserted ) {
-                            // Bewerbung in temporärer DB gespeichert, jetzt auf Discord-Join warten
-                            $form_submitted = true;
-                            $waiting_for_discord = true;
-                            $application_data = array(
+                        // Leere ID abfangen, bevor es die DB tut
+                        if ( empty($discord_id) ) {
+                            error_log("JC: ❌ FEHLER: Discord ID ist LEER. Session-Problem besteht weiterhin. Abbruch.");
+                            $validation_errors[] = 'Deine Discord-Sitzung ist abgelaufen. Bitte lade die Seite neu und melde dich erneut an.';
+                        } else {
+                            
+                            // ##### START: KORRIGIERTE DATENBANK-LOGIK #####
+                            
+                            // SCHRITT 1: Lösche eine eventuell vorhandene, alte temporäre Bewerbung
+                            // Dies behebt das "stille Fehlschlagen" bei doppelten Einsendungen.
+                            $wpdb->delete(
+                                $temp_table,
+                                array( 'discord_id' => $discord_id ),
+                                array( '%s' )
+                            );
+                            
+                            // SCHRITT 2: Füge die neue Bewerbung ein
+                            // Wir verwenden jetzt wieder $wpdb->insert, da $wpdb->replace nicht existiert.
+                            $inserted = $wpdb->insert( $temp_table, array(
                                 'discord_id' => $discord_id,
                                 'discord_name' => $discord_display,
                                 'applicant_name' => $applicant_name,
                                 'age' => $age,
-                                'social_channels' => $social_channels,
+                                'social_channels' => $social_channels_json,
                                 'social_activity' => $social_activity,
                                 'motivation' => $motivation,
-                                'temp_id' => $wpdb->insert_id // $wpdb->insert_id funktioniert auch bei REPLACE
-                            );
-                            // In Session speichern für späteren Bot-Call
-                            $_SESSION['jc_pending_application'] = $application_data;
+                                'expires_at' => $expires_at
+                            ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
+                            
+                            // ##### ENDE: KORRIGIERTE DATENBANK-LOGIK #####
+                            
+                            if ( $inserted ) {
+                                error_log("JC: ✅ Neue temp Bewerbung für $discord_id gespeichert. Zeige Warte-Bildschirm.");
+                                
+                                // Bewerbung in temporärer DB gespeichert, jetzt auf Discord-Join warten
+                                $form_submitted = true;
+                                $waiting_for_discord = true;
+                                $application_data = array(
+                                    'discord_id' => $discord_id,
+                                    'discord_name' => $discord_display,
+                                    'applicant_name' => $applicant_name,
+                                    'age' => $age,
+                                    'social_channels' => $social_channels,
+                                    'social_activity' => $social_activity,
+                                    'motivation' => $motivation,
+                                    'temp_id' => $wpdb->insert_id
+                                );
+                                // In Session speichern für späteren Bot-Call
+                                $_SESSION['jc_pending_application'] = $application_data;
+                            } else {
+                                // HIER IST DER FEHLERFALL
+                                error_log("JC: ❌ DB INSERT FEHLGESCHLAGEN. DB-Fehler: " . $wpdb->last_error);
+                                error_log("JC: ❌ FEHLER: Lade Formular neu.");
+                            }
                         }
-                        // Wenn $inserted false ist, wird das Formular einfach neu geladen
-                        // (was das gemeldete Problem war)
                     }
                 }
             }
@@ -1726,7 +1748,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 </div>
                 <?php
             } else {
-                // FORMULAR IST ZU LANG - WIRD IM NÄCHSTEN TEIL FORTGESETZT
+                // FORMULAR
                 ?>
                 <p style="line-height: 1.7; margin-bottom: 20px;">
                     Fülle das Formular aus um dich bei der <strong>2. Season von JustCreators</strong> zu bewerben.
@@ -2134,7 +2156,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                     if (firstSocialInput) {
                                         firstSocialInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                         firstSocialInput.focus();
-D                                    }
+                                    }
                                 } else if (!activityValid && activityInput) {
                                     activityInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                     activityInput.focus();
