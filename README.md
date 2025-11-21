@@ -57,6 +57,25 @@ Das Plugin verwaltet den kompletten Bewerbungsprozess für JustCreators Season 2
    - Die Tabellen werden automatisch bei der Aktivierung erstellt:
      - `wp_jc_discord_applications` - Bewerbungen
      - `wp_jc_members` - Mitglieder (wird bei Bedarf erstellt)
+    
+### **Temp DB erstellen!**
+   ``` mysql
+CREATE TABLE `wp_jc_discord_applications_temp` (
+    `id` mediumint(9) NOT NULL AUTO_INCREMENT,
+    `discord_id` varchar(64) NOT NULL,
+    `discord_name` varchar(255) NOT NULL,
+    `applicant_name` varchar(255) NOT NULL,
+    `age` varchar(20) DEFAULT '',
+    `social_channels` text DEFAULT '',
+    `social_activity` varchar(255) DEFAULT '',
+    `motivation` text DEFAULT '',
+    `created_at` datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    `expires_at` datetime NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `discord_id` (`discord_id`),
+    KEY `expires_at` (`expires_at`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
 
 ## ⚙️ Konfiguration
 
