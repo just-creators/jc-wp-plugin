@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JustCreators Bewerbungsportal Pro
  * Description: Erweiterte Version mit Link-Validierung, Auto-Sync und Discord Tags
- * Version: 6.1
+ * Version: 6.2 (Fixed)
  * Author: JustCreators Team
  * License: GPL2
  */
@@ -440,11 +440,11 @@ function jc_bot_setup_page() {
 // ========================================
 // SESSION & DATABASE
 // ========================================
-add_action( 'init', function() {
-    if ( session_status() === PHP_SESSION_NONE ) {
-        @session_start();
-    }
-}, 1 );
+
+// ##### FIX 1: Entferne den überflüssigen session_start() Block #####
+// Der doppelte add_action( 'init', ... 1 ) Block wurde hier entfernt.
+// Der korrekte Session-Start befindet sich bereits in Zeile 46.
+
 // Cleanup für abgelaufene temporäre Bewerbungen
 add_action( 'jc_cleanup_temp_applications', function() {
     global $wpdb;
@@ -1503,7 +1503,10 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         // Bewerbung in temporäre Tabelle speichern (20 Minuten Gültigkeit)
                         $expires_at = date( 'Y-m-d H:i:s', time() + (20 * 60) ); // 20 Minuten
                         
-                        $inserted = $wpdb->insert( $temp_table, array(
+                        // ##### FIX 2: Geändert von $wpdb->insert zu $wpdb->replace #####
+                        // Dies verhindert den Fehler, wenn ein User mit einer "hängenden"
+                        // Bewerbung in der temp-Tabelle es erneut versucht.
+                        $inserted = $wpdb->replace( $temp_table, array(
                             'discord_id' => $discord_id,
                             'discord_name' => $discord_display,
                             'applicant_name' => $applicant_name,
@@ -1526,11 +1529,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 'social_channels' => $social_channels,
                                 'social_activity' => $social_activity,
                                 'motivation' => $motivation,
-                                'temp_id' => $wpdb->insert_id
+                                'temp_id' => $wpdb->insert_id // $wpdb->insert_id funktioniert auch bei REPLACE
                             );
                             // In Session speichern für späteren Bot-Call
                             $_SESSION['jc_pending_application'] = $application_data;
                         }
+                        // Wenn $inserted false ist, wird das Formular einfach neu geladen
+                        // (was das gemeldete Problem war)
                     }
                 }
             }
@@ -2129,7 +2134,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                     if (firstSocialInput) {
                                         firstSocialInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                         firstSocialInput.focus();
-                                    }
+D                                    }
                                 } else if (!activityValid && activityInput) {
                                     activityInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                     activityInput.focus();
@@ -2648,3 +2653,5 @@ function jc_admin_bewerbungen_page() {
 // MEMBER DASHBOARD LADEN
 // ========================================
 require_once plugin_dir_path( __FILE__ ) . 'justcreators_rules_page.php';
+
+?>
