@@ -1598,9 +1598,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </a>
                         </div>
                         
-                        <p class="jc-waiting-hint">
-                            <small>💡 Tipp: Öffne den Link in einem neuen Tab und join dem Server. Diese Seite prüft automatisch, ob du beigetreten bist.</small>
-                        </p>
+
                     </div>
                 </div>
                 
@@ -1717,16 +1715,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 <h3>🎉 Bewerbung erfolgreich!</h3>
                                 <p><strong>Vielen Dank für deine Bewerbung!</strong></p>
                                 <p>📬 Wir melden uns innerhalb von <strong>1-2 Tagen</strong> bei dir via Discord.</p>
-                            </div>
-                            <div style="margin-top: 30px; padding: 20px; background: rgba(88, 101, 242, 0.1); border-radius: 10px; border-left: 4px solid #5865F2;">
-                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                    <span style="font-size: 24px;">🔗</span>
-                                    <strong style="font-size: 16px;">Temporärer Discord-Server</strong>
-                                </div>
-                                <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                    Du bist bereits auf dem temporären Server!<br>
-                                    Sobald du dem Haupt-Server beitrittst, wirst du automatisch vom temporären Server entfernt.
-                                </p>
                             </div>
                         `;
                     }
