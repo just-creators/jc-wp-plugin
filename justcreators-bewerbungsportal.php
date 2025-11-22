@@ -266,19 +266,17 @@ function jc_handle_send_application( $request ) {
     
     // Prüfe ob bereits abgelaufen
     if ( strtotime( $temp_application->expires_at ) < time() ) {
-        // Abgelaufen, löschen
         $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
         return new WP_Error( 'expired', 'Bewerbung ist abgelaufen. Bitte starte eine neue Bewerbung.', array( 'status' => 410 ) );
     }
     
-    // Prüfe ob bereits in Haupttabelle vorhanden
+    // Prüfe ob bereits in Haupttabelle vorhanden (redundant, aber sicher)
     $existing = $wpdb->get_row( $wpdb->prepare(
         "SELECT id, forum_post_id FROM {$main_table} WHERE discord_id = %s",
         $discord_id
     ) );
     
     if ( $existing && ! empty( $existing->forum_post_id ) ) {
-        // Bereits verarbeitet
         $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
         return array(
             'success' => true,
@@ -286,8 +284,33 @@ function jc_handle_send_application( $request ) {
             'already_sent' => true
         );
     }
+
+    // ########## START: NEUE LOGIK (v6.13) ##########
+
+    // 1. ZUERST in die Haupt-DB einfügen, um die ID zu bekommen
+    // (Wir fügen sie erstmal OHNE forum_post_id ein)
+    $inserted = $wpdb->insert( $main_table, array(
+        'discord_id' => $temp_application->discord_id,
+        'discord_name' => $temp_application->discord_name,
+        'applicant_name' => $temp_application->applicant_name,
+        'age' => $temp_application->age,
+        'social_channels' => $temp_application->social_channels,
+        'social_activity' => $temp_application->social_activity,
+        'motivation' => $temp_application->motivation,
+        'status' => 'pending' // Status ist 'pending'
+    ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
+
+    if ( ! $inserted ) {
+        // Wenn das Einfügen fehlschlägt (z.B. DB-Problem), abbrechen.
+        error_log("JC Handle Send: ❌ DB INSERT FAILED. " . $wpdb->last_error);
+        return new WP_Error( 'db_error', 'Fehler beim Speichern in Haupttabelle: ' . $wpdb->last_error, array( 'status' => 500 ) );
+    }
     
-    // Bewerbung an Bot senden
+    // 2. Die neue, echte DB ID holen
+    $real_database_id = $wpdb->insert_id;
+    error_log("JC Handle Send: ✅ Eintrag in DB erstellt. Neue ID: " . $real_database_id);
+
+    // 3. Bewerbung an Bot senden, MIT der echten DB ID
     $bot_data = array(
         'discord_id' => $temp_application->discord_id,
         'discord_name' => $temp_application->discord_name,
@@ -296,45 +319,50 @@ function jc_handle_send_application( $request ) {
         'social_channels' => json_decode( $temp_application->social_channels, true ),
         'social_activity' => $temp_application->social_activity,
         'motivation' => $temp_application->motivation,
-        'database_id' => null // Wird nach Insert gesetzt
+        'database_id' => $real_database_id // <-- HIER IST DER FIX
     );
     
     $bot_result = jc_send_application_to_bot( $bot_data );
     
+    // 4. Bot-Antwort verarbeiten
     if ( $bot_result['success'] && isset( $bot_result['data']['post_id'] ) ) {
-        // Von temporärer Tabelle in Haupttabelle verschieben
-        $inserted = $wpdb->insert( $main_table, array(
-            'discord_id' => $temp_application->discord_id,
-            'discord_name' => $temp_application->discord_name,
-            'applicant_name' => $temp_application->applicant_name,
-            'age' => $temp_application->age,
-            'social_channels' => $temp_application->social_channels,
-            'social_activity' => $temp_application->social_activity,
-            'motivation' => $temp_application->motivation,
-            'forum_post_id' => $bot_result['data']['post_id'],
-            'status' => 'pending'
-        ), array('%s','%s','%s','%s','%s','%s','%s','%s','%s') );
         
-        if ( $inserted ) {
-            // Temporäre Bewerbung löschen
-            $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
-            
-            // Session aufräumen
-            unset( $_SESSION['jc_pending_application'] );
-            unset( $_SESSION['jc_discord_user'] );
-            
-            return array(
-                'success' => true,
-                'message' => 'Bewerbung erfolgreich verarbeitet',
-                'post_id' => $bot_result['data']['post_id']
-            );
-        } else {
-            return new WP_Error( 'db_error', 'Fehler beim Speichern in Haupttabelle', array( 'status' => 500 ) );
-        }
+        // 5. Bot war erfolgreich, also die forum_post_id in der DB nachtragen
+        $wpdb->update(
+            $main_table,
+            array( 'forum_post_id' => $bot_result['data']['post_id'] ),
+            array( 'id' => $real_database_id ),
+            array( '%s' ),
+            array( '%d' )
+        );
+        
+        // Temporäre Bewerbung löschen
+        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
+        
+        // Session aufräumen
+        unset( $_SESSION['jc_pending_application'] );
+        unset( $_SESSION['jc_discord_user'] );
+        
+        error_log("JC Handle Send: ✅ Bot-Post erstellt und DB-Eintrag $real_database_id aktualisiert.");
+
+        return array(
+            'success' => true,
+            'message' => 'Bewerbung erfolgreich verarbeitet',
+            'post_id' => $bot_result['data']['post_id']
+        );
+
+    } else {
+        // 6. Bot ist FEHLGESCHLAGEN. Rollback!
+        error_log("JC Handle Send: ❌ Bot ist fehlgeschlagen. Rollback von DB-Eintrag $real_database_id.");
+        
+        // Lösche den Eintrag, den wir in Schritt 1 gemacht haben, da der Bot-Post nicht erstellt werden konnte.
+        $wpdb->delete( $main_table, array( 'id' => $real_database_id ), array( '%d' ) );
+        
+        return new WP_Error( 'bot_error', $bot_result['message'] ?? 'Fehler beim Senden an Bot', array( 'status' => 500 ) );
     }
-    
-    return new WP_Error( 'bot_error', $bot_result['message'] ?? 'Fehler beim Senden an Bot', array( 'status' => 500 ) );
+    // ########## ENDE: NEUE LOGIK (v6.13) ##########
 }
+
 // ========================================
 // ADMIN EINSTELLUNGEN
 // ========================================
