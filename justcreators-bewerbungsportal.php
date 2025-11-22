@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JustCreators Bewerbungsportal Pro
  * Description: Erweiterte Version mit Link-Validierung, Auto-Sync und Discord Tags
- * Version: 6.2 (Fixed)
+ * Version: 6.11 (Info-Boxen bei 'Pending' entfernt)
  * Author: JustCreators Team
  * License: GPL2
  */
@@ -441,10 +441,6 @@ function jc_bot_setup_page() {
 // SESSION & DATABASE
 // ========================================
 
-// ##### FIX 1: Entferne den überflüssigen session_start() Block #####
-// Der doppelte add_action( 'init', ... 1 ) Block wurde hier entfernt.
-// Der korrekte Session-Start befindet sich bereits in Zeile 46.
-
 // Cleanup für abgelaufene temporäre Bewerbungen
 add_action( 'jc_cleanup_temp_applications', function() {
     global $wpdb;
@@ -865,17 +861,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
        
         .jc-status-desc {
             font-size: 17px;
-            color: #a0a8b8;
+            color: #f0f0f0 !important; /* Auf helles Weiß geändert */
             line-height: 1.8;
             margin: 15px 0;
         }
+        
+        .jc-status-desc * {
+            color: inherit !important;
+        }
        
         .jc-status-meta {
-            margin-top: 30px;
-            padding-top: 25px;
-            border-top: 1px solid rgba(255,255,255,0.1);
             font-size: 14px;
             color: #8a8f9e;
+            padding: 25px; /* Padding hierher verschoben */
         }
        
         .jc-discord-btn {
@@ -1371,85 +1369,67 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <h2 class="jc-status-title"><?php echo $current['title']; ?></h2>
                     <p class="jc-status-desc"><?php echo $current['desc']; ?></p>
                    
-                    <div class="jc-status-meta">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; text-align: left;">
-                            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
-                                <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📝 BEWERBER</div>
-                                <div style="font-weight: 600; font-size: 16px;"><?php echo esc_html( $application->applicant_name ); ?></div>
-                                <div style="font-size: 13px; opacity: 0.8; margin-top: 4px;"><?php echo $discord_display; ?></div>
-                            </div>
-                           
-                            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
-                                <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📅 EINGEREICHT AM</div>
-                                <div style="font-weight: 600; font-size: 16px;"><?php echo esc_html( date_i18n( 'd.m.Y', strtotime( $application->created_at ) ) ); ?></div>
-                                <div style="font-size: 13px; opacity: 0.8; margin-top: 4px;"><?php echo esc_html( date_i18n( 'H:i', strtotime( $application->created_at ) ) ); ?> Uhr</div>
-                            </div>
-                           
-                            <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
-                                <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📊 STATUS</div>
-                                <div style="font-weight: 600; font-size: 16px; text-transform: uppercase;">
-                                    <?php
-                                    $status_names = array(
-                                        'pending' => '⏳ In Bearbeitung',
-                                        'accepted' => '✅ Angenommen',
-                                        'rejected' => '❌ Abgelehnt'
-                                    );
-                                    echo isset($status_names[$application->status]) ? $status_names[$application->status] : $application->status;
-                                    ?>
+                    <div class="jc-status-info-wrapper" style="margin-top: 30px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.15); text-align: left;"> 
+                   
+                        <div class="jc-status-meta"> <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                                <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📝 BEWERBER</div>
+                                    <div style="font-weight: 600; font-size: 16px;"><?php echo esc_html( $application->applicant_name ); ?></div>
+                                    <div style="font-size: 13px; opacity: 0.8; margin-top: 4px;"><?php echo $discord_display; ?></div>
+                                </div>
+                               
+                                <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📅 EINGEREICHT AM</div>
+                                    <div style="font-weight: 600; font-size: 16px;"><?php echo esc_html( date_i18n( 'd.m.Y', strtotime( $application->created_at ) ) ); ?></div>
+                                    <div style="font-size: 13px; opacity: 0.8; margin-top: 4px;"><?php echo esc_html( date_i18n( 'H:i', strtotime( $application->created_at ) ) ); ?> Uhr</div>
+                                </div>
+                               
+                                <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+                                    <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📊 STATUS</div>
+                                    <div style="font-weight: 600; font-size: 16px; text-transform: uppercase;">
+                                        <?php
+                                        $status_names = array(
+                                            'pending' => '⏳ In Bearbeitung',
+                                            'accepted' => '✅ Angenommen',
+                                            'rejected' => '❌ Abgelehnt'
+                                        );
+                                        echo isset($status_names[$application->status]) ? $status_names[$application->status] : $application->status;
+                                        ?>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
                    
-                    <?php if ( $application->status === 'pending' ): ?>
-                        <div style="margin-top: 30px; padding: 20px; background: rgba(88, 101, 242, 0.1); border-radius: 10px; border-left: 4px solid #5865F2;">
-                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                <span style="font-size: 24px;">💬</span>
-                                <strong style="font-size: 16px;">Wichtiger Hinweis</strong>
+                        <?php if ( $application->status === 'pending' ): ?>
+                            <?php endif; ?>
+                       
+                        <?php if ( $application->status === 'accepted' ): ?>
+                            <div style="padding: 20px; border-left: 4px solid #4ade80; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <span style="font-size: 24px;">🎊</span>
+                                    <strong style="font-size: 16px; color: #f0f0f0;">Nächste Schritte</strong>
+                                </div>
+                                <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
+                                    Willkommen im Team! Unser Team wird sich in Kürze bei dir melden, um:
+                                    <br>• Dir alle wichtigen Infos zu geben
+                                    <br>• Die nächsten Schritte zu besprechen
+                                    <br>• Dich in die Season 2 einzuführen
+                                    <br><br>
+                                    <strong>Wir freuen uns auf die Zusammenarbeit! 🚀</strong>
+                                </p>
                             </div>
-                            <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                Überprüfe regelmäßig deine <strong>Discord Direktnachrichten</strong>!
-                                Wir melden uns innerhalb von 1-2 Tagen bei dir.
-                                <br><br>
-                                Falls du keine Nachricht erhalten solltest, stelle sicher dass:
-                                <br>• Du auf dem JustCreators Discord-Server bist
-                                <br>• Direktnachrichten von Servermitgliedern aktiviert sind
-                            </p>
-                        </div>
-                        <div style="margin-top: 30px; padding: 20px; background: rgba(88, 101, 242, 0.1); border-radius: 10px; border-left: 4px solid #5865F2;">
-                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                <span style="font-size: 24px;">🔗</span>
-                                <strong style="font-size: 16px;">Temporärer Discord-Server</strong>
-                            </div>
-                            <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                Um Nachrichten vom Bot zu empfangen, join bitte unserem temporären Discord-Server: 
-                                <br><a href="<?php echo JC_TEMP_DISCORD_INVITE; ?>" target="_blank"><?php echo JC_TEMP_DISCORD_INVITE; ?></a>
-                                <br><br>
-                                Sobald du dem Haupt-Server beitrittst, wirst du automatisch vom temporären Server entfernt.
-                            </p>
-                        </div>
+                        <?php endif; ?>
+
+                    </div> <?php if ( $application->status === 'accepted' ): ?>
+                        <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
+                            ✅ Akzeptiere die Regeln
+                        </a>
+                    <?php else: ?>
+                        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="jc-discord-btn" style="margin-top: 25px; background: #3a3c4a !important; box-shadow: none !important;">
+                            🏠 Zurück zur Startseite
+                        </a>
                     <?php endif; ?>
                    
-                    <?php if ( $application->status === 'accepted' ): ?>
-                        <div style="margin-top: 30px; padding: 20px; background: rgba(74, 222, 128, 0.1); border-radius: 10px; border-left: 4px solid #4ade80;">
-                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                <span style="font-size: 24px;">🎊</span>
-                                <strong style="font-size: 16px;">Nächste Schritte</strong>
-                            </div>
-                            <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                Willkommen im Team! Unser Team wird sich in Kürze bei dir melden, um:
-                                <br>• Dir alle wichtigen Infos zu geben
-                                <br>• Die nächsten Schritte zu besprechen
-                                <br>• Dich in die Season 2 einzuführen
-                                <br><br>
-                                <strong>Wir freuen uns auf die Zusammenarbeit! 🚀</strong>
-                            </p>
-                        </div>
-                    <?php endif; ?>
-                   
-                    <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
-                        ✅ Akzeptiere die Regeln
-                    </a>
                 </div>
                
                 <?php
@@ -1457,7 +1437,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 return ob_get_clean();
             }
            
-            // FORMULAR-VERARBEITUNG (REST BLEIBT GLEICH)
+            // FORMULAR-VERARBEITUNG
             $form_submitted = false;
             $validation_errors = array();
            
@@ -1503,39 +1483,57 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         // Bewerbung in temporäre Tabelle speichern (20 Minuten Gültigkeit)
                         $expires_at = date( 'Y-m-d H:i:s', time() + (20 * 60) ); // 20 Minuten
                         
-                        // ##### FIX 2: Geändert von $wpdb->insert zu $wpdb->replace #####
-                        // Dies verhindert den Fehler, wenn ein User mit einer "hängenden"
-                        // Bewerbung in der temp-Tabelle es erneut versucht.
-                        $inserted = $wpdb->replace( $temp_table, array(
-                            'discord_id' => $discord_id,
-                            'discord_name' => $discord_display,
-                            'applicant_name' => $applicant_name,
-                            'age' => $age,
-                            'social_channels' => $social_channels_json,
-                            'social_activity' => $social_activity,
-                            'motivation' => $motivation,
-                            'expires_at' => $expires_at
-                        ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
-                        
-                        if ( $inserted ) {
-                            // Bewerbung in temporärer DB gespeichert, jetzt auf Discord-Join warten
-                            $form_submitted = true;
-                            $waiting_for_discord = true;
-                            $application_data = array(
+                        // Leere ID abfangen, bevor es die DB tut
+                        if ( empty($discord_id) ) {
+                            error_log("JC: ❌ FEHLER: Discord ID ist LEER. Session-Problem besteht weiterhin. Abbruch.");
+                            $validation_errors[] = 'Deine Discord-Sitzung ist abgelaufen. Bitte lade die Seite neu und melde dich erneut an.';
+                        } else {
+                            
+                            // ##### KORRIGIERTE DATENBANK-LOGIK (v6.4) #####
+                            
+                            // SCHRITT 1: Lösche eine eventuell vorhandene, alte temporäre Bewerbung
+                            $wpdb->delete(
+                                $temp_table,
+                                array( 'discord_id' => $discord_id ),
+                                array( '%s' )
+                            );
+                            
+                            // SCHRITT 2: Füge die neue Bewerbung ein
+                            $inserted = $wpdb->insert( $temp_table, array(
                                 'discord_id' => $discord_id,
                                 'discord_name' => $discord_display,
                                 'applicant_name' => $applicant_name,
                                 'age' => $age,
-                                'social_channels' => $social_channels,
+                                'social_channels' => $social_channels_json,
                                 'social_activity' => $social_activity,
                                 'motivation' => $motivation,
-                                'temp_id' => $wpdb->insert_id // $wpdb->insert_id funktioniert auch bei REPLACE
-                            );
-                            // In Session speichern für späteren Bot-Call
-                            $_SESSION['jc_pending_application'] = $application_data;
+                                'expires_at' => $expires_at
+                            ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
+                            
+                            if ( $inserted ) {
+                                error_log("JC: ✅ Neue temp Bewerbung für $discord_id gespeichert. Zeige Warte-Bildschirm.");
+                                
+                                // Bewerbung in temporärer DB gespeichert, jetzt auf Discord-Join warten
+                                $form_submitted = true;
+                                $waiting_for_discord = true;
+                                $application_data = array(
+                                    'discord_id' => $discord_id,
+                                    'discord_name' => $discord_display,
+                                    'applicant_name' => $applicant_name,
+                                    'age' => $age,
+                                    'social_channels' => $social_channels,
+                                    'social_activity' => $social_activity,
+                                    'motivation' => $motivation,
+                                    'temp_id' => $wpdb->insert_id
+                                );
+                                // In Session speichern für späteren Bot-Call
+                                $_SESSION['jc_pending_application'] = $application_data;
+                            } else {
+                                // HIER IST DER FEHLERFALL
+                                error_log("JC: ❌ DB INSERT FEHLGESCHLAGEN. DB-Fehler: " . $wpdb->last_error);
+                                error_log("JC: ❌ FEHLER: Lade Formular neu.");
+                            }
                         }
-                        // Wenn $inserted false ist, wird das Formular einfach neu geladen
-                        // (was das gemeldete Problem war)
                     }
                 }
             }
@@ -1726,7 +1724,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 </div>
                 <?php
             } else {
-                // FORMULAR IST ZU LANG - WIRD IM NÄCHSTEN TEIL FORTGESETZT
+                // FORMULAR
                 ?>
                 <p style="line-height: 1.7; margin-bottom: 20px;">
                     Fülle das Formular aus um dich bei der <strong>2. Season von JustCreators</strong> zu bewerben.
@@ -1893,6 +1891,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     return true;
                 }
                 
+                // ########## START: ANPASSUNG VALIDIERUNG (v6.7) ##########
                 // Validierung für Motivation
                 function validateMotivation() {
                     const motivationInput = document.getElementById('jc-motivation-input');
@@ -1901,10 +1900,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     if (!motivationInput || !motivationError) return true;
                     
                     const text = motivationInput.value;
-                    const length = text.length;
+                    // Entfernt ALLE Leerzeichen (auch zwischen Wörtern) vor dem Zählen
+                    const textWithoutSpaces = text.replace(/\s/g, ''); 
+                    const length = textWithoutSpaces.length; // Zählt nur "echte" Zeichen
                     
-                    // Wenn leer, keine Validierung (required wird vom Browser gehandhabt)
-                    if (text.trim() === '') {
+                    // Wenn nach dem Entfernen aller Leerzeichen leer
+                    if (length === 0) {
+                        if (motivationInput.hasAttribute('required')) {
+                             motivationError.textContent = '❌ Bitte gib eine Motivation ein.';
+                             motivationError.style.display = 'block';
+                             motivationInput.classList.add('error');
+                             return false;
+                        }
+                        // Falls es nicht required ist
                         motivationError.style.display = 'none';
                         motivationError.textContent = '';
                         motivationInput.classList.remove('error');
@@ -1921,12 +1929,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     } else {
                         // Zu wenig Zeichen
                         const remaining = 100 - length;
-                        motivationError.textContent = '❌ Bitte gib mindestens 100 Zeichen ein. (Noch ' + remaining + ' Zeichen)';
+                        // Angepasste Fehlermeldung
+                        motivationError.textContent = '❌ Bitte gib mindestens 100 Zeichen ein (Leerzeichen zählen nicht). (Noch ' + remaining + ' Zeichen)';
                         motivationError.style.display = 'block';
                         motivationInput.classList.add('error');
                         return false;
                     }
                 }
+                // ########## ENDE: ANPASSUNG VALIDIERUNG (v6.7) ##########
                 
                 // Validierung für Name
                 function validateName() {
@@ -2104,8 +2114,10 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         ageInput.addEventListener('change', validateAge);
                     }
                     
-                    // Motivation-Validierung nur beim Abschicken, nicht während des Tippens
-                    // (keine Event-Listener für input/blur/change)
+                    if (motivationInput) {
+                        motivationInput.addEventListener('input', validateMotivation);
+                        motivationInput.addEventListener('blur', validateMotivation);
+                    }
                     
                     // Form-Submit-Validierung
                     if (form) {
@@ -2134,7 +2146,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                     if (firstSocialInput) {
                                         firstSocialInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                         firstSocialInput.focus();
-D                                    }
+                                    }
                                 } else if (!activityValid && activityInput) {
                                     activityInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                     activityInput.focus();
@@ -2385,7 +2397,7 @@ function jc_admin_bewerbungen_page() {
         
         .jc-stat-card {
             background: #2a2c36;
-            padding: 25px;
+            padding: 15px 25px 20px 25px; /* Top-Padding weiter reduziert */
             border-radius: 14px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2422,7 +2434,7 @@ function jc_admin_bewerbungen_page() {
             font-size: 42px;
             font-weight: 700;
             color: #f0f0f0;
-            margin-bottom: 8px;
+            margin-bottom: 2px; /* Von 4px auf 2px reduziert */
         }
         
         .jc-stat-label {
@@ -2584,7 +2596,7 @@ function jc_admin_bewerbungen_page() {
             transition: all 0.3s ease;
             -webkit-appearance: none;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%<path fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             padding-right: 35px;
@@ -2654,4 +2666,190 @@ function jc_admin_bewerbungen_page() {
 // ========================================
 require_once plugin_dir_path( __FILE__ ) . 'justcreators_rules_page.php';
 
+// ========================================
+// COUNTDOWN SHORTCODE
+// ========================================
+add_shortcode( 'jc_countdown', 'jc_application_countdown_shortcode' );
+function jc_application_countdown_shortcode() {
+    
+    // Zieldatum: 1. Dezember 2025, 00:00:00 Uhr
+    // WICHTIG: Das Format MUSS YYYY-MM-DDTHH:MM:SS sein
+    $target_date_string = '2025-12-01T00:00:00';
+
+    ob_start();
+    ?>
+    
+    <style>
+        .jc-countdown-wrap {
+            background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+            border-radius: 16px;
+            padding: 40px 30px;
+            max-width: 900px;
+            margin: 40px auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+        
+        .jc-countdown-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #f0f0f0;
+            text-align: center;
+            margin: 0 0 30px 0;
+        }
+        
+        #jc-countdown-timer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+        }
+        
+        .jc-countdown-box {
+            background: #2a2c36;
+            border-radius: 14px;
+            padding: 25px 35px;
+            text-align: center;
+            min-width: 120px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .jc-countdown-number {
+            font-size: 64px;
+            font-weight: 700;
+            color: #f0f0f0;
+            line-height: 1.1;
+            display: block;
+            /* Dieser Textschatten gibt den Look eures Designs */
+            text-shadow: 0 0 15px rgba(88, 101, 242, 0.5);
+        }
+        
+        .jc-countdown-label {
+            font-size: 16px;
+            color: #a0a8b8;
+            margin-top: 10px;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        #jc-countdown-expired {
+            text-align: center;
+        }
+        
+        /* Responsive Anpassungen */
+        @media (max-width: 768px) {
+            .jc-countdown-wrap {
+                padding: 30px 20px;
+            }
+            #jc-countdown-timer {
+                gap: 15px;
+            }
+            .jc-countdown-box {
+                padding: 20px;
+                min-width: 100px;
+            }
+            .jc-countdown-number {
+                font-size: 48px;
+            }
+            .jc-countdown-label {
+                font-size: 14px;
+                margin-top: 5px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+             #jc-countdown-timer {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+            }
+            .jc-countdown-box {
+                min-width: auto;
+                padding: 20px 10px;
+            }
+            .jc-countdown-number {
+                font-size: 40px;
+            }
+        }
+
+    </style>
+    
+    <div class="jc-countdown-wrap">
+        
+        <div id="jc-countdown-timer-wrap">
+            <h2 class="jc-countdown-title">Bewerbungsphase beginnt in...</h2>
+            <div id="jc-countdown-timer">
+                <div class="jc-countdown-box">
+                    <span id="jc-days" class="jc-countdown-number">--</span>
+                    <span class="jc-countdown-label">Tage</span>
+                </div>
+                <div class="jc-countdown-box">
+                    <span id="jc-hours" class="jc-countdown-number">--</span>
+                    <span class="jc-countdown-label">Stunden</span>
+                </div>
+                <div class="jc-countdown-box">
+                    <span id="jc-minutes" class="jc-countdown-number">--</span>
+                    <span class="jc-countdown-label">Minuten</span>
+                </div>
+                <div class="jc-countdown-box">
+                    <span id="jc-seconds" class="jc-countdown-number">--</span>
+                    <span class="jc-countdown-label">Sekunden</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="jc-countdown-expired" style="display:none;">
+            <h2 class="jc-countdown-title">Die Bewerbungsphase ist jetzt geöffnet!</h2>
+            <a href="<?php echo esc_url( home_url('/bewerbung') ); ?>" class="jc-discord-btn" style="margin-top: 20px;">
+                <svg class="jc-discord-logo" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg"><path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/></svg>
+                Jetzt bewerben
+            </a>
+        </div>
+    </div>
+    
+    <script>
+    (function() {
+        // Zieldatum (aus PHP übernommen)
+        const countDownDate = new Date("<?php echo $target_date_string; ?>").getTime();
+
+        // Helfer-Funktion: Fügt eine führende Null hinzu (z.B. 9 -> 09)
+        function formatTime(time) {
+            return time < 10 ? "0" + time : time;
+        }
+
+        // Update den Countdown jede Sekunde
+        const x = setInterval(function() {
+            const now = new Date().getTime();
+            const distance = countDownDate - now;
+
+            // Zeitberechnungen
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+            // HTML-Elemente aktualisieren
+            document.getElementById("jc-days").innerHTML = formatTime(days);
+            document.getElementById("jc-hours").innerHTML = formatTime(hours);
+            document.getElementById("jc-minutes").innerHTML = formatTime(minutes);
+            document.getElementById("jc-seconds").innerHTML = formatTime(seconds);
+
+            // Wenn der Countdown abgelaufen ist
+            if (distance < 0) {
+                clearInterval(x);
+                // Verstecke den Timer
+                document.getElementById("jc-countdown-timer-wrap").style.display = "none";
+                // Zeige die "Bewerbung geöffnet"-Nachricht an
+                document.getElementById("jc-countdown-expired").style.display = "block";
+            }
+        }, 1000);
+    })();
+    </script>
+    
+    <?php
+    return ob_get_clean();
+}
 ?>
