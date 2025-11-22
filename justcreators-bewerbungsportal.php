@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JustCreators Bewerbungsportal Pro
  * Description: Erweiterte Version mit Link-Validierung, Auto-Sync und Discord Tags
- * Version: 6.2 (Fixed)
+ * Version: 6.11 (Info-Boxen bei 'Pending' entfernt)
  * Author: JustCreators Team
  * License: GPL2
  */
@@ -1400,55 +1400,36 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </div>
                         </div>
                    
-                    <?php if ( $application->status === 'pending' ): ?>
-                        <div style="margin-top: 30px; padding: 20px; background: rgba(88, 101, 242, 0.1); border-radius: 10px; border-left: 4px solid #5865F2;">
-                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                <span style="font-size: 24px;">💬</span>
-                                <strong style="font-size: 16px;">Wichtiger Hinweis</strong>
+                        <?php if ( $application->status === 'pending' ): ?>
+                            <?php endif; ?>
+                       
+                        <?php if ( $application->status === 'accepted' ): ?>
+                            <div style="padding: 20px; border-left: 4px solid #4ade80; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                    <span style="font-size: 24px;">🎊</span>
+                                    <strong style="font-size: 16px; color: #f0f0f0;">Nächste Schritte</strong>
+                                </div>
+                                <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
+                                    Willkommen im Team! Unser Team wird sich in Kürze bei dir melden, um:
+                                    <br>• Dir alle wichtigen Infos zu geben
+                                    <br>• Die nächsten Schritte zu besprechen
+                                    <br>• Dich in die Season 2 einzuführen
+                                    <br><br>
+                                    <strong>Wir freuen uns auf die Zusammenarbeit! 🚀</strong>
+                                </p>
                             </div>
-                            <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                Überprüfe regelmäßig deine <strong>Discord Direktnachrichten</strong>!
-                                Wir melden uns innerhalb von 1-2 Tagen bei dir.
-                                <br><br>
-                                Falls du keine Nachricht erhalten solltest, stelle sicher dass:
-                                <br>• Du auf dem JustCreators Discord-Server bist
-                                <br>• Direktnachrichten von Servermitgliedern aktiviert sind
-                            </p>
-                        </div>
-                        <div style="margin-top: 30px; padding: 20px; background: rgba(88, 101, 242, 0.1); border-radius: 10px; border-left: 4px solid #5865F2;">
-                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                <span style="font-size: 24px;">🔗</span>
-                                <strong style="font-size: 16px;">Temporärer Discord-Server</strong>
-                            </div>
-                            <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                Um Nachrichten vom Bot zu empfangen, join bitte unserem temporären Discord-Server: 
-                                <br><a href="<?php echo JC_TEMP_DISCORD_INVITE; ?>" target="_blank"><?php echo JC_TEMP_DISCORD_INVITE; ?></a>
-                                <br><br>
-                                Sobald du dem Haupt-Server beitrittst, wirst du automatisch vom temporären Server entfernt.
-                            </p>
-                        </div>
+                        <?php endif; ?>
+
+                    </div> <?php if ( $application->status === 'accepted' ): ?>
+                        <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
+                            ✅ Akzeptiere die Regeln
+                        </a>
+                    <?php else: ?>
+                        <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="jc-discord-btn" style="margin-top: 25px; background: #3a3c4a !important; box-shadow: none !important;">
+                            🏠 Zurück zur Startseite
+                        </a>
                     <?php endif; ?>
                    
-                    <?php if ( $application->status === 'accepted' ): ?>
-                        <div style="margin-top: 30px; padding: 20px; background: rgba(74, 222, 128, 0.1); border-radius: 10px; border-left: 4px solid #4ade80;">
-                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-                                <span style="font-size: 24px;">🎊</span>
-                                <strong style="font-size: 16px;">Nächste Schritte</strong>
-                            </div>
-                            <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                Willkommen im Team! Unser Team wird sich in Kürze bei dir melden, um:
-                                <br>• Dir alle wichtigen Infos zu geben
-                                <br>• Die nächsten Schritte zu besprechen
-                                <br>• Dich in die Season 2 einzuführen
-                                <br><br>
-                                <strong>Wir freuen uns auf die Zusammenarbeit! 🚀</strong>
-                            </p>
-                        </div>
-                    <?php endif; ?>
-                   
-                    <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
-                        ✅ Akzeptiere die Regeln
-                    </a>
                 </div>
                
                 <?php
@@ -2414,7 +2395,6 @@ function jc_admin_bewerbungen_page() {
             margin: 0 0 30px 0;
         }
         
-        /* ########## START: ANPASSUNG ADMIN-BOXEN (v6.6) ########## */
         .jc-stat-card {
             background: #2a2c36;
             padding: 15px 25px 20px 25px; /* Top-Padding weiter reduziert */
@@ -2424,7 +2404,6 @@ function jc_admin_bewerbungen_page() {
             animation: jc-fadeIn 0.6s ease-out;
             border-left: 4px solid;
         }
-        /* ########## ENDE: ANPASSUNG ADMIN-BOXEN ########## */
         
         .jc-stat-card:hover {
             transform: translateY(-5px);
@@ -2451,14 +2430,12 @@ function jc_admin_bewerbungen_page() {
             background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, #2a2c36 100%);
         }
         
-        /* ########## START: ANPASSUNG ADMIN-BOXEN (v6.6) ########## */
         .jc-stat-number {
             font-size: 42px;
             font-weight: 700;
             color: #f0f0f0;
             margin-bottom: 2px; /* Von 4px auf 2px reduziert */
         }
-        /* ########## ENDE: ANPASSUNG ADMIN-BOXEN ########## */
         
         .jc-stat-label {
             font-size: 15px;
