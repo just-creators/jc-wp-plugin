@@ -853,7 +853,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             display: inline-block; /* Wichtig für Höhe/Breite */
             width: 32px;  /* Deine gewünschte Breite */
             height: 32px; /* Deine gewünschte Höhe */
-            background-image: url('https://just-creators.de/wp-content/uploads/2025/11/cropped-WordPress-Favicon-removebg-preview-2.png');
+            background-image: url('https://just-creators.de/wp-content/uploads/2025/11/JC-Favicon-1.png');
             background-size: contain; /* Stellt sicher, dass das Bild hineinpasst */
             background-repeat: no-repeat;
             background-position: center;
