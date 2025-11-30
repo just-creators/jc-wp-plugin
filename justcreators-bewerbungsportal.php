@@ -1343,7 +1343,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 $auth_url = jc_get_discord_authorize_url();
                 ?>
                 <p style="line-height: 1.7; margin-bottom: 20px;">
-                    Es ist soweit, die <strong>2. Staffel von JustCreators</strong> beginnt.Wir werden uns innerhalb 24-48 Stunden bei dir über Discord melden.
+                    Es ist soweit, die <strong>2. Staffel von JustCreators</strong> beginnt .Wir werden uns innerhalb 24-48 Stunden bei dir über Discord melden.
                     <br><br>
                     <strong>Wichtig:</strong> Stelle sicher, dass du Direktnachrichten von Servermitgliedern aktiviert hast, sowie Nachrichtenanfragen <strong>deaktiviert</strong> hast.
                     <br><br>
