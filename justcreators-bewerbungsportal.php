@@ -849,7 +849,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
         }
        
         .jc-h::before {
-            content: '🎮';
+            content: 'JC';
             font-size: 32px;
         }
        
@@ -1326,7 +1326,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
    
     <div class="jc-bewerbung-wrap">
         <div class="jc-card">
-            <h2 class="jc-h">Bewerbung — JustCreators</h2>
+            <h2 class="jc-h">Bewerbung — JustCreators Season 2</h2>
            
             <?php
             $discord_user = isset( $_SESSION['jc_discord_user'] ) ? $_SESSION['jc_discord_user'] : false;
@@ -1336,13 +1336,12 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 $auth_url = jc_get_discord_authorize_url();
                 ?>
                 <p style="line-height: 1.7; margin-bottom: 20px;">
-                    Um dich bei der <strong>2. Season von JustCreators</strong> zu bewerben, musst du dich mit deinem Discord Account anmelden.
-                    Nach 1-2 Tagen werden wir uns bei dir über Discord melden.
+                    Es ist soweit, die <strong>2. Staffel von JustCreators</strong> beginnt.Wir werden uns innerhalb 24-48 Stunden bei dir über Discord melden.
                     <br><br>
-                    <strong>Wichtig:</strong> Stelle sicher, dass du Direktnachrichten von Servermitgliedern aktiviert hast.
+                    <strong>Wichtig:</strong> Stelle sicher, dass du Direktnachrichten von Servermitgliedern aktiviert hast, sowie Nachrichtenanfragen <strong>deaktiviert</strong> hast.
                     <br><br>
                     Wir wünschen dir viel Glück!<br>
-                    <em>— Dein JustCreators Team</em>
+                    <em>Dein JustCreators Team</em>
                 </p>
                
                 <?php if ( isset( $_GET['jc_oauth_error'] ) ): ?>
@@ -1893,8 +1892,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     const age = parseInt(ageValue, 10);
                     
                     // Prüfe ob es eine gültige Zahl ist und im erlaubten Bereich
-                    if (isNaN(age) || age < 11 || age > 99) {
-                        ageError.textContent = '❌ Das Alter muss zwischen 11 und 99 Jahren liegen.';
+                    if (isNaN(age) || age < 11 || age > 67) {
+                        ageError.textContent = '❌ Das Alter muss zwischen 11 und 67 Jahren liegen.';
                         ageError.style.display = 'block';
                         ageInput.classList.add('error');
                         return false;
@@ -1936,7 +1935,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                     
                     // Prüfe ob mindestens 100 Zeichen
-                    if (length >= 100) {
+                    if (length >= 67) {
                         // Alles OK - mindestens 100 Zeichen
                         motivationError.style.display = 'none';
                         motivationError.textContent = '';
@@ -1946,7 +1945,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         // Zu wenig Zeichen
                         const remaining = 100 - length;
                         // Angepasste Fehlermeldung
-                        motivationError.textContent = '❌ Bitte gib mindestens 100 Zeichen ein (Leerzeichen zählen nicht). (Noch ' + remaining + ' Zeichen)';
+                        motivationError.textContent = '❌ Bitte gib mindestens 67 Zeichen ein (Leerzeichen zählen nicht). (Noch ' + remaining + ' Zeichen)';
                         motivationError.style.display = 'block';
                         motivationInput.classList.add('error');
                         return false;
