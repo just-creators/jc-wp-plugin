@@ -1942,7 +1942,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                     
                     // Prüfe ob mindestens 100 Zeichen
-                    if (length >= 67) {
+                    if (length >= 100) {
                         // Alles OK - mindestens 100 Zeichen
                         motivationError.style.display = 'none';
                         motivationError.textContent = '';
@@ -1952,7 +1952,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         // Zu wenig Zeichen
                         const remaining = 100 - length;
                         // Angepasste Fehlermeldung
-                        motivationError.textContent = '❌ Bitte gib mindestens 67 Zeichen ein (Leerzeichen zählen nicht). (Noch ' + remaining + ' Zeichen)';
+                        motivationError.textContent = '❌ Bitte gib mindestens 100 Zeichen ein (Leerzeichen zählen nicht). (Noch ' + remaining + ' Zeichen)';
                         motivationError.style.display = 'block';
                         motivationInput.classList.add('error');
                         return false;
