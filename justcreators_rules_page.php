@@ -436,7 +436,7 @@ function jc_rules_form( $discord_name, $member ) {
                     <span style="color: #dcddde; font-size: 15px; line-height: 1.7;">
                         <strong style="color: #f44336; font-size: 16px;">Ich habe die Regeln vollständig gelesen und akzeptiere sie</strong><br>
                         <small style="color: #a0a8b8; font-size: 14px;">
-                            Ich verpflichte mich, die Content-Pflichten einzuhalten und die Regeln zu respektieren.<br>
+                            Ich verpflichte mich, die Content-Pflichten einzuhalten und die Regeln zu respektieren, sowie verpflichtende Mods zu verwenden.<br>
                             Bei Regelverstößen kann meine Teilnahme beendet werden.
                         </small>
                     </span>
@@ -489,7 +489,7 @@ function jc_rules_discord_invite( $member, $discord_name ) {
                     <h3 style="color: #5865F2; margin: 0 0 15px 0; font-size: 24px; font-weight: 700;">📱 Dein Persönlicher Invite</h3>
                     <p style="color: #dcddde; line-height: 1.8; margin-bottom: 30px; font-size: 16px;">
                         Klicke auf den Button, um dem <strong>JustCreators Discord Server</strong> beizutreten.<br>
-                        <strong style="color: #ffc107;">⚠️ Dieser Link ist nur 1x gültig und läuft in 15 Minuten ab!</strong>
+                        <strong style="color: #ffc107;">⚠️ Dieser Link ist nur 1x gültig!</strong>
                     </p>
                     <a 
                         href="<?php echo esc_url( $discord_invite ); ?>" 
@@ -509,7 +509,7 @@ function jc_rules_discord_invite( $member, $discord_name ) {
                     <h3 style="color: #f44336; margin: 0 0 15px 0; font-size: 24px; font-weight: 700;">❌ Fehler</h3>
                     <p style="color: #dcddde; line-height: 1.8; margin-bottom: 30px; font-size: 16px;">
                         Dein Profil ist vollständig, aber wir konnten gerade keinen persönlichen Einladungslink generieren.<br>
-                        Bitte kontaktiere einen Admin im JustCreators Team-Discord.
+                        Bitte kontaktiere einen kabel_entwirer im JustCreators Bewerbungs-Discord.
                     </p>
                 </div>
             <?php endif; ?>
