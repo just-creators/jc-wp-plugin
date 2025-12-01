@@ -1571,12 +1571,12 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                     <strong style="font-size: 16px; color: #f0f0f0;">Nächste Schritte</strong>
                                 </div>
                                 <p style="color: #a0a8b8; font-size: 14px; line-height: 1.6; margin: 0;">
-                                    Willkommen im Team! Unser Team wird sich in Kürze bei dir melden, um:
-                                    <br>• Dir alle wichtigen Infos zu geben
-                                    <br>• Die nächsten Schritte zu besprechen
-                                    <br>• Dich in die Season 2 einzuführen
+                                    Willkommen im Projekt! Klicke nun unten um die Regeln zu akzeptieren so kannst du;
+                                    <br>• Alle Wichtigen Informationen bekommen
+                                    <br>• Dich über das Regelwerk informieren
+                                    <br>• Im Projekt mitspielen und Spaß haben
                                     <br><br>
-                                    <strong>Wir freuen uns auf die Zusammenarbeit! 🚀</strong>
+                                    <strong>Wir freuen deine Teilnhame im Projekt! 🚀</strong>
                                 </p>
                             </div>
                         <?php endif; ?>
