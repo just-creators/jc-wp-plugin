@@ -399,9 +399,10 @@ function jc_rules_form( $discord_name, $member ) {
                 <div class="jc-rule-box" style="border-left-color: #ffc107;">
                     <h3 style="color: #ffc107;">🛠️ Erlaubte Modifikationen</h3>
                     <ul>
-                        <li>Alle Modifikationen, die nicht explizit auf der offiziellen Liste stehen, sind <strong style="color: #f44336;">strikte verboten</strong>.</li>
+                        <li>Alle Modifikationen, die nicht explizit auf der offiziellen Liste stehen, sind <strong style="color: #f44336;">strikt verboten</strong>.</li>
                         <li>Eine vollständige Liste aller erlaubten Modifikationen findest du hier: <a href="https://just-creators.de/mods" target="_blank" style="color: #5865F2; text-decoration: none; font-weight: 600;">just-creators.de/mods</a></li>
-                        <li>Du kannst jederzeit neue Mods (z.B. Performance-Mods) über den Support im Discord einreichen, um sie zur Liste hinzufügen zu lassen.</li>
+                        <li>In diesem Projekt wird Simple Voice Chat verpfliichtend verwendet. Mit dem akzetieren der Regeln, verpflichtest du dich für die Beutzung!</li>
+                        <li>Du kannst jederzeit neue Mods über den Support im Discord einreichen, um sie zur Liste hinzufügen zu lassen.</li>
                     </ul>
                 </div>
                 </div>
