@@ -366,33 +366,34 @@ function jc_rules_form( $discord_name, $member ) {
                 <div class="jc-rule-box" style="border-left-color: #4ade80;">
                     <h3 style="color: #4ade80;">🤝 Verhalten & Kommunikation</h3>
                     <ul>
-                        <li>Keine Beleidigungen gegenüber Teammitgliedern / Spielern</li>
-                        <li>Angemessenes Verhalten im Discord und im Chat</li>
-                        <li>AKeine GIFs, Memes oder Sticker in den Discord schicken.</li>
-                        <li>Spammen in jeder Art ist untersagt.</li>
-                        <li>Rassistische Äußerungen in jeder Art sind strengstens verboten!</li>
+                        <li><strong>§1:</strong> Keine Beleidigungen gegenüber Teammitgliedern / Spielern</li>
+                        <li><strong>§2:</strong> Angemessenes Verhalten im Discord und im Chat</li>
+                        <li><strong>§3:</strong> Keine GIFs, Memes oder Sticker in den Discord schicken.</li>
+                        <li><strong>§4:</strong> Spammen in jeder Art ist untersagt.</li>
+                        <li><strong>§5:</strong> Rassistische Äußerungen in jeder Art sind strengstens verboten!</li>
                     </ul>
                 </div>
                 
                 <div class="jc-rule-box" style="border-left-color: #5865F2;">
                     <h3 style="color: #5865F2;">⛏️ Minecraft Server Regeln</h3>
                     <ul>
-                        <li>Die Verwendung jeglicher Hack Clients oder Modifikationen welche nicht durch uns freigegeben wurden, sind strengstens untersagt.</li>
-                        <li>Jegliche Modifikationen, die die Verbindung zu unseren Server verändern (z.B. VPN, WTFast, Proxy-Server), werden nicht unterstützt</li>
-                        <li>Spiel/Plugin -fehler (Bugs) ausnutzen ist verboten. (Über Ausnahmen beim Support informieren)</li>
-                        <li>Das Verfolgen von Absichten mit dem vorrangigen Ziel, anderen den Spielspaß zu nehmen oder das Nutzungserlebnis zu mindern, ist verboten.</li>
-                        <li>Das Umgehen sämtlicher Strafen, beispielsweise durch ein VPN oder einen anderen Account ist untersagt.</li>
-                        <li>DDoS ist verboten und wird dementsprechend zur Anzeige gebracht.</li>
-                        <li>Jegliche Art von Lag produzierenden Maschinen und Aktivitäten sind verboten. (Informationen beim Support)</li>
-                        <li>Kein unnötiges Töten von Spielern.</li>
-                        <li>Griefen und/oder klauen ist strengstens untersagt!</li>
-                        <li>Im Shopping District muss der angeschriebene Betrag bezahlt werden. Diebstahl ist verboten.</li>
-                        <li>Es dürfen nur Items verkauft/gehandelt werden, welche auch im Discord von einem selber geclaimt wurden.</li>
-                        <li>Das End darf erst beim offiziellen End Event (10.02.2026 um 18:30) betreten werden.</li>
-                        <li>Das verändern, griefen und verwüsten vom Spawn ist strengstens untersagt</li>
-                        <li>Regelmäßiges Streamen / Video Uploads sind Pflicht! (Informationen stehen im Upload/Stream Plan im Discord)</li>
-                        <li>Bei einem Ban oder einer Konsequenz, darf der Bann nicht von einem selber/anderen Spielern in einem Video erwähnt werden</li>
-                        <li>Öffentliche Kritiken über den Server zu verbreiten folgt zu einem Projekt Ausschluss</li>
+                        <li><strong>§1:</strong> Die Verwendung jeglicher Hack Clients oder Modifikationen welche nicht durch uns freigegeben wurden, sind strengstens untersagt.</li>
+                        <li><strong>§2:</strong> Jegliche Modifikationen, die die Verbindung zu unseren Server verändern (z.B. VPN, WTFast, Proxy-Server), werden nicht unterstützt</li>
+                        <li><strong>§3:</strong> Spiel/Plugin -fehler (Bugs) ausnutzen ist verboten. (Über Ausnahmen beim Support informieren)</li>
+                        <li><strong>§4:</strong> Das Verfolgen von Absichten mit dem vorrangigen Ziel, anderen den Spielspaß zu nehmen oder das Nutzungserlebnis zu mindern, ist verboten.</li>
+                        <li><strong>§5:</strong> Das Umgehen sämtlicher Strafen, beispielsweise durch ein VPN oder einen anderen Account ist untersagt.</li>
+                        <li><strong>§6:</strong> DDoS ist verboten und wird dementsprechend zur Anzeige gebracht.</li>
+                        <li><strong>§7:</strong> Jegliche Art von Lag produzierenden Maschinen und Aktivitäten sind verboten. (Informationen beim Support)</li>
+                        <li><strong>§8:</strong> Kein unnötiges Töten von Spielern.</li>
+                        <li><strong>§9:</strong> Griefen und/oder klauen ist strengstens untersagt!</li>
+                        <li><strong>§10:</strong> Im Shopping District muss der angeschriebene Betrag bezahlt werden. Diebstahl ist verboten.</li>
+                        <li><strong>§11:</strong> Es dürfen nur Items verkauft/gehandelt werden, welche auch im Discord von einem selber geclaimt wurden.</li>
+                        <li><strong>§12:</strong> Das End darf erst beim offiziellen End Event (10.02.2026 um 18:30) betreten werden.</li>
+                        <li><strong>§13:</strong> Das verändern, griefen und verwüsten vom Spawn ist strengstens untersagt</li>
+                        <li><strong>§14:</strong> Regelmäßiges Streamen / Video Uploads sind Pflicht! (Informationen stehen im Upload/Stream Plan im Discord)</li>
+                        <li><strong>§15:</strong> Bei einem Ban oder einer Konsequenz, darf der Bann nicht von einem selber/anderen Spielern in einem Video erwähnt werden</li>
+                        <li><strong>§16:</strong> Öffentliche Kritiken über den Server zu verbreiten folgt zu einem Projekt Ausschluss</li>
+                        <li><strong>§17:</strong> Mehrere Minecraft Accounts eines Teilnehmers sind in diesem Projekt nicht gestattet</li>
                     </ul>
                 </div>
                 
