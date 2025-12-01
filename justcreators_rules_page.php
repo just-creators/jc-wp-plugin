@@ -2,7 +2,7 @@
 /**
  * JustCreators Regeln-Seite - Komplett
  * Enthält: Discord OAuth, Regeln, Formular, REST API, Dynamische Invites
- * Version: 3.1 (Mit dynamischen Einmal-Invites & UI-Fixes)
+ * Version: 6.18 (Mit Modifikationen-Reiter)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -395,7 +395,16 @@ function jc_rules_form( $discord_name, $member ) {
                         <li>Öffentliche Kritiken über den Server zu verbreiten folgt zu einem Projekt Ausschluss</li>
                     </ul>
                 </div>
-            </div>
+                
+                <div class="jc-rule-box" style="border-left-color: #ffc107;">
+                    <h3 style="color: #ffc107;">🛠️ Erlaubte Modifikationen</h3>
+                    <ul>
+                        <li>Alle Modifikationen, die nicht explizit auf der offiziellen Liste stehen, sind <strong style="color: #f44336;">strikte verboten</strong>.</li>
+                        <li>Eine vollständige Liste aller erlaubten Modifikationen findest du hier: <a href="https://just-creators.de/mods" target="_blank" style="color: #5865F2; text-decoration: none; font-weight: 600;">just-creators.de/mods</a></li>
+                        <li>Du kannst jederzeit neue Mods (z.B. Performance-Mods) über den Support im Discord einreichen, um sie zur Liste hinzufügen zu lassen.</li>
+                    </ul>
+                </div>
+                </div>
             
             <form method="POST" style="margin-top: 40px;">
                 <?php wp_nonce_field( 'jc_rules_action' ); ?>
@@ -516,6 +525,8 @@ function jc_rules_discord_invite( $member, $discord_name ) {
     </div>
     <?php
 }
+// ########## ENDE: ANPASSUNG INVITE-LOGIK (v6.12) ##########
+
 
 // ========================================
 // FORMULAR VERARBEITUNG
