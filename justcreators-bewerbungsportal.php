@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JustCreators Bewerbungsportal Pro
  * Description: Erweiterte Version mit Link-Validierung, Auto-Sync und Discord Tags
- * Version: 6.11 (Info-Boxen bei 'Pending' entfernt)
+ * Version: 6.17 (Datenschutz-Checkbox)
  * Author: JustCreators Team
  * License: GPL2
  */
@@ -80,6 +80,20 @@ add_action('rest_api_init', function() {
         'methods' => 'POST',
         'callback' => 'jc_handle_send_application',
         'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
+    ));
+    
+    // NEUER Endpunkt für ioBroker (LESEN)
+    register_rest_route('jc/v1', '/applications', array(
+        'methods' => 'GET',
+        'callback' => 'jc_api_get_all_applications',
+        'permission_callback' => 'jc_verify_api_secret' // Wir nutzen dieselbe Sicheit wie der Bot
+    ));
+    
+    // NEUER Endpunkt für ioBroker (SCHREIBEN)
+    register_rest_route('jc/v1', '/update-status', array(
+        'methods' => 'POST', // Wichtig: POST, nicht GET
+        'callback' => 'jc_api_update_status',
+        'permission_callback' => 'jc_verify_api_secret' // Dieselbe Sicherheit
     ));
 });
 function jc_handle_status_sync( $request ) {
@@ -230,6 +244,9 @@ function jc_handle_check_discord_join( $request ) {
         'is_on_temp_server' => $check_result['is_on_temp_server']
     );
 }
+
+// ########## START: AKTUALISIERTE FUNKTION (v6.17) ##########
+// Fügt 'privacy_accepted_at' zur Übertragung hinzu
 function jc_handle_send_application( $request ) {
     $params = $request->get_json_params();
     
@@ -285,10 +302,7 @@ function jc_handle_send_application( $request ) {
         );
     }
 
-    // ########## START: NEUE LOGIK (v6.13) ##########
-
     // 1. ZUERST in die Haupt-DB einfügen, um die ID zu bekommen
-    // (Wir fügen sie erstmal OHNE forum_post_id ein)
     $inserted = $wpdb->insert( $main_table, array(
         'discord_id' => $temp_application->discord_id,
         'discord_name' => $temp_application->discord_name,
@@ -297,8 +311,13 @@ function jc_handle_send_application( $request ) {
         'social_channels' => $temp_application->social_channels,
         'social_activity' => $temp_application->social_activity,
         'motivation' => $temp_application->motivation,
-        'status' => 'pending' // Status ist 'pending'
-    ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
+        'privacy_accepted_at' => $temp_application->privacy_accepted_at, // <-- NEU (v6.17)
+        'status' => 'pending'
+    ), array(
+        '%s','%s','%s','%s','%s','%s','%s',
+        '%s', // <-- NEU (v6.17) für privacy_accepted_at
+        '%s'
+    ) );
 
     if ( ! $inserted ) {
         // Wenn das Einfügen fehlschlägt (z.B. DB-Problem), abbrechen.
@@ -360,8 +379,113 @@ function jc_handle_send_application( $request ) {
         
         return new WP_Error( 'bot_error', $bot_result['message'] ?? 'Fehler beim Senden an Bot', array( 'status' => 500 ) );
     }
-    // ########## ENDE: NEUE LOGIK (v6.13) ##########
 }
+// ########## ENDE: AKTUALISIERTE FUNKTION (v6.17) ##########
+
+
+// ########## START: NEUE IOBROKER API FUNKTIONEN (v6.14) ##########
+/**
+ * NEUE API-FUNKTION FÜR IOBROKER (LESEN)
+ * Gibt alle Bewerbungen und eine Zusammenfassung zurück.
+ * Gesichert durch jc_verify_api_secret.
+ */
+function jc_api_get_all_applications( $request ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+    
+    // Hole alle Bewerbungen
+    $applications = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" );
+    
+    if ( is_wp_error( $applications ) ) {
+        return new WP_Error( 'db_error', 'Fehler beim Abrufen der Bewerbungen', array( 'status' => 500 ) );
+    }
+    
+    // Nützliche Statistiken für ioBroker-Dashboards
+    $total = count($applications);
+    $pending = 0;
+    $accepted = 0;
+    $rejected = 0;
+    
+    foreach ( $applications as $app ) {
+        if ( $app->status === 'pending' ) {
+            $pending++;
+        } elseif ( $app->status === 'accepted' ) {
+            $accepted++;
+        } elseif ( $app->status === 'rejected' ) {
+            $rejected++;
+        }
+        
+        // Bonus: social_channels als JSON-Objekt statt als String ausgeben
+        // ioBroker kann das direkt als Objekt parsen.
+        $app->social_channels = json_decode($app->social_channels);
+    }
+    
+    // Datenpaket für ioBroker
+    $data = array(
+        'success' => true,
+        'summary' => array(
+            'total' => $total,
+            'pending' => $pending,
+            'accepted' => $accepted,
+            'rejected' => $rejected
+        ),
+        'applications' => $applications // Die komplette Liste
+    );
+    
+    return new WP_REST_Response( $data, 200 );
+}
+
+/**
+ * NEUE API-FUNKTION FÜR IOBROKER (SCHREIBEN)
+ * Aktualisiert den Status einer Bewerbung.
+ * Akzeptiert JSON: { "discord_id": "12345", "new_status": "accepted" }
+ */
+function jc_api_update_status( $request ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+    
+    // Daten aus dem ioBroker POST-Request holen
+    $discord_id = sanitize_text_field( $request['discord_id'] );
+    $new_status = sanitize_text_field( $request['new_status'] );
+    
+    // Validierung
+    if ( empty($discord_id) || empty($new_status) ) {
+        return new WP_Error( 'missing_params', 'discord_id und new_status sind erforderlich', array( 'status' => 400 ) );
+    }
+    
+    // Prüfen, ob der Status gültig ist
+    if ( ! in_array( $new_status, ['pending', 'accepted', 'rejected'] ) ) {
+        return new WP_Error( 'invalid_status', 'Ungültiger Status. Erlaubt sind: pending, accepted, rejected', array( 'status' => 400 ) );
+    }
+
+    // Update in der Datenbank durchführen
+    $updated = $wpdb->update(
+        $table,
+        array( 'status' => $new_status ), // SET
+        array( 'discord_id' => $discord_id ), // WHERE
+        array( '%s' ), // Format für SET
+        array( '%s' )  // Format für WHERE
+    );
+
+    if ( $updated === false ) {
+        return new WP_Error( 'db_error', 'Fehler beim Update des Status', array( 'status' => 500 ) );
+    }
+    
+    if ( $updated === 0 ) {
+        return new WP_REST_Response( array(
+            'success' => false,
+            'message' => 'Keine Bewerbung mit dieser Discord ID gefunden.'
+        ), 404 );
+    }
+    
+    // Erfolg zurück an ioBroker senden
+    return new WP_REST_Response( array(
+        'success' => true,
+        'message' => "Status für $discord_id auf $new_status gesetzt."
+    ), 200 );
+}
+// ########## ENDE: NEUE IOBROKER API FUNKTIONEN (v6.14) ##########
+
 
 // ========================================
 // ADMIN EINSTELLUNGEN
@@ -488,6 +612,7 @@ register_activation_hook( __FILE__, function() {
     global $wpdb;
     $charset_collate = $wpdb->get_charset_collate();
     
+    // ########## START: AKTUALISIERTE TABELLE (v6.17) ##########
     // Haupttabelle für Bewerbungen
     $table_name = $wpdb->prefix . 'jc_discord_applications';
     $sql = "CREATE TABLE $table_name (
@@ -502,6 +627,7 @@ register_activation_hook( __FILE__, function() {
         forum_post_id varchar(64) DEFAULT '',
         status varchar(50) DEFAULT 'pending',
         created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        privacy_accepted_at datetime DEFAULT NULL, -- NEU (v6.17)
         PRIMARY KEY (id),
         KEY status (status),
         KEY discord_id (discord_id)
@@ -522,11 +648,13 @@ register_activation_hook( __FILE__, function() {
         motivation text DEFAULT '',
         created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
         expires_at datetime NOT NULL,
+        privacy_accepted_at datetime DEFAULT NULL, -- NEU (v6.17)
         PRIMARY KEY (id),
         KEY discord_id (discord_id),
         KEY expires_at (expires_at)
     ) $charset_collate;";
     dbDelta( $sql_temp );
+    // ########## ENDE: AKTUALISIERTE TABELLE (v6.17) ##########
     
     // Cron Job für Cleanup
     if ( ! wp_next_scheduled( 'jc_cleanup_temp_applications' ) ) {
@@ -848,18 +976,20 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             gap: 10px;
         }
        
+        /* ########## START: ANPASSUNG ICON (v6.15) ########## */
         .jc-h::before {
             content: ''; /* Wichtig: Inhalt leeren */
             display: inline-block; /* Wichtig für Höhe/Breite */
             width: 32px;  /* Deine gewünschte Breite */
             height: 32px; /* Deine gewünschte Höhe */
-            background-image: url('https://just-creators.de/wp-content/uploads/2025/11/JC-Favicon-1.png');
+            background-image: url('https://just-creators.de/wp-content/uploads/2025/11/cropped-WordPress-Favicon-removebg-preview-2.png');
             background-size: contain; /* Stellt sicher, dass das Bild hineinpasst */
             background-repeat: no-repeat;
             background-position: center;
-            margin-top: 4px; /* <-- HIER IST DIE ÄNDERUNG (verschiebt es 4px nach unten) */
+            margin-top: 4px; /* Verschiebt es 4px nach unten */
         }
-       
+        /* ########## ENDE: ANPASSUNG ICON (v6.15) ########## */
+
         .jc-status-box {
             background: #2a2c36 !important;
             padding: 40px !important;
@@ -1333,7 +1463,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
    
     <div class="jc-bewerbung-wrap">
         <div class="jc-card">
-            <h2 class="jc-h">Bewerbung — JustCreators Season 2</h2>
+            <h2 class="jc-h">Bewerbung — JustCreators</h2>
            
             <?php
             $discord_user = isset( $_SESSION['jc_discord_user'] ) ? $_SESSION['jc_discord_user'] : false;
@@ -1404,8 +1534,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <p class="jc-status-desc"><?php echo $current['desc']; ?></p>
                    
                     <div class="jc-status-info-wrapper" style="margin-top: 30px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.15); text-align: left;"> 
-                   
-                        <div class="jc-status-meta"> <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div class="jc-status-meta">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                 <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
                                     <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📝 BEWERBER</div>
                                     <div style="font-weight: 600; font-size: 16px;"><?php echo esc_html( $application->applicant_name ); ?></div>
@@ -1434,9 +1564,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </div>
                         </div>
                    
-                        <?php if ( $application->status === 'pending' ): ?>
-                            <?php endif; ?>
-                       
                         <?php if ( $application->status === 'accepted' ): ?>
                             <div style="padding: 20px; border-left: 4px solid #4ade80; border-top: 1px solid rgba(255, 255, 255, 0.1);">
                                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
@@ -1454,7 +1581,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </div>
                         <?php endif; ?>
 
-                    </div> <?php if ( $application->status === 'accepted' ): ?>
+                    </div>
+                   
+                    <?php if ( $application->status === 'accepted' ): ?>
                         <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
                             ✅ Akzeptiere die Regeln
                         </a>
@@ -1471,7 +1600,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 return ob_get_clean();
             }
            
-            // FORMULAR-VERARBEITUNG
+            // ########## START: AKTUALISIERTE FORMULAR-VERARBEITUNG (v6.17) ##########
+            // Fügt 'privacy_accepted_at' zur Verarbeitung hinzu
             $form_submitted = false;
             $validation_errors = array();
            
@@ -1480,6 +1610,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 if ( ! wp_verify_nonce( $nonce, 'jc_bewerbung_action' ) ) {
                     error_log( "JC Nonce: FAILED - Nonce={$nonce}, User={$discord_id}" );
                     $validation_errors[] = 'Sicherheitsüberprüfung fehlgeschlagen. Bitte lade die Seite neu (F5) und versuche es erneut.';
+                
+                // NEUE PRÜFUNG (v6.17)
+                } elseif ( ! isset( $_POST['jc_privacy_accept'] ) ) {
+                    $validation_errors[] = 'Du musst die Datenschutzerklärung akzeptieren, um fortzufahren.';
+                
                 } else {
                     $applicant_name = sanitize_text_field( wp_unslash( $_POST['applicant_name'] ) );
                     $age = sanitize_text_field( wp_unslash( $_POST['age'] ) );
@@ -1516,14 +1651,12 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         
                         // Bewerbung in temporäre Tabelle speichern (20 Minuten Gültigkeit)
                         $expires_at = date( 'Y-m-d H:i:s', time() + (20 * 60) ); // 20 Minuten
+                        $privacy_accepted_at = current_time( 'mysql' ); // NEU (v6.17)
                         
-                        // Leere ID abfangen, bevor es die DB tut
                         if ( empty($discord_id) ) {
                             error_log("JC: ❌ FEHLER: Discord ID ist LEER. Session-Problem besteht weiterhin. Abbruch.");
                             $validation_errors[] = 'Deine Discord-Sitzung ist abgelaufen. Bitte lade die Seite neu und melde dich erneut an.';
                         } else {
-                            
-                            // ##### KORRIGIERTE DATENBANK-LOGIK (v6.4) #####
                             
                             // SCHRITT 1: Lösche eine eventuell vorhandene, alte temporäre Bewerbung
                             $wpdb->delete(
@@ -1541,13 +1674,16 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 'social_channels' => $social_channels_json,
                                 'social_activity' => $social_activity,
                                 'motivation' => $motivation,
-                                'expires_at' => $expires_at
-                            ), array('%s','%s','%s','%s','%s','%s','%s','%s') );
+                                'expires_at' => $expires_at,
+                                'privacy_accepted_at' => $privacy_accepted_at // <-- NEU (v6.17)
+                            ), array(
+                                '%s','%s','%s','%s','%s','%s','%s','%s',
+                                '%s' // <-- NEU (v6.17) für privacy_accepted_at
+                            ) );
                             
                             if ( $inserted ) {
                                 error_log("JC: ✅ Neue temp Bewerbung für $discord_id gespeichert. Zeige Warte-Bildschirm.");
                                 
-                                // Bewerbung in temporärer DB gespeichert, jetzt auf Discord-Join warten
                                 $form_submitted = true;
                                 $waiting_for_discord = true;
                                 $application_data = array(
@@ -1560,10 +1696,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                     'motivation' => $motivation,
                                     'temp_id' => $wpdb->insert_id
                                 );
-                                // In Session speichern für späteren Bot-Call
                                 $_SESSION['jc_pending_application'] = $application_data;
                             } else {
-                                // HIER IST DER FEHLERFALL
                                 error_log("JC: ❌ DB INSERT FEHLGESCHLAGEN. DB-Fehler: " . $wpdb->last_error);
                                 error_log("JC: ❌ FEHLER: Lade Formular neu.");
                             }
@@ -1571,6 +1705,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                 }
             }
+            // ########## ENDE: AKTUALISIERTE FORMULAR-VERARBEITUNG (v6.17) ##########
            
             if ( ! empty( $validation_errors ) ) {
                 foreach ( $validation_errors as $error ) {
@@ -1603,8 +1738,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 Discord Server beitreten
                             </a>
                         </div>
-                        
-
                     </div>
                 </div>
                 
@@ -1796,7 +1929,15 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         ℹ️ <strong>Hinweis:</strong> Überprüfe deine Bewerbung bevor du sie einreichst!
                     </div>
                    
-                    <br>
+                    <label style="display: flex; align-items: flex-start; gap: 15px; margin: 25px 0; cursor: pointer; padding: 20px; background: rgba(88, 101, 242, 0.08); border-radius: 10px; border: 1px solid rgba(88, 101, 242, 0.2);">
+                        <input type="checkbox" name="jc_privacy_accept" required style="width: 24px; height: 24px; cursor: pointer; margin-top: 2px; flex-shrink: 0;" />
+                        <span style="color: #dcddde; font-size: 15px; line-height: 1.7;">
+                            <strong style="color: #f0f0f0; font-size: 16px;">Ich habe die <a href="<?php echo esc_url( home_url('/datenschutz') ); ?>" target="_blank" style="color: #5865F2; text-decoration: none;">Datenschutzerklärung</a> gelesen und akzeptiere sie.</strong><br>
+                            <small style="color: #a0a8b8; font-size: 14px;">
+                                Mir ist bewusst, dass meine Bewerbungsdaten (inkl. Discord-ID) zur Prüfung an das JustCreators-Team übermittelt werden.
+                            </small>
+                        </span>
+                    </label>
                     <button type="submit" class="jc-discord-btn" style="width: 100%;">
                         <svg class="jc-discord-logo" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg">
                             <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/>
@@ -1899,8 +2040,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     const age = parseInt(ageValue, 10);
                     
                     // Prüfe ob es eine gültige Zahl ist und im erlaubten Bereich
-                    if (isNaN(age) || age < 11 || age > 67) {
-                        ageError.textContent = '❌ Das Alter muss zwischen 11 und 67 Jahren liegen.';
+                    if (isNaN(age) || age < 11 || age > 99) {
+                        ageError.textContent = '❌ Das Alter muss zwischen 11 und 99 Jahren liegen.';
                         ageError.style.display = 'block';
                         ageInput.classList.add('error');
                         return false;
@@ -1913,7 +2054,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     return true;
                 }
                 
-                // ########## START: ANPASSUNG VALIDIERUNG (v6.7) ##########
                 // Validierung für Motivation
                 function validateMotivation() {
                     const motivationInput = document.getElementById('jc-motivation-input');
@@ -1958,7 +2098,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         return false;
                     }
                 }
-                // ########## ENDE: ANPASSUNG VALIDIERUNG (v6.7) ##########
                 
                 // Validierung für Name
                 function validateName() {
@@ -2304,7 +2443,6 @@ function jc_admin_bewerbungen_page() {
         echo '<th>📝 Name</th>';
         echo '<th>🎂 Alter</th>';
         echo '<th>🌐 Social</th>';
-        echo '<th>📊 Aktivität</th>';
         echo '<th>💭 Motivation</th>';
         echo '<th>📅 Datum</th>';
         echo '<th class="jc-status-col">🏷️ Status</th>';
@@ -2340,9 +2478,19 @@ function jc_admin_bewerbungen_page() {
             echo '<td class="jc-cell-name"><strong>' . esc_html( $r->applicant_name ) . '</strong></td>';
             echo '<td class="jc-cell-age">' . esc_html( $r->age ) . '</td>';
             echo '<td class="jc-cell-social"><small>' . $social_display . '</small></td>';
-            echo '<td class="jc-cell-activity">' . esc_html( $r->social_activity ) . '</td>';
-            echo '<td class="jc-cell-motivation"><div class="jc-motivation-preview">' . esc_html( substr($r->motivation, 0, 15) ) . (strlen($r->motivation) > 15 ? '...' : '') . '</div></td>';
-            echo '<td class="jc-cell-date"><small>' . esc_html( date_i18n( 'd.m.Y', strtotime( $r->created_at ) ) ) . '<br>' . esc_html( date_i18n( 'H:i', strtotime( $r->created_at ) ) ) . ' Uhr</small></td>';
+            echo '<td class="jc-cell-motivation"><div class="jc-motivation-preview" title="' . esc_attr($r->motivation) . '">' . esc_html( substr($r->motivation, 0, 15) ) . (strlen($r->motivation) > 15 ? '...' : '') . '</div></td>';
+            
+            // NEU (v6.17): Zeige Datenschutz-Zeitstempel
+            $created_date = esc_html( date_i18n( 'd.m.Y', strtotime( $r->created_at ) ) );
+            $created_time = esc_html( date_i18n( 'H:i', strtotime( $r->created_at ) ) ) . ' Uhr';
+            
+            if ( ! empty( $r->privacy_accepted_at ) && $r->privacy_accepted_at !== '0000-00-00 00:00:00' ) {
+                $privacy_time = esc_html( date_i18n( 'd.m. H:i', strtotime( $r->privacy_accepted_at ) ) );
+                $date_display = "<small>{$created_date}<br>{$created_time}</small><br><small style='color: #4ade80; font-size: 11px; margin-top: 5px; display: block;'>✓ DS {$privacy_time}</small>";
+            } else {
+                $date_display = "<small>{$created_date}<br>{$created_time}</small><br><small style='color: #f44336; font-size: 11px; margin-top: 5px; display: block;'>✗ DS FEHLT</small>";
+            }
+            echo '<td class="jc-cell-date">' . $date_display . '</td>';
             
             // STATUS ÄNDERN DROPDOWN
             echo '<td class="jc-cell-status">';
