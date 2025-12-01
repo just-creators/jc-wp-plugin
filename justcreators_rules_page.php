@@ -354,33 +354,45 @@ function jc_rules_form( $discord_name, $member ) {
                     <ul>
                         <li><strong>31.01.2026 (19:45):</strong> Projekt Start → Alle streamen/1 Video</li>
                         <li><strong>31.01 - 10.02:</strong> Min. 2 Streams und/oder 1 Video</li>
-                        <li><strong>10.02.2026 (14:30):</strong> End-Eröffnung</li>
+                        <li><strong>10.02.2026 (18:30):</strong> End-Eröffnung</li>
                         <li><strong>10.02 - 16.02:</strong> Min. 1 Stream und/oder 1 Video</li>
                         <li><strong>16.02.2026 (15:00):</strong> Shopping District Eröffnung</li>
                         <li><strong>16.02 - 20.03:</strong> Min. 8 Streams und/oder 3 Videos</li>
-                        <li><strong>20.03.2026:</strong> Content-Ende → Keine Pflicht mehr! 🎊</li>
+                        <li><strong>20.03.2026:</strong> Content-Ende → Keine Pflicht mehr!</li>
+                        <li><strong>Ausnahmen:</strong> Ausnahmen können mit unserem Team besprochen werden!</li>
                     </ul>
                 </div>
                 
                 <div class="jc-rule-box" style="border-left-color: #4ade80;">
                     <h3 style="color: #4ade80;">🤝 Verhalten & Kommunikation</h3>
                     <ul>
-                        <li>Respektvoller Umgang mit allen Mitgliedern</li>
-                        <li>Keine Werbung für andere Projekte während JustCreators</li>
-                        <li>Aktive Kommunikation über Discord ist Pflicht</li>
-                        <li>Bei Problemen sofort das Team kontaktieren</li>
-                        <li>Regelverstöße können zum Ausschluss führen</li>
+                        <li>Keine Beleidigungen gegenüber Teammitgliedern / Spielern</li>
+                        <li>Angemessenes Verhalten im Discord und im Chat</li>
+                        <li>AKeine GIFs, Memes oder Sticker in den Discord schicken.</li>
+                        <li>Spammen in jeder Art ist untersagt.</li>
+                        <li>Rassistische Äußerungen in jeder Art sind strengstens verboten!</li>
                     </ul>
                 </div>
                 
                 <div class="jc-rule-box" style="border-left-color: #5865F2;">
                     <h3 style="color: #5865F2;">⛏️ Minecraft Server Regeln</h3>
                     <ul>
-                        <li>Kein Griefing oder absichtliches Zerstören von Builds</li>
-                        <li>Keine Hacks, Mods oder X-Ray (nur erlaubte Client-Mods)</li>
-                        <li>Fair Play: Kein Ausnutzen von Bugs oder Glitches</li>
-                        <li>Respektiere die Builds anderer Member</li>
-                        <li>Server-IP erhältst du nach Discord-Beitritt</li>
+                        <li>Die Verwendung jeglicher Hack Clients oder Modifikationen welche nicht durch uns freigegeben wurden, sind strengstens untersagt.</li>
+                        <li>Jegliche Modifikationen, die die Verbindung zu unseren Server verändern (z.B. VPN, WTFast, Proxy-Server), werden nicht unterstützt</li>
+                        <li>Spiel/Plugin -fehler (Bugs) ausnutzen ist verboten. (Über Ausnahmen beim Support informieren)</li>
+                        <li>Das Verfolgen von Absichten mit dem vorrangigen Ziel, anderen den Spielspaß zu nehmen oder das Nutzungserlebnis zu mindern, ist verboten.</li>
+                        <li>Das Umgehen sämtlicher Strafen, beispielsweise durch ein VPN oder einen anderen Account ist untersagt.</li>
+                        <li>DDoS ist verboten und wird dementsprechend zur Anzeige gebracht.</li>
+                        <li>Jegliche Art von Lag produzierenden Maschinen und Aktivitäten sind verboten. (Informationen beim Support)</li>
+                        <li>Kein unnötiges Töten von Spielern.</li>
+                        <li>Griefen und/oder klauen ist strengstens untersagt!</li>
+                        <li>Im Shopping District muss der angeschriebene Betrag bezahlt werden. Diebstahl ist verboten.</li>
+                        <li>Es dürfen nur Items verkauft/gehandelt werden, welche auch im Discord von einem selber geclaimt wurden.</li>
+                        <li>Das End darf erst beim offiziellen End Event (10.02.2026 um 18:30) betreten werden.</li>
+                        <li>Das verändern, griefen und verwüsten vom Spawn ist strengstens untersagt</li>
+                        <li>Regelmäßiges Streamen / Video Uploads sind Pflicht! (Informationen stehen im Upload/Stream Plan im Discord)</li>
+                        <li>Bei einem Ban oder einer Konsequenz, darf der Bann nicht von einem selber/anderen Spielern in einem Video erwähnt werden</li>
+                        <li>Öffentliche Kritiken über den Server zu verbreiten folgt zu einem Projekt Ausschluss</li>
                     </ul>
                 </div>
             </div>
@@ -390,7 +402,7 @@ function jc_rules_form( $discord_name, $member ) {
                 
                 <div style="background: rgba(88, 101, 242, 0.08); padding: 25px; border-radius: 10px; border: 1px solid rgba(88, 101, 242, 0.2); margin-bottom: 25px; animation: jc-fadeIn 0.6s ease-out;">
                     <label class="jc-label" style="margin-top: 0;">
-                        🎮 Dein Minecraft Name (Java Edition) *
+                        Dein Minecraft Name (Java Edition) *
                         <input 
                             class="jc-input" 
                             type="text" 
