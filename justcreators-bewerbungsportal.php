@@ -33,7 +33,7 @@ function jc_get_bot_api_secret() {
 // ========================================
 // Session GLOBAL starten - für ALLE Seiten
 add_action( 'init', function() {
-    if ( ! session_id() && ! headers_sent() ) {
+    if ( session_status() === PHP_SESSION_NONE && ! headers_sent() ) {
         // Session mit Cookie-Optionen starten
         session_set_cookie_params([
             'lifetime' => 0, // Browser-Session
