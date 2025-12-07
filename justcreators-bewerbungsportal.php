@@ -1988,7 +1988,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         updatePlatformIcon(e.target, index);
                     }
                 });
-                function jcAddSocialField() {
+                
+                // Globale Funktionen für onclick-Handler
+                window.jcAddSocialField = function() {
+                    console.log('jcAddSocialField aufgerufen, socialFieldCount:', socialFieldCount);
+                    
                     if (socialFieldCount >= maxSocialFields) {
                         alert('Du kannst maximal 5 Social Media Kanäle hinzufügen.');
                         return;
@@ -2000,6 +2004,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         return;
                     }
                     
+                    console.log('Container gefunden, erstelle neues Feld...');
+                    
                     const fieldGroup = document.createElement('div');
                     fieldGroup.className = 'jc-social-field-group';
                     fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
@@ -2007,28 +2013,34 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         'placeholder="z. B. youtube.com/@username" data-index="' + socialFieldCount + '" />' +
                         '<span class="jc-platform-icon" data-index="' + socialFieldCount + '"></span>' +
                         '</div>' +
-                        '<button type="button" class="jc-remove-social-btn">✕</button>';
+                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">✕</button>';
                    
                     container.appendChild(fieldGroup);
                     socialFieldCount++;
+                    
+                    console.log('Feld hinzugefügt, neuer Count:', socialFieldCount);
                    
                     const addBtn = document.querySelector('.jc-add-social-btn');
                     if (socialFieldCount >= maxSocialFields && addBtn) {
                         addBtn.style.display = 'none';
                     }
-                }
-                function jcRemoveSocialField(button) {
+                };
+                
+                window.jcRemoveSocialField = function(button) {
+                    console.log('jcRemoveSocialField aufgerufen');
                     const fieldGroup = button.closest('.jc-social-field-group');
                     if (fieldGroup) {
                         fieldGroup.remove();
                         socialFieldCount--;
+                        
+                        console.log('Feld entfernt, neuer Count:', socialFieldCount);
                        
                         const addBtn = document.querySelector('.jc-add-social-btn');
                         if (socialFieldCount < maxSocialFields && addBtn) {
                             addBtn.style.display = 'inline-block';
                         }
                     }
-                }
+                };
                 
                 // Validierung für Alter
                 function validateAge() {
