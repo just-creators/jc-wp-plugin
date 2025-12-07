@@ -2007,7 +2007,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         'placeholder="z. B. youtube.com/@username" data-index="' + socialFieldCount + '" />' +
                         '<span class="jc-platform-icon" data-index="' + socialFieldCount + '"></span>' +
                         '</div>' +
-                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">✕</button>';
+                        '<button type="button" class="jc-remove-social-btn">✕</button>';
                    
                     container.appendChild(fieldGroup);
                     socialFieldCount++;
@@ -2338,6 +2338,25 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 } else {
                     initValidation();
                 }
+                
+                // Event-Listener für "Kanal hinzufügen" Button
+                document.addEventListener('DOMContentLoaded', function() {
+                    const addBtn = document.getElementById('jc-add-social-btn');
+                    if (addBtn) {
+                        addBtn.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            jcAddSocialField();
+                        });
+                    }
+                });
+                
+                // Event-Delegation für Remove-Buttons (funktioniert auch für dynamisch hinzugefügte Buttons)
+                document.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('jc-remove-social-btn')) {
+                        e.preventDefault();
+                        jcRemoveSocialField(e.target);
+                    }
+                });
                 </script>
                 <?php
             }
