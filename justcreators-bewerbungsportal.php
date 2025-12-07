@@ -1995,6 +1995,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                    
                     const container = document.getElementById('jc-social-fields');
+                    if (!container) {
+                        console.error('Container jc-social-fields nicht gefunden');
+                        return;
+                    }
+                    
                     const fieldGroup = document.createElement('div');
                     fieldGroup.className = 'jc-social-field-group';
                     fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
@@ -2007,16 +2012,21 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     container.appendChild(fieldGroup);
                     socialFieldCount++;
                    
-                    if (socialFieldCount >= maxSocialFields) {
-                        document.querySelector('.jc-add-social-btn').style.display = 'none';
+                    const addBtn = document.querySelector('.jc-add-social-btn');
+                    if (socialFieldCount >= maxSocialFields && addBtn) {
+                        addBtn.style.display = 'none';
                     }
                 }
                 function jcRemoveSocialField(button) {
-                    button.closest('.jc-social-field-group').remove();
-                    socialFieldCount--;
-                   
-                    if (socialFieldCount < maxSocialFields) {
-                        document.querySelector('.jc-add-social-btn').style.display = 'inline-block';
+                    const fieldGroup = button.closest('.jc-social-field-group');
+                    if (fieldGroup) {
+                        fieldGroup.remove();
+                        socialFieldCount--;
+                       
+                        const addBtn = document.querySelector('.jc-add-social-btn');
+                        if (socialFieldCount < maxSocialFields && addBtn) {
+                            addBtn.style.display = 'inline-block';
+                        }
                     }
                 }
                 
