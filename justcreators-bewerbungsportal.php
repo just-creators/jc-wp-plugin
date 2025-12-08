@@ -1955,6 +1955,161 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         Bewerbung jetzt absenden
                     </button>
                 </form>
+                
+                <script>
+                console.log("JC Script loaded!");
+                
+                // basic counters
+                window.socialFieldCount = 1;
+                window.maxSocialFields = 5;
+                
+                console.log("socialFieldCount set to:", window.socialFieldCount);
+
+                // very small platform detection (ascii only)
+                var jcPlatformIcons = {
+                    youtube: "YT",
+                    tiktok: "TT",
+                    twitch: "TW",
+                    twitter: "TW",
+                    instagram: "IG",
+                    handle: "@",
+                    unknown: "?"
+                };
+
+                function detectPlatform(url) {
+                    var u = (url || "").toLowerCase();
+                    if (u.indexOf("youtube.com") !== -1 || u.indexOf("youtu.be") !== -1) return "youtube";
+                    if (u.indexOf("tiktok.com") !== -1) return "tiktok";
+                    if (u.indexOf("twitch.tv") !== -1) return "twitch";
+                    if (u.indexOf("twitter.com") !== -1 || u.indexOf("x.com") !== -1) return "twitter";
+                    if (u.indexOf("instagram.com") !== -1) return "instagram";
+                    if (u.charAt(0) === "@") return "handle";
+                    return "unknown";
+                }
+
+                function updatePlatformIcon(input, index) {
+                    var url = (input.value || "").trim();
+                    var iconElement = document.querySelector('.jc-platform-icon[data-index="' + index + '"]');
+                    if (!iconElement) return;
+                    if (url.length > 3) {
+                        var p = detectPlatform(url);
+                        iconElement.textContent = jcPlatformIcons[p] || jcPlatformIcons.unknown;
+                        iconElement.classList.add("visible");
+                    } else {
+                        iconElement.classList.remove("visible");
+                    }
+                }
+
+                document.addEventListener("input", function(e) {
+                    if (e.target.classList.contains("jc-social-input")) {
+                        var idx = e.target.getAttribute("data-index") || "0";
+                        updatePlatformIcon(e.target, idx);
+                    }
+                });
+
+                function jcAddSocialField() {
+                    console.log("jcAddSocialField called!");
+                    if (window.socialFieldCount >= window.maxSocialFields) {
+                        alert("Maximal 5 Social Media Kanaele erlaubt.");
+                        return;
+                    }
+                    var container = document.getElementById("jc-social-fields");
+                    if (!container) {
+                        console.error("Container not found!");
+                        return;
+                    }
+
+                    var fieldGroup = document.createElement("div");
+                    fieldGroup.className = "jc-social-field-group";
+                    fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
+                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" ' +
+                        'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
+                        '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
+                        '</div>' +
+                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
+
+                    container.appendChild(fieldGroup);
+                    window.socialFieldCount += 1;
+                    console.log("Field added, new count:", window.socialFieldCount);
+
+                    var addBtn = document.querySelector(".jc-add-social-btn");
+                    if (addBtn && window.socialFieldCount >= window.maxSocialFields) {
+                        addBtn.style.display = "none";
+                    }
+                }
+                
+                console.log("Defining window.jcAddSocialField...");
+                window.jcAddSocialField = jcAddSocialField;
+                console.log("window.jcAddSocialField is now:", typeof window.jcAddSocialField);
+
+                function jcRemoveSocialField(button) {
+                    console.log("jcRemoveSocialField called!");
+                    var group = button.closest(".jc-social-field-group");
+                    if (!group) return;
+                    group.remove();
+                    window.socialFieldCount = Math.max(1, window.socialFieldCount - 1);
+                    var addBtn = document.querySelector(".jc-add-social-btn");
+                    if (addBtn && window.socialFieldCount < window.maxSocialFields) {
+                        addBtn.style.display = "inline-block";
+                    }
+                }
+                window.jcRemoveSocialField = jcRemoveSocialField;
+
+                // minimal validation (kept simple to avoid charset issues)
+                function validateAge() {
+                    var ageInput = document.getElementById("jc-age-input");
+                    if (!ageInput) return true;
+                    var val = (ageInput.value || "").trim();
+                    if (val === "") return true;
+                    var n = parseInt(val, 10);
+                    return !isNaN(n) && n >= 11 && n <= 99;
+                }
+
+                function validateName() {
+                    var nameInput = document.getElementById("jc-name-input");
+                    if (!nameInput) return true;
+                    return (nameInput.value || "").trim().length >= 2;
+                }
+
+                function validateSocialLinks() {
+                    var inputs = document.querySelectorAll(".jc-social-input");
+                    return Array.from(inputs).some(function(input) {
+                        var v = (input.value || "").toLowerCase();
+                        return v.indexOf("youtube.com") !== -1 || v.indexOf("youtu.be") !== -1 || v.indexOf("twitch.tv") !== -1 || v.indexOf("tiktok.com") !== -1;
+                    });
+                }
+
+                function validateActivity() {
+                    var a = document.getElementById("jc-activity-input");
+                    if (!a) return true;
+                    return (a.value || "").trim().length >= 2;
+                }
+
+                function validateMotivation() {
+                    var m = document.getElementById("jc-motivation-input");
+                    if (!m) return true;
+                    return (m.value || "").replace(/\s/g, "").length >= 20;
+                }
+
+                function initValidation() {
+                    var form = document.getElementById("jc-application-form");
+                    if (!form) return;
+                    form.addEventListener("submit", function(e) {
+                        var ok = validateName() && validateAge() && validateSocialLinks() && validateActivity() && validateMotivation();
+                        if (!ok) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                    });
+                }
+
+                if (document.readyState === "loading") {
+                    document.addEventListener("DOMContentLoaded", initValidation);
+                } else {
+                    initValidation();
+                }
+                
+                </script>
                 <?php
             }
             ?>
