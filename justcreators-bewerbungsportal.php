@@ -2768,7 +2768,4 @@ if (document.readyState === "loading") {
 } else {
     jcInitForm();
 }
-</script>
-    <?php
 } );
-?>
