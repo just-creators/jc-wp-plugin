@@ -1989,10 +1989,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                 });
                 
-                // Globale Funktionen für onclick-Handler
-                window.jcAddSocialField = function() {
-                    console.log('jcAddSocialField aufgerufen, socialFieldCount:', socialFieldCount);
-                    
+                function jcAddSocialField() {
                     if (socialFieldCount >= maxSocialFields) {
                         alert('Du kannst maximal 5 Social Media Kanäle hinzufügen.');
                         return;
@@ -2003,8 +2000,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         console.error('Container jc-social-fields nicht gefunden');
                         return;
                     }
-                    
-                    console.log('Container gefunden, erstelle neues Feld...');
                     
                     const fieldGroup = document.createElement('div');
                     fieldGroup.className = 'jc-social-field-group';
@@ -2017,30 +2012,25 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                    
                     container.appendChild(fieldGroup);
                     socialFieldCount++;
-                    
-                    console.log('Feld hinzugefügt, neuer Count:', socialFieldCount);
                    
                     const addBtn = document.querySelector('.jc-add-social-btn');
                     if (socialFieldCount >= maxSocialFields && addBtn) {
                         addBtn.style.display = 'none';
                     }
-                };
+                }
                 
-                window.jcRemoveSocialField = function(button) {
-                    console.log('jcRemoveSocialField aufgerufen');
+                function jcRemoveSocialField(button) {
                     const fieldGroup = button.closest('.jc-social-field-group');
                     if (fieldGroup) {
                         fieldGroup.remove();
                         socialFieldCount--;
-                        
-                        console.log('Feld entfernt, neuer Count:', socialFieldCount);
                        
                         const addBtn = document.querySelector('.jc-add-social-btn');
                         if (socialFieldCount < maxSocialFields && addBtn) {
                             addBtn.style.display = 'inline-block';
                         }
                     }
-                };
+                }
                 
                 // Validierung für Alter
                 function validateAge() {
@@ -2350,25 +2340,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 } else {
                     initValidation();
                 }
-                
-                // Event-Listener für "Kanal hinzufügen" Button
-                document.addEventListener('DOMContentLoaded', function() {
-                    const addBtn = document.getElementById('jc-add-social-btn');
-                    if (addBtn) {
-                        addBtn.addEventListener('click', function(e) {
-                            e.preventDefault();
-                            jcAddSocialField();
-                        });
-                    }
-                });
-                
-                // Event-Delegation für Remove-Buttons (funktioniert auch für dynamisch hinzugefügte Buttons)
-                document.addEventListener('click', function(e) {
-                    if (e.target.classList.contains('jc-remove-social-btn')) {
-                        e.preventDefault();
-                        jcRemoveSocialField(e.target);
-                    }
-                });
                 </script>
                 <?php
             }
