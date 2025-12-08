@@ -2647,8 +2647,7 @@ function jc_application_countdown_shortcode() {
     
     <?php
     return ob_get_clean();
-}
-});
+} );
 
 // Register inline script for form functionality
 add_action( 'wp_head', function() {
