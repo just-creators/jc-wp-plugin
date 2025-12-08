@@ -1957,11 +1957,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 </form>
                 
                 <script>
-                // FIX: Removed IIFE wrapper so functions are globally accessible for onclick events
+                console.log("JC Script loaded!");
                 
                 // basic counters
                 window.socialFieldCount = 1;
                 window.maxSocialFields = 5;
+                
+                console.log("socialFieldCount set to:", window.socialFieldCount);
 
                 // very small platform detection (ascii only)
                 var jcPlatformIcons = {
@@ -2006,12 +2008,16 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 });
 
                 function jcAddSocialField() {
+                    console.log("jcAddSocialField called!");
                     if (window.socialFieldCount >= window.maxSocialFields) {
                         alert("Maximal 5 Social Media Kanaele erlaubt.");
                         return;
                     }
                     var container = document.getElementById("jc-social-fields");
-                    if (!container) return;
+                    if (!container) {
+                        console.error("Container not found!");
+                        return;
+                    }
 
                     var fieldGroup = document.createElement("div");
                     fieldGroup.className = "jc-social-field-group";
@@ -2024,16 +2030,20 @@ add_shortcode( 'discord_application_form', function( $atts ) {
 
                     container.appendChild(fieldGroup);
                     window.socialFieldCount += 1;
+                    console.log("Field added, new count:", window.socialFieldCount);
 
                     var addBtn = document.querySelector(".jc-add-social-btn");
                     if (addBtn && window.socialFieldCount >= window.maxSocialFields) {
                         addBtn.style.display = "none";
                     }
                 }
-                // Ensure explicit window assignment just in case
+                
+                console.log("Defining window.jcAddSocialField...");
                 window.jcAddSocialField = jcAddSocialField;
+                console.log("window.jcAddSocialField is now:", typeof window.jcAddSocialField);
 
                 function jcRemoveSocialField(button) {
+                    console.log("jcRemoveSocialField called!");
                     var group = button.closest(".jc-social-field-group");
                     if (!group) return;
                     group.remove();
