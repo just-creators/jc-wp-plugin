@@ -1947,348 +1947,146 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 </form>
                
                 <script>
-                // Globale Variablen
-                window.socialFieldCount = 1;
-                window.maxSocialFields = 5;
-               
-                const platformIcons = {
-                    'youtube': '🎥',
-                    'tiktok': '🎵',
-                    'twitch': '🎮',
-                    'twitter': '🐦',
-                    'instagram': '📸',
-                    'handle': '👤',
-                    'unknown': '🔗'
-                };
-                function detectPlatform(url) {
-                    url = url.toLowerCase();
-                    if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
-                    if (url.includes("tiktok.com")) return "tiktok";
-                    if (url.includes("twitch.tv")) return "twitch";
-                    if (url.includes("twitter.com") || url.includes("x.com")) return "twitter";
-                    if (url.includes("instagram.com")) return "instagram";
-                    if (url.startsWith("@")) return "handle";
-                    return "unknown";
-                }
-                function updatePlatformIcon(input, index) {
-                    var url = input.value.trim();
-                    var iconElement = document.querySelector(".jc-platform-icon[data-index=\"" + index + "\"]");
-                    if (!iconElement) return;
-                   
-                    if (url.length > 3) {
-                        var platform = detectPlatform(url);
-                        iconElement.textContent = platformIcons[platform];
-                        iconElement.classList.add("visible");
-                    } else {
-                        iconElement.classList.remove("visible");
+                (function() {
+                    // basic counters
+                    window.socialFieldCount = 1;
+                    window.maxSocialFields = 5;
+
+                    // very small platform detection (ascii only)
+                    var platformIcons = {
+                        youtube: "YT",
+                        tiktok: "TT",
+                        twitch: "TW",
+                        twitter: "TW",
+                        instagram: "IG",
+                        handle: "@",
+                        unknown: "?"
+                    };
+
+                    function detectPlatform(url) {
+                        var u = (url || "").toLowerCase();
+                        if (u.indexOf("youtube.com") !== -1 || u.indexOf("youtu.be") !== -1) return "youtube";
+                        if (u.indexOf("tiktok.com") !== -1) return "tiktok";
+                        if (u.indexOf("twitch.tv") !== -1) return "twitch";
+                        if (u.indexOf("twitter.com") !== -1 || u.indexOf("x.com") !== -1) return "twitter";
+                        if (u.indexOf("instagram.com") !== -1) return "instagram";
+                        if (u.charAt(0) === "@") return "handle";
+                        return "unknown";
                     }
-                }
-                document.addEventListener("input", function(e) {
-                    if (e.target.classList.contains("jc-social-input")) {
-                        var index = e.target.getAttribute("data-index");
-                        updatePlatformIcon(e.target, index);
+
+                    function updatePlatformIcon(input, index) {
+                        var url = (input.value || "").trim();
+                        var iconElement = document.querySelector('.jc-platform-icon[data-index="' + index + '"]');
+                        if (!iconElement) return;
+                        if (url.length > 3) {
+                            var p = detectPlatform(url);
+                            iconElement.textContent = platformIcons[p] || platformIcons.unknown;
+                            iconElement.classList.add("visible");
+                        } else {
+                            iconElement.classList.remove("visible");
+                        }
                     }
-                });
-                
-                function jcAddSocialField() {
-                    if (window.socialFieldCount >= window.maxSocialFields) {
-                        alert("Du kannst maximal 5 Social Media Kanaele hinzufuegen.");
-                        return;
-                    }
-                   
-                    var container = document.getElementById("jc-social-fields");
-                    if (!container) {
-                        console.error("Container jc-social-fields nicht gefunden");
-                        return;
-                    }
-                    
-                    var fieldGroup = document.createElement("div");
-                    fieldGroup.className = "jc-social-field-group";
-                    var html = '<div class="jc-social-field-wrapper">' +
-                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" ' +
-                        'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
-                        '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
-                        '</div>' +
-                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
-                    fieldGroup.innerHTML = html;
-                   
-                    container.appendChild(fieldGroup);
-                    window.socialFieldCount++;
-                   
-                    var addBtn = document.querySelector(".jc-add-social-btn");
-                    if (window.socialFieldCount >= window.maxSocialFields && addBtn) {
-                        addBtn.style.display = "none";
-                    }
-                }
-                window.jcAddSocialField = jcAddSocialField;
-                
-                function jcRemoveSocialField(button) {
-                    var fieldGroup = button.closest(".jc-social-field-group");
-                    if (fieldGroup) {
-                        fieldGroup.remove();
-                        window.socialFieldCount--;
-                       
+
+                    document.addEventListener("input", function(e) {
+                        if (e.target.classList.contains("jc-social-input")) {
+                            var idx = e.target.getAttribute("data-index") || "0";
+                            updatePlatformIcon(e.target, idx);
+                        }
+                    });
+
+                    function jcAddSocialField() {
+                        if (window.socialFieldCount >= window.maxSocialFields) {
+                            alert("Maximal 5 Social Media Kanaele erlaubt.");
+                            return;
+                        }
+                        var container = document.getElementById("jc-social-fields");
+                        if (!container) return;
+
+                        var fieldGroup = document.createElement("div");
+                        fieldGroup.className = "jc-social-field-group";
+                        fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
+                            '<input class="jc-input jc-social-input" type="text" name="social_channels[]" ' +
+                            'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
+                            '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
+                            '</div>' +
+                            '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
+
+                        container.appendChild(fieldGroup);
+                        window.socialFieldCount += 1;
+
                         var addBtn = document.querySelector(".jc-add-social-btn");
-                        if (window.socialFieldCount < window.maxSocialFields && addBtn) {
+                        if (addBtn && window.socialFieldCount >= window.maxSocialFields) {
+                            addBtn.style.display = "none";
+                        }
+                    }
+                    window.jcAddSocialField = jcAddSocialField;
+
+                    function jcRemoveSocialField(button) {
+                        var group = button.closest(".jc-social-field-group");
+                        if (!group) return;
+                        group.remove();
+                        window.socialFieldCount = Math.max(1, window.socialFieldCount - 1);
+                        var addBtn = document.querySelector(".jc-add-social-btn");
+                        if (addBtn && window.socialFieldCount < window.maxSocialFields) {
                             addBtn.style.display = "inline-block";
                         }
                     }
-                }
-                window.jcRemoveSocialField = jcRemoveSocialField;
-                
-                // Validierung für Alter
-                function validateAge() {
-                    var ageInput = document.getElementById("jc-age-input");
-                    var ageError = document.getElementById("jc-age-error");
-                    
-                    if (!ageInput || !ageError) return true;
-                    
-                    var ageValue = ageInput.value.trim();
-                    
-                    if (ageValue === "") {
-                        ageError.style.display = "none";
-                        ageError.textContent = "";
-                        ageInput.classList.remove("error");
-                        return true;
+                    window.jcRemoveSocialField = jcRemoveSocialField;
+
+                    // minimal validation (kept simple to avoid charset issues)
+                    function validateAge() {
+                        var ageInput = document.getElementById("jc-age-input");
+                        if (!ageInput) return true;
+                        var val = (ageInput.value || "").trim();
+                        if (val === "") return true;
+                        var n = parseInt(val, 10);
+                        return !isNaN(n) && n >= 11 && n <= 99;
                     }
-                    
-                    var age = parseInt(ageValue, 10);
-                    
-                    if (isNaN(age) || age < 11 || age > 99) {
-                        ageError.textContent = "Alter muss zwischen 11 und 99 Jahren liegen.";
-                        ageError.style.display = "block";
-                        ageInput.classList.add("error");
-                        return false;
+
+                    function validateName() {
+                        var nameInput = document.getElementById("jc-name-input");
+                        if (!nameInput) return true;
+                        return (nameInput.value || "").trim().length >= 2;
                     }
-                    
-                    ageError.style.display = "none";
-                    ageError.textContent = "";
-                    ageInput.classList.remove("error");
-                    return true;
-                }
-                
-                // Validierung für Motivation
-                function validateMotivation() {
-                    var motivationInput = document.getElementById("jc-motivation-input");
-                    var motivationError = document.getElementById("jc-motivation-error");
-                    
-                    if (!motivationInput || !motivationError) return true;
-                    
-                    var text = motivationInput.value;
-                    var textWithoutSpaces = text.replace(/\s/g, ""); 
-                    var length = textWithoutSpaces.length;
-                    
-                    if (length === 0) {
-                        if (motivationInput.hasAttribute("required")) {
-                             motivationError.textContent = "Bitte gib eine Motivation ein.";
-                             motivationError.style.display = "block";
-                             motivationInput.classList.add("error");
-                             return false;
-                        }
-                        motivationError.style.display = "none";
-                        motivationError.textContent = "";
-                        motivationInput.classList.remove("error");
-                        return true;
+
+                    function validateSocialLinks() {
+                        var inputs = document.querySelectorAll(".jc-social-input");
+                        return Array.from(inputs).some(function(input) {
+                            var v = (input.value || "").toLowerCase();
+                            return v.indexOf("youtube.com") !== -1 || v.indexOf("youtu.be") !== -1 || v.indexOf("twitch.tv") !== -1 || v.indexOf("tiktok.com") !== -1;
+                        });
                     }
-                    
-                    if (length >= 100) {
-                        motivationError.style.display = "none";
-                        motivationError.textContent = "";
-                        motivationInput.classList.remove("error");
-                        return true;
-                    } else {
-                        var remaining = 100 - length;
-                        motivationError.textContent = "Bitte gib mindestens 100 Zeichen ein (Leerzeichen zählen nicht). (Noch " + remaining + " Zeichen)";
-                        motivationError.style.display = "block";
-                        motivationInput.classList.add("error");
-                        return false;
+
+                    function validateActivity() {
+                        var a = document.getElementById("jc-activity-input");
+                        if (!a) return true;
+                        return (a.value || "").trim().length >= 2;
                     }
-                }
-                
-                // Validierung für Name
-                function validateName() {
-                    var nameInput = document.getElementById("jc-name-input");
-                    var nameError = document.getElementById("jc-name-error");
-                    
-                    if (!nameInput || !nameError) return true;
-                    
-                    var name = nameInput.value.trim();
-                    
-                    if (name === "") {
-                        nameError.textContent = "Bitte gib deinen Namen ein.";
-                        nameError.style.display = "block";
-                        nameInput.classList.add("error");
-                        return false;
+
+                    function validateMotivation() {
+                        var m = document.getElementById("jc-motivation-input");
+                        if (!m) return true;
+                        return (m.value || "").replace(/\s/g, "").length >= 20;
                     }
-                    
-                    if (name.length < 2) {
-                        nameError.textContent = "Der Name muss mindestens 2 Zeichen lang sein.";
-                        nameError.style.display = "block";
-                        nameInput.classList.add("error");
-                        return false;
-                    }
-                    
-                    nameError.style.display = "none";
-                    nameError.textContent = "";
-                    nameInput.classList.remove("error");
-                    return true;
-                }
-                
-                // Validierung für Social Media Links
-                function validateSocialLinks() {
-                    var socialError = document.getElementById("jc-social-error");
-                    var socialInputs = document.querySelectorAll(".jc-social-input");
-                    
-                    if (!socialError) return true;
-                    
-                    var hasValidLink = false;
-                    var invalidLinks = [];
-                    
-                    var filledInputs = Array.from(socialInputs).filter(function(input) { 
-                        return input.value.trim() !== ""; 
-                    });
-                    
-                    if (filledInputs.length === 0) {
-                        socialError.textContent = "Bitte gib mindestens einen Social Media Kanal an.";
-                        socialError.style.display = "block";
-                        socialInputs.forEach(function(input) { input.classList.add("error"); });
-                        return false;
-                    }
-                    
-                    filledInputs.forEach(function(input, index) {
-                        var value = input.value.trim();
-                        if (value === "") return;
-                        
-                        var isValid = false;
-                        var valueLower = value.toLowerCase();
-                        
-                        if (valueLower.includes("youtube.com") || valueLower.includes("youtu.be")) {
-                            isValid = true;
-                        } else if (valueLower.includes("twitch.tv")) {
-                            isValid = true;
-                        } else if (valueLower.includes("tiktok.com")) {
-                            isValid = true;
-                        }
-                        
-                        if (isValid) {
-                            hasValidLink = true;
-                            input.classList.remove("error");
-                        } else {
-                            invalidLinks.push("Link " + (index + 1));
-                            input.classList.add("error");
-                        }
-                    });
-                    
-                    if (invalidLinks.length > 0) {
-                        socialError.textContent = "Ungültiger Link: " + invalidLinks.join(", ") + ". Es sind nur YouTube, Twitch und TikTok erlaubt.";
-                        socialError.style.display = "block";
-                        return false;
-                    }
-                    
-                    if (!hasValidLink) {
-                        socialError.textContent = "Bitte gib mindestens einen gültigen Social Media Kanal an.";
-                        socialError.style.display = "block";
-                        return false;
-                    }
-                    
-                    socialError.style.display = "none";
-                    socialError.textContent = "";
-                    socialInputs.forEach(function(input) { input.classList.remove("error"); });
-                    return true;
-                }
-                
-                // Validierung für "Wie aktiv bist du?"
-                function validateActivity() {
-                    var activityInput = document.getElementById("jc-activity-input");
-                    var activityError = document.getElementById("jc-activity-error");
-                    
-                    if (!activityInput || !activityError) return true;
-                    
-                    var activity = activityInput.value.trim();
-                    
-                    if (activity === "") {
-                        activityError.textContent = "Bitte gib an, wie aktiv du bist.";
-                        activityError.style.display = "block";
-                        activityInput.classList.add("error");
-                        return false;
-                    }
-                    
-                    if (activity.length < 2) {
-                        activityError.textContent = "Bitte gib eine aussagekraeftige Antwort ein (mindestens 2 Zeichen).";
-                        activityError.style.display = "block";
-                        activityInput.classList.add("error");
-                        return false;
-                    }
-                    
-                    activityError.style.display = "none";
-                    activityError.textContent = "";
-                    activityInput.classList.remove("error");
-                    return true;
-                }
-                
-                // Event-Listener für Echtzeit-Validierung
-                function initValidation() {
-                    var ageInput = document.getElementById("jc-age-input");
-                    var motivationInput = document.getElementById("jc-motivation-input");
-                    var form = document.getElementById("jc-application-form");
-                    
-                    if (ageInput) {
-                        ageInput.addEventListener("input", validateAge);
-                        ageInput.addEventListener("blur", validateAge);
-                        ageInput.addEventListener("change", validateAge);
-                    }
-                    
-                    if (motivationInput) {
-                        motivationInput.addEventListener("input", validateMotivation);
-                        motivationInput.addEventListener("blur", validateMotivation);
-                    }
-                    
-                    if (form) {
+
+                    function initValidation() {
+                        var form = document.getElementById("jc-application-form");
+                        if (!form) return;
                         form.addEventListener("submit", function(e) {
-                            var nameValid = validateName();
-                            var ageValid = validateAge();
-                            var socialValid = validateSocialLinks();
-                            var activityValid = validateActivity();
-                            var motivationValid = validateMotivation();
-                            
-                            if (!nameValid || !ageValid || !socialValid || !activityValid || !motivationValid) {
+                            var ok = validateName() && validateAge() && validateSocialLinks() && validateActivity() && validateMotivation();
+                            if (!ok) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                
-                                var nameInput = document.getElementById("jc-name-input");
-                                var activityInput = document.getElementById("jc-activity-input");
-                                if (!nameValid && nameInput) {
-                                    nameInput.scrollIntoView({ behavior: "smooth", block: "center" });
-                                    nameInput.focus();
-                                } else if (!ageValid && ageInput) {
-                                    ageInput.scrollIntoView({ behavior: "smooth", block: "center" });
-                                    ageInput.focus();
-                                } else if (!socialValid) {
-                                    var firstSocialInput = document.querySelector(".jc-social-input");
-                                    if (firstSocialInput) {
-                                        firstSocialInput.scrollIntoView({ behavior: "smooth", block: "center" });
-                                        firstSocialInput.focus();
-                                    }
-                                } else if (!activityValid && activityInput) {
-                                    activityInput.scrollIntoView({ behavior: "smooth", block: "center" });
-                                    activityInput.focus();
-                                } else if (!motivationValid && motivationInput) {
-                                    motivationInput.scrollIntoView({ behavior: "smooth", block: "center" });
-                                    motivationInput.focus();
-                                }
-                                
-                                return false;
                             }
                         });
                     }
-                }
-                
-                // Initialisierung
-                if (document.readyState === "loading") {
-                    document.addEventListener("DOMContentLoaded", initValidation);
-                } else {
-                    initValidation();
-                }
+
+                    if (document.readyState === "loading") {
+                        document.addEventListener("DOMContentLoaded", initValidation);
+                    } else {
+                        initValidation();
+                    }
+                })();
                 </script>
                 <?php
             }
