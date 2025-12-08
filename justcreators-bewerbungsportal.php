@@ -913,24 +913,24 @@ function jc_check_user_on_temp_server( $discord_id ) {
 add_shortcode( 'discord_application_form', function( $atts ) {
     ob_start();
     ?>
-   
+    
     <style>
         @keyframes jc-fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-       
+        
         @keyframes jc-slideIn {
             from { opacity: 0; transform: translateX(-20px); }
             to { opacity: 1; transform: translateX(0); }
         }
-       
+        
         @keyframes jc-success-pop {
             0% { transform: scale(0.8); opacity: 0; }
             50% { transform: scale(1.1); }
             100% { transform: scale(1); opacity: 1; }
         }
-       
+        
         @keyframes jc-pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -958,14 +958,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             box-shadow: 0 10px 40px rgba(0,0,0,0.4);
             animation: jc-fadeIn 0.6s ease-out;
         }
-       
+        
         .jc-card {
             background: #2a2c36 !important;
             padding: 35px !important;
             border-radius: 14px !important;
             animation: jc-fadeIn 0.8s ease-out 0.2s both !important;
         }
-       
+        
         .jc-h {
             font-size: 28px;
             margin-bottom: 15px;
@@ -975,7 +975,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             align-items: center;
             gap: 10px;
         }
-       
+        
         /* ########## START: ANPASSUNG ICON (v6.15) ########## */
         .jc-h::before {
             content: ''; /* Wichtig: Inhalt leeren */
@@ -998,32 +998,32 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             box-shadow: 0 2px 12px rgba(0,0,0,0.3) !important;
             animation: jc-fadeIn 0.8s ease-out !important;
         }
-       
+        
         .jc-status-pending {
             border-left: 6px solid #ffc107;
         }
-       
+        
         .jc-status-accepted {
             border-left: 6px solid #4caf50;
         }
-       
+        
         .jc-status-rejected {
             border-left: 6px solid #f44336;
         }
-       
+        
         .jc-status-icon {
             font-size: 80px;
             margin-bottom: 20px;
             animation: jc-pulse 2s infinite;
         }
-       
+        
         .jc-status-title {
             font-size: 32px;
             font-weight: 700;
             margin-bottom: 15px;
             color: #f0f0f0;
         }
-       
+        
         .jc-status-desc {
             font-size: 17px;
             color: #f0f0f0 !important; /* Auf helles Weiß geändert */
@@ -1034,13 +1034,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
         .jc-status-desc * {
             color: inherit !important;
         }
-       
+        
         .jc-status-meta {
             font-size: 14px;
             color: #8a8f9e;
             padding: 25px; /* Padding hierher verschoben */
         }
-       
+        
         .jc-discord-btn {
             display: inline-flex !important;
             align-items: center !important;
@@ -1061,7 +1061,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             overflow: hidden !important;
             box-sizing: border-box !important;
         }
-       
+        
         .jc-discord-btn::before {
             content: '' !important;
             position: absolute !important;
@@ -1072,23 +1072,23 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
             transition: left 0.5s !important;
         }
-       
+        
         .jc-discord-btn:hover::before {
             left: 100% !important;
         }
-       
+        
         .jc-discord-btn:hover {
             transform: translateY(-2px) !important;
             box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6) !important;
             background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%) !important;
         }
-       
+        
         .jc-discord-logo {
             width: 24px !important;
             height: 24px !important;
             fill: #fff !important;
         }
-       
+        
         .jc-label {
             display: block !important;
             margin-top: 20px !important;
@@ -1097,7 +1097,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             color: #f0f0f0 !important;
             font-size: 15px !important;
         }
-       
+        
         .jc-input, .jc-textarea {
             width: 100% !important;
             padding: 14px !important;
@@ -1112,18 +1112,18 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             transition: all 0.3s ease !important;
             box-sizing: border-box !important;
         }
-       
+        
         .jc-input::placeholder, .jc-textarea::placeholder {
             color: #a0a8b8 !important;
         }
-       
+        
         .jc-input:focus, .jc-textarea:focus {
             outline: none !important;
             border-color: #5865F2 !important;
             box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2) !important;
             transform: translateY(-1px) !important;
         }
-       
+        
         .jc-social-field-group {
             display: flex !important;
             gap: 12px !important;
@@ -1137,23 +1137,23 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             border: 1px solid rgba(74, 76, 90, 0.3) !important;
             transition: all 0.3s ease !important;
         }
-       
+        
         .jc-social-field-group:hover {
             background: rgba(58, 60, 74, 0.35) !important;
             border-color: rgba(88, 101, 242, 0.2) !important;
         }
-       
+        
         .jc-social-field-wrapper {
             flex: 1 !important;
             position: relative !important;
         }
-       
+        
         .jc-social-field-group input {
             margin-top: 0 !important;
             padding-right: 50px !important;
             background: #2a2c36 !important;
         }
-       
+        
         .jc-platform-icon {
             position: absolute !important;
             right: 14px !important;
@@ -1164,11 +1164,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             opacity: 0 !important;
             transition: opacity 0.3s ease !important;
         }
-       
+        
         .jc-platform-icon.visible {
             opacity: 1 !important;
         }
-       
+        
         .jc-add-social-btn, .jc-remove-social-btn {
             padding: 12px 20px !important;
             border: 2px solid transparent !important;
@@ -1183,7 +1183,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             align-items: center !important;
             gap: 8px !important;
         }
-       
+        
         .jc-add-social-btn {
             background: rgba(88, 101, 242, 0.15) !important;
             color: #5865F2 !important;
@@ -1191,19 +1191,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             border: 1px solid rgba(88, 101, 242, 0.3) !important;
             box-shadow: none !important;
         }
-       
+        
         .jc-add-social-btn::before {
             content: '➕' !important;
             font-size: 16px !important;
         }
-       
+        
         .jc-add-social-btn:hover {
             background: linear-gradient(135deg, rgba(88, 101, 242, 0.25) 0%, rgba(88, 101, 242, 0.35) 100%) !important;
             transform: translateY(-2px) !important;
             box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3) !important;
             border-color: rgba(88, 101, 242, 0.5) !important;
         }
-       
+        
         .jc-remove-social-btn {
             background: linear-gradient(135deg, rgba(244, 67, 54, 0.15) 0%, rgba(244, 67, 54, 0.25) 100%) !important;
             color: #f44336 !important;
@@ -1215,19 +1215,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             line-height: 1 !important;
             min-width: 44px !important;
         }
-       
+        
         .jc-remove-social-btn:hover {
             background: rgba(244, 67, 54, 0.25) !important;
             transform: scale(1.05) !important;
             border-color: rgba(244, 67, 54, 0.5) !important;
         }
-       
+        
         .jc-add-social-btn:hover {
             background: rgba(88, 101, 242, 0.25) !important;
             transform: translateY(-1px) !important;
             border-color: rgba(88, 101, 242, 0.5) !important;
         }
-       
+        
         .jc-remove-social-btn {
             background: rgba(244, 67, 54, 0.15) !important;
             color: #f44336 !important;
@@ -1240,11 +1240,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             min-width: 42px !important;
             height: 42px !important;
         }
-       
+        
         .jc-remove-social-btn:hover {
             background: rgba(255, 107, 107, 0.3) !important;
         }
-       
+        
         .jc-note {
             font-size: 14px !important;
             color: #a0a8b8 !important;
@@ -1254,7 +1254,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             border-left: 3px solid #5865F2 !important;
             border-radius: 6px !important;
         }
-       
+        
         .jc-error {
             color: #ffb4b4 !important;
             background: #3a2323 !important;
@@ -1264,7 +1264,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             margin: 15px 0 !important;
             animation: jc-fadeIn 0.4s ease-out !important;
         }
-       
+        
         .jc-success {
             background: linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 100%) !important;
             padding: 30px !important;
@@ -1275,43 +1275,43 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             border: 2px solid #4ade80 !important;
             box-shadow: 0 8px 24px rgba(74, 222, 128, 0.2) !important;
         }
-       
+        
         .jc-success-icon {
             width: 80px !important;
             height: 80px !important;
             margin: 0 auto 20px !important;
         }
-       
+        
         .jc-success-icon svg {
             width: 100% !important;
             height: 100% !important;
         }
-       
+        
         .jc-success-icon circle {
             fill: #4ade80 !important;
             animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
         }
-       
+        
         .jc-success-icon path {
             stroke: #fff !important;
             stroke-width: 3 !important;
             stroke-dasharray: 100 !important;
         }
-       
+        
         .jc-success h3 {
             color: #d1f7d1 !important;
             font-size: 24px !important;
             margin: 0 0 15px 0 !important;
             font-weight: 700 !important;
         }
-       
+        
         .jc-success p {
             color: #b8e6b8 !important;
             font-size: 16px !important;
             line-height: 1.6 !important;
             margin: 10px 0 !important;
         }
-       
+        
         .jc-user-badge {
             display: inline-flex !important;
             align-items: center !important;
@@ -1322,7 +1322,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             margin: 15px 0 !important;
             border: 2px solid rgba(88, 101, 242, 0.3) !important;
         }
-       
+        
         .jc-user-badge strong {
             color: #5865F2 !important;
             font-size: 16px !important;
@@ -1340,6 +1340,16 @@ add_shortcode( 'discord_application_form', function( $atts ) {
         .jc-input.error, .jc-textarea.error {
             border-color: #ff6b6b !important;
             box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2) !important;
+        }
+
+        /* ADMIN STATUS SELECT FIX */
+        .jc-status-select {
+            -webkit-appearance: none;
+            appearance: none;
+            /* FIX: %<path zu %3Cpath korrigiert */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
         }
         
         .jc-waiting-screen {
@@ -1433,15 +1443,15 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 padding: 30px 20px !important;
                 margin: 20px auto !important;
             }
-           
+            
             .jc-card {
                 padding: 25px 20px !important;
             }
-           
+            
             .jc-h {
                 font-size: 22px !important;
             }
-           
+            
             .jc-social-field-group {
                 flex-direction: column !important;
             }
@@ -1460,14 +1470,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             }
         }
     </style>
-   
+    
     <div class="jc-bewerbung-wrap">
         <div class="jc-card">
             <h2 class="jc-h">Bewerbung — JustCreators</h2>
-           
+            
             <?php
             $discord_user = isset( $_SESSION['jc_discord_user'] ) ? $_SESSION['jc_discord_user'] : false;
-           
+            
             // NICHT ANGEMELDET
             if ( ! $discord_user ) {
                 $auth_url = jc_get_discord_authorize_url();
@@ -1480,11 +1490,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     Wir wünschen dir viel Glück!<br>
                     <em>Dein JustCreators Team</em>
                 </p>
-               
+                
                 <?php if ( isset( $_GET['jc_oauth_error'] ) ): ?>
                     <div class="jc-error">❌ <strong>Fehler bei der Discord-Authentifizierung.</strong> Bitte versuche es erneut.</div>
                 <?php endif; ?>
-               
+                
                 <a class="jc-discord-btn" href="<?php echo esc_url( $auth_url ); ?>">
                     <svg class="jc-discord-logo" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg">
                         <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/>
@@ -1495,13 +1505,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 echo '</div></div>';
                 return ob_get_clean();
             }
-           
+            
             $discord_id = sanitize_text_field( $discord_user['id'] );
             $discord_display = esc_html( $discord_user['username'] );
-           
+            
             // STATUS PRÜFEN
             $application = jc_get_application_status( $discord_id );
-           
+            
             // BEWERBUNG EXISTIERT - STATUS ANZEIGEN
             if ( $application ) {
                 $status_config = array(
@@ -1524,15 +1534,15 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         'class' => 'jc-status-rejected'
                     )
                 );
-               
+                
                 $current = isset( $status_config[$application->status] ) ? $status_config[$application->status] : $status_config['pending'];
                 ?>
-               
+                
                 <div class="jc-status-box <?php echo $current['class']; ?>">
                     <div class="jc-status-icon"><?php echo $current['icon']; ?></div>
                     <h2 class="jc-status-title"><?php echo $current['title']; ?></h2>
                     <p class="jc-status-desc"><?php echo $current['desc']; ?></p>
-                   
+                    
                     <div class="jc-status-info-wrapper" style="margin-top: 30px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.15); text-align: left;"> 
                         <div class="jc-status-meta">
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
@@ -1541,13 +1551,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                     <div style="font-weight: 600; font-size: 16px;"><?php echo esc_html( $application->applicant_name ); ?></div>
                                     <div style="font-size: 13px; opacity: 0.8; margin-top: 4px;"><?php echo $discord_display; ?></div>
                                 </div>
-                               
+                                
                                 <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
                                     <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📅 EINGEREICHT AM</div>
                                     <div style="font-weight: 600; font-size: 16px;"><?php echo esc_html( date_i18n( 'd.m.Y', strtotime( $application->created_at ) ) ); ?></div>
                                     <div style="font-size: 13px; opacity: 0.8; margin-top: 4px;"><?php echo esc_html( date_i18n( 'H:i', strtotime( $application->created_at ) ) ); ?> Uhr</div>
                                 </div>
-                               
+                                
                                 <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
                                     <div style="font-size: 12px; opacity: 0.7; margin-bottom: 5px;">📊 STATUS</div>
                                     <div style="font-weight: 600; font-size: 16px; text-transform: uppercase;">
@@ -1563,7 +1573,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 </div>
                             </div>
                         </div>
-                   
+                    
                         <?php if ( $application->status === 'accepted' ): ?>
                             <div style="padding: 20px; border-left: 4px solid #4ade80; border-top: 1px solid rgba(255, 255, 255, 0.1);">
                                 <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
@@ -1582,7 +1592,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         <?php endif; ?>
 
                     </div>
-                   
+                    
                     <?php if ( $application->status === 'accepted' ): ?>
                         <a href="https://just-creators.de/regeln" class="jc-discord-btn" style="margin-top: 25px;">
                             ✅ Akzeptiere die Regeln
@@ -1592,19 +1602,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             🏠 Zurück zur Startseite
                         </a>
                     <?php endif; ?>
-                   
+                    
                 </div>
-               
+                
                 <?php
                 echo '</div></div>';
                 return ob_get_clean();
             }
-           
+            
             // ########## START: AKTUALISIERTE FORMULAR-VERARBEITUNG (v6.17) ##########
             // Fügt 'privacy_accepted_at' zur Verarbeitung hinzu
             $form_submitted = false;
             $validation_errors = array();
-           
+            
             if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['jc_bewerbung_nonce'] ) ) {
                 $nonce = sanitize_text_field( wp_unslash( $_POST['jc_bewerbung_nonce'] ) );
                 if ( ! wp_verify_nonce( $nonce, 'jc_bewerbung_action' ) ) {
@@ -1620,7 +1630,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     $age = sanitize_text_field( wp_unslash( $_POST['age'] ) );
                     $social_activity = sanitize_text_field( wp_unslash( $_POST['social_activity'] ) );
                     $motivation = sanitize_textarea_field( wp_unslash( $_POST['motivation'] ) );
-                   
+                    
                     $social_channels = array();
                     if ( isset( $_POST['social_channels'] ) && is_array( $_POST['social_channels'] ) ) {
                         foreach ( $_POST['social_channels'] as $channel ) {
@@ -1638,11 +1648,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             }
                         }
                     }
-                   
+                    
                     if ( empty( $social_channels ) ) {
                         $validation_errors[] = 'Bitte gib mindestens einen Social Media Kanal an.';
                     }
-                   
+                    
                     if ( empty( $validation_errors ) ) {
                         global $wpdb;
                         $temp_table = $wpdb->prefix . 'jc_discord_applications_temp';
@@ -1706,13 +1716,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 }
             }
             // ########## ENDE: AKTUALISIERTE FORMULAR-VERARBEITUNG (v6.17) ##########
-           
+            
             if ( ! empty( $validation_errors ) ) {
                 foreach ( $validation_errors as $error ) {
                     echo '<div class="jc-error">❌ ' . esc_html( $error ) . '</div>';
                 }
             }
-           
+            
             if ( $form_submitted && isset( $waiting_for_discord ) && $waiting_for_discord ) {
                 // Warte-Screen mit Animation
                 ?>
@@ -1884,22 +1894,22 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 <p style="line-height: 1.7; margin-bottom: 20px;">
                     Fülle das Formular aus um dich bei der <strong>2. Season von JustCreators</strong> zu bewerben.
                 </p>
-               
+                
                 <div class="jc-user-badge">
                     👤 Angemeldet als <strong><?php echo $discord_display; ?></strong>
                 </div>
-               
+                
                 <form method="post" id="jc-application-form">
                     <?php wp_nonce_field( 'jc_bewerbung_action', 'jc_bewerbung_nonce' ); ?>
-                   
+                    
                     <label class="jc-label">📝 Name *</label>
                     <input class="jc-input" type="text" name="applicant_name" id="jc-name-input" required placeholder="Dein vollständiger Name" />
                     <span class="jc-field-error" id="jc-name-error" style="display: none;"></span>
-                   
+                    
                     <label class="jc-label">🎂 Alter *</label>
                     <input class="jc-input" type="number" name="age" id="jc-age-input" required placeholder="z. B. 18" />
                     <span class="jc-field-error" id="jc-age-error" style="display: none;"></span>
-                   
+                    
                     <label class="jc-label">🌐 Social Media Kanäle *</label>
                     <div class="jc-note" style="margin-top: 8px;">
                         Gib deine Social Media Kanäle an. <strong>Nur YouTube, Twitch und TikTok sind erlaubt.</strong> Die Links werden automatisch validiert.
@@ -1924,11 +1934,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <textarea class="jc-textarea" name="motivation" id="jc-motivation-input" rows="6" required placeholder="Erzähle uns..."></textarea>
                     <span class="jc-field-error" id="jc-motivation-error" style="display: none;"></span>
 
-                   
+                    
                     <div class="jc-note">
                         ℹ️ <strong>Hinweis:</strong> Überprüfe deine Bewerbung bevor du sie einreichst!
                     </div>
-                   
+                    
                     <label style="display: flex; align-items: flex-start; gap: 15px; margin: 25px 0; cursor: pointer; padding: 20px; background: rgba(88, 101, 242, 0.08); border-radius: 10px; border: 1px solid rgba(88, 101, 242, 0.2);">
                         <input type="checkbox" name="jc_privacy_accept" required style="width: 24px; height: 24px; cursor: pointer; margin-top: 2px; flex-shrink: 0;" />
                         <span style="color: #dcddde; font-size: 15px; line-height: 1.7;">
@@ -1945,155 +1955,157 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         Bewerbung jetzt absenden
                     </button>
                 </form>
-               
+                
                 <script>
-                (function() {
-                    // basic counters
-                    window.socialFieldCount = 1;
-                    window.maxSocialFields = 5;
+                // FIX: Removed IIFE wrapper so functions are globally accessible for onclick events
+                
+                // basic counters
+                window.socialFieldCount = 1;
+                window.maxSocialFields = 5;
 
-                    // very small platform detection (ascii only)
-                    var platformIcons = {
-                        youtube: "YT",
-                        tiktok: "TT",
-                        twitch: "TW",
-                        twitter: "TW",
-                        instagram: "IG",
-                        handle: "@",
-                        unknown: "?"
-                    };
+                // very small platform detection (ascii only)
+                var jcPlatformIcons = {
+                    youtube: "YT",
+                    tiktok: "TT",
+                    twitch: "TW",
+                    twitter: "TW",
+                    instagram: "IG",
+                    handle: "@",
+                    unknown: "?"
+                };
 
-                    function detectPlatform(url) {
-                        var u = (url || "").toLowerCase();
-                        if (u.indexOf("youtube.com") !== -1 || u.indexOf("youtu.be") !== -1) return "youtube";
-                        if (u.indexOf("tiktok.com") !== -1) return "tiktok";
-                        if (u.indexOf("twitch.tv") !== -1) return "twitch";
-                        if (u.indexOf("twitter.com") !== -1 || u.indexOf("x.com") !== -1) return "twitter";
-                        if (u.indexOf("instagram.com") !== -1) return "instagram";
-                        if (u.charAt(0) === "@") return "handle";
-                        return "unknown";
+                function detectPlatform(url) {
+                    var u = (url || "").toLowerCase();
+                    if (u.indexOf("youtube.com") !== -1 || u.indexOf("youtu.be") !== -1) return "youtube";
+                    if (u.indexOf("tiktok.com") !== -1) return "tiktok";
+                    if (u.indexOf("twitch.tv") !== -1) return "twitch";
+                    if (u.indexOf("twitter.com") !== -1 || u.indexOf("x.com") !== -1) return "twitter";
+                    if (u.indexOf("instagram.com") !== -1) return "instagram";
+                    if (u.charAt(0) === "@") return "handle";
+                    return "unknown";
+                }
+
+                function updatePlatformIcon(input, index) {
+                    var url = (input.value || "").trim();
+                    var iconElement = document.querySelector('.jc-platform-icon[data-index="' + index + '"]');
+                    if (!iconElement) return;
+                    if (url.length > 3) {
+                        var p = detectPlatform(url);
+                        iconElement.textContent = jcPlatformIcons[p] || jcPlatformIcons.unknown;
+                        iconElement.classList.add("visible");
+                    } else {
+                        iconElement.classList.remove("visible");
                     }
+                }
 
-                    function updatePlatformIcon(input, index) {
-                        var url = (input.value || "").trim();
-                        var iconElement = document.querySelector('.jc-platform-icon[data-index="' + index + '"]');
-                        if (!iconElement) return;
-                        if (url.length > 3) {
-                            var p = detectPlatform(url);
-                            iconElement.textContent = platformIcons[p] || platformIcons.unknown;
-                            iconElement.classList.add("visible");
-                        } else {
-                            iconElement.classList.remove("visible");
-                        }
+                document.addEventListener("input", function(e) {
+                    if (e.target.classList.contains("jc-social-input")) {
+                        var idx = e.target.getAttribute("data-index") || "0";
+                        updatePlatformIcon(e.target, idx);
                     }
+                });
 
-                    document.addEventListener("input", function(e) {
-                        if (e.target.classList.contains("jc-social-input")) {
-                            var idx = e.target.getAttribute("data-index") || "0";
-                            updatePlatformIcon(e.target, idx);
+                function jcAddSocialField() {
+                    if (window.socialFieldCount >= window.maxSocialFields) {
+                        alert("Maximal 5 Social Media Kanaele erlaubt.");
+                        return;
+                    }
+                    var container = document.getElementById("jc-social-fields");
+                    if (!container) return;
+
+                    var fieldGroup = document.createElement("div");
+                    fieldGroup.className = "jc-social-field-group";
+                    fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
+                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" ' +
+                        'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
+                        '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
+                        '</div>' +
+                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
+
+                    container.appendChild(fieldGroup);
+                    window.socialFieldCount += 1;
+
+                    var addBtn = document.querySelector(".jc-add-social-btn");
+                    if (addBtn && window.socialFieldCount >= window.maxSocialFields) {
+                        addBtn.style.display = "none";
+                    }
+                }
+                // Ensure explicit window assignment just in case
+                window.jcAddSocialField = jcAddSocialField;
+
+                function jcRemoveSocialField(button) {
+                    var group = button.closest(".jc-social-field-group");
+                    if (!group) return;
+                    group.remove();
+                    window.socialFieldCount = Math.max(1, window.socialFieldCount - 1);
+                    var addBtn = document.querySelector(".jc-add-social-btn");
+                    if (addBtn && window.socialFieldCount < window.maxSocialFields) {
+                        addBtn.style.display = "inline-block";
+                    }
+                }
+                window.jcRemoveSocialField = jcRemoveSocialField;
+
+                // minimal validation (kept simple to avoid charset issues)
+                function validateAge() {
+                    var ageInput = document.getElementById("jc-age-input");
+                    if (!ageInput) return true;
+                    var val = (ageInput.value || "").trim();
+                    if (val === "") return true;
+                    var n = parseInt(val, 10);
+                    return !isNaN(n) && n >= 11 && n <= 99;
+                }
+
+                function validateName() {
+                    var nameInput = document.getElementById("jc-name-input");
+                    if (!nameInput) return true;
+                    return (nameInput.value || "").trim().length >= 2;
+                }
+
+                function validateSocialLinks() {
+                    var inputs = document.querySelectorAll(".jc-social-input");
+                    return Array.from(inputs).some(function(input) {
+                        var v = (input.value || "").toLowerCase();
+                        return v.indexOf("youtube.com") !== -1 || v.indexOf("youtu.be") !== -1 || v.indexOf("twitch.tv") !== -1 || v.indexOf("tiktok.com") !== -1;
+                    });
+                }
+
+                function validateActivity() {
+                    var a = document.getElementById("jc-activity-input");
+                    if (!a) return true;
+                    return (a.value || "").trim().length >= 2;
+                }
+
+                function validateMotivation() {
+                    var m = document.getElementById("jc-motivation-input");
+                    if (!m) return true;
+                    return (m.value || "").replace(/\s/g, "").length >= 20;
+                }
+
+                function initValidation() {
+                    var form = document.getElementById("jc-application-form");
+                    if (!form) return;
+                    form.addEventListener("submit", function(e) {
+                        var ok = validateName() && validateAge() && validateSocialLinks() && validateActivity() && validateMotivation();
+                        if (!ok) {
+                            e.preventDefault();
+                            e.stopPropagation();
                         }
                     });
+                }
 
-                    function jcAddSocialField() {
-                        if (window.socialFieldCount >= window.maxSocialFields) {
-                            alert("Maximal 5 Social Media Kanaele erlaubt.");
-                            return;
-                        }
-                        var container = document.getElementById("jc-social-fields");
-                        if (!container) return;
-
-                        var fieldGroup = document.createElement("div");
-                        fieldGroup.className = "jc-social-field-group";
-                        fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
-                            '<input class="jc-input jc-social-input" type="text" name="social_channels[]" ' +
-                            'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
-                            '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
-                            '</div>' +
-                            '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
-
-                        container.appendChild(fieldGroup);
-                        window.socialFieldCount += 1;
-
-                        var addBtn = document.querySelector(".jc-add-social-btn");
-                        if (addBtn && window.socialFieldCount >= window.maxSocialFields) {
-                            addBtn.style.display = "none";
-                        }
-                    }
-                    window.jcAddSocialField = jcAddSocialField;
-
-                    function jcRemoveSocialField(button) {
-                        var group = button.closest(".jc-social-field-group");
-                        if (!group) return;
-                        group.remove();
-                        window.socialFieldCount = Math.max(1, window.socialFieldCount - 1);
-                        var addBtn = document.querySelector(".jc-add-social-btn");
-                        if (addBtn && window.socialFieldCount < window.maxSocialFields) {
-                            addBtn.style.display = "inline-block";
-                        }
-                    }
-                    window.jcRemoveSocialField = jcRemoveSocialField;
-
-                    // minimal validation (kept simple to avoid charset issues)
-                    function validateAge() {
-                        var ageInput = document.getElementById("jc-age-input");
-                        if (!ageInput) return true;
-                        var val = (ageInput.value || "").trim();
-                        if (val === "") return true;
-                        var n = parseInt(val, 10);
-                        return !isNaN(n) && n >= 11 && n <= 99;
-                    }
-
-                    function validateName() {
-                        var nameInput = document.getElementById("jc-name-input");
-                        if (!nameInput) return true;
-                        return (nameInput.value || "").trim().length >= 2;
-                    }
-
-                    function validateSocialLinks() {
-                        var inputs = document.querySelectorAll(".jc-social-input");
-                        return Array.from(inputs).some(function(input) {
-                            var v = (input.value || "").toLowerCase();
-                            return v.indexOf("youtube.com") !== -1 || v.indexOf("youtu.be") !== -1 || v.indexOf("twitch.tv") !== -1 || v.indexOf("tiktok.com") !== -1;
-                        });
-                    }
-
-                    function validateActivity() {
-                        var a = document.getElementById("jc-activity-input");
-                        if (!a) return true;
-                        return (a.value || "").trim().length >= 2;
-                    }
-
-                    function validateMotivation() {
-                        var m = document.getElementById("jc-motivation-input");
-                        if (!m) return true;
-                        return (m.value || "").replace(/\s/g, "").length >= 20;
-                    }
-
-                    function initValidation() {
-                        var form = document.getElementById("jc-application-form");
-                        if (!form) return;
-                        form.addEventListener("submit", function(e) {
-                            var ok = validateName() && validateAge() && validateSocialLinks() && validateActivity() && validateMotivation();
-                            if (!ok) {
-                                e.preventDefault();
-                                e.stopPropagation();
-                            }
-                        });
-                    }
-
-                    if (document.readyState === "loading") {
-                        document.addEventListener("DOMContentLoaded", initValidation);
-                    } else {
-                        initValidation();
-                    }
-                })();
+                if (document.readyState === "loading") {
+                    document.addEventListener("DOMContentLoaded", initValidation);
+                } else {
+                    initValidation();
+                }
+                
                 </script>
                 <?php
             }
             ?>
         </div>
     </div>
-   
+    
     <?php
     return ob_get_clean();
 } );
