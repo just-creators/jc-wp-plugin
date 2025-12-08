@@ -1992,43 +1992,44 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 
                 window.jcAddSocialField = function() {
                     if (window.socialFieldCount >= window.maxSocialFields) {
-                        alert('Du kannst maximal 5 Social Media Kanäle hinzufügen.');
+                        alert("Du kannst maximal 5 Social Media Kanaele hinzufuegen.");
                         return;
                     }
                    
-                    const container = document.getElementById('jc-social-fields');
+                    var container = document.getElementById("jc-social-fields");
                     if (!container) {
-                        console.error('Container jc-social-fields nicht gefunden');
+                        console.error("Container jc-social-fields nicht gefunden");
                         return;
                     }
                     
-                    const fieldGroup = document.createElement('div');
-                    fieldGroup.className = 'jc-social-field-group';
-                    fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
+                    var fieldGroup = document.createElement("div");
+                    fieldGroup.className = "jc-social-field-group";
+                    var html = '<div class="jc-social-field-wrapper">' +
                         '<input class="jc-input jc-social-input" type="text" name="social_channels[]" ' +
                         'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
                         '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
                         '</div>' +
-                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">✕</button>';
+                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
+                    fieldGroup.innerHTML = html;
                    
                     container.appendChild(fieldGroup);
                     window.socialFieldCount++;
                    
-                    const addBtn = document.querySelector('.jc-add-social-btn');
+                    var addBtn = document.querySelector(".jc-add-social-btn");
                     if (window.socialFieldCount >= window.maxSocialFields && addBtn) {
-                        addBtn.style.display = 'none';
+                        addBtn.style.display = "none";
                     }
                 };
                 
                 window.jcRemoveSocialField = function(button) {
-                    const fieldGroup = button.closest('.jc-social-field-group');
+                    var fieldGroup = button.closest(".jc-social-field-group");
                     if (fieldGroup) {
                         fieldGroup.remove();
                         window.socialFieldCount--;
                        
-                        const addBtn = document.querySelector('.jc-add-social-btn');
+                        var addBtn = document.querySelector(".jc-add-social-btn");
                         if (window.socialFieldCount < window.maxSocialFields && addBtn) {
-                            addBtn.style.display = 'inline-block';
+                            addBtn.style.display = "inline-block";
                         }
                     }
                 };
