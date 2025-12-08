@@ -1962,35 +1962,35 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 };
                 function detectPlatform(url) {
                     url = url.toLowerCase();
-                    if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-                    if (url.includes('tiktok.com')) return 'tiktok';
-                    if (url.includes('twitch.tv')) return 'twitch';
-                    if (url.includes('twitter.com') || url.includes('x.com')) return 'twitter';
-                    if (url.includes('instagram.com')) return 'instagram';
-                    if (url.startsWith('@')) return 'handle';
-                    return 'unknown';
+                    if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
+                    if (url.includes("tiktok.com")) return "tiktok";
+                    if (url.includes("twitch.tv")) return "twitch";
+                    if (url.includes("twitter.com") || url.includes("x.com")) return "twitter";
+                    if (url.includes("instagram.com")) return "instagram";
+                    if (url.startsWith("@")) return "handle";
+                    return "unknown";
                 }
                 function updatePlatformIcon(input, index) {
-                    const url = input.value.trim();
-                    const iconElement = document.querySelector('.jc-platform-icon[data-index="' + index + '"]');
+                    var url = input.value.trim();
+                    var iconElement = document.querySelector(".jc-platform-icon[data-index=\"" + index + "\"]");
                     if (!iconElement) return;
                    
                     if (url.length > 3) {
-                        const platform = detectPlatform(url);
+                        var platform = detectPlatform(url);
                         iconElement.textContent = platformIcons[platform];
-                        iconElement.classList.add('visible');
+                        iconElement.classList.add("visible");
                     } else {
-                        iconElement.classList.remove('visible');
+                        iconElement.classList.remove("visible");
                     }
                 }
-                document.addEventListener('input', function(e) {
-                    if (e.target.classList.contains('jc-social-input')) {
-                        const index = e.target.getAttribute('data-index');
+                document.addEventListener("input", function(e) {
+                    if (e.target.classList.contains("jc-social-input")) {
+                        var index = e.target.getAttribute("data-index");
                         updatePlatformIcon(e.target, index);
                     }
                 });
                 
-                window.jcAddSocialField = function() {
+                function jcAddSocialField() {
                     if (window.socialFieldCount >= window.maxSocialFields) {
                         alert("Du kannst maximal 5 Social Media Kanaele hinzufuegen.");
                         return;
@@ -2019,9 +2019,10 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     if (window.socialFieldCount >= window.maxSocialFields && addBtn) {
                         addBtn.style.display = "none";
                     }
-                };
+                }
+                window.jcAddSocialField = jcAddSocialField;
                 
-                window.jcRemoveSocialField = function(button) {
+                function jcRemoveSocialField(button) {
                     var fieldGroup = button.closest(".jc-social-field-group");
                     if (fieldGroup) {
                         fieldGroup.remove();
@@ -2032,301 +2033,247 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             addBtn.style.display = "inline-block";
                         }
                     }
-                };
+                }
+                window.jcRemoveSocialField = jcRemoveSocialField;
                 
                 // Validierung für Alter
                 function validateAge() {
-                    const ageInput = document.getElementById('jc-age-input');
-                    const ageError = document.getElementById('jc-age-error');
+                    var ageInput = document.getElementById("jc-age-input");
+                    var ageError = document.getElementById("jc-age-error");
                     
                     if (!ageInput || !ageError) return true;
                     
-                    const ageValue = ageInput.value.trim();
+                    var ageValue = ageInput.value.trim();
                     
-                    // Wenn leer, keine Validierung (required wird vom Browser gehandhabt)
-                    if (ageValue === '') {
-                        ageError.style.display = 'none';
-                        ageError.textContent = '';
-                        ageInput.classList.remove('error');
+                    if (ageValue === "") {
+                        ageError.style.display = "none";
+                        ageError.textContent = "";
+                        ageInput.classList.remove("error");
                         return true;
                     }
                     
-                    const age = parseInt(ageValue, 10);
+                    var age = parseInt(ageValue, 10);
                     
-                    // Prüfe ob es eine gültige Zahl ist und im erlaubten Bereich
                     if (isNaN(age) || age < 11 || age > 99) {
-                        ageError.textContent = '❌ Das Alter muss zwischen 11 und 99 Jahren liegen.';
-                        ageError.style.display = 'block';
-                        ageInput.classList.add('error');
+                        ageError.textContent = "Alter muss zwischen 11 und 99 Jahren liegen.";
+                        ageError.style.display = "block";
+                        ageInput.classList.add("error");
                         return false;
                     }
                     
-                    // Alles OK
-                    ageError.style.display = 'none';
-                    ageError.textContent = '';
-                    ageInput.classList.remove('error');
+                    ageError.style.display = "none";
+                    ageError.textContent = "";
+                    ageInput.classList.remove("error");
                     return true;
                 }
                 
                 // Validierung für Motivation
                 function validateMotivation() {
-                    const motivationInput = document.getElementById('jc-motivation-input');
-                    const motivationError = document.getElementById('jc-motivation-error');
+                    var motivationInput = document.getElementById("jc-motivation-input");
+                    var motivationError = document.getElementById("jc-motivation-error");
                     
                     if (!motivationInput || !motivationError) return true;
                     
-                    const text = motivationInput.value;
-                    // Entfernt ALLE Leerzeichen (auch zwischen Wörtern) vor dem Zählen
-                    const textWithoutSpaces = text.replace(/\s/g, ''); 
-                    const length = textWithoutSpaces.length; // Zählt nur "echte" Zeichen
+                    var text = motivationInput.value;
+                    var textWithoutSpaces = text.replace(/\s/g, ""); 
+                    var length = textWithoutSpaces.length;
                     
-                    // Wenn nach dem Entfernen aller Leerzeichen leer
                     if (length === 0) {
-                        if (motivationInput.hasAttribute('required')) {
-                             motivationError.textContent = '❌ Bitte gib eine Motivation ein.';
-                             motivationError.style.display = 'block';
-                             motivationInput.classList.add('error');
+                        if (motivationInput.hasAttribute("required")) {
+                             motivationError.textContent = "Bitte gib eine Motivation ein.";
+                             motivationError.style.display = "block";
+                             motivationInput.classList.add("error");
                              return false;
                         }
-                        // Falls es nicht required ist
-                        motivationError.style.display = 'none';
-                        motivationError.textContent = '';
-                        motivationInput.classList.remove('error');
+                        motivationError.style.display = "none";
+                        motivationError.textContent = "";
+                        motivationInput.classList.remove("error");
                         return true;
                     }
                     
-                    // Prüfe ob mindestens 100 Zeichen
                     if (length >= 100) {
-                        // Alles OK - mindestens 100 Zeichen
-                        motivationError.style.display = 'none';
-                        motivationError.textContent = '';
-                        motivationInput.classList.remove('error');
+                        motivationError.style.display = "none";
+                        motivationError.textContent = "";
+                        motivationInput.classList.remove("error");
                         return true;
                     } else {
-                        // Zu wenig Zeichen
-                        const remaining = 100 - length;
-                        // Angepasste Fehlermeldung
-                        motivationError.textContent = '❌ Bitte gib mindestens 100 Zeichen ein (Leerzeichen zählen nicht). (Noch ' + remaining + ' Zeichen)';
-                        motivationError.style.display = 'block';
-                        motivationInput.classList.add('error');
+                        var remaining = 100 - length;
+                        motivationError.textContent = "Bitte gib mindestens 100 Zeichen ein (Leerzeichen zählen nicht). (Noch " + remaining + " Zeichen)";
+                        motivationError.style.display = "block";
+                        motivationInput.classList.add("error");
                         return false;
                     }
                 }
                 
                 // Validierung für Name
                 function validateName() {
-                    const nameInput = document.getElementById('jc-name-input');
-                    const nameError = document.getElementById('jc-name-error');
+                    var nameInput = document.getElementById("jc-name-input");
+                    var nameError = document.getElementById("jc-name-error");
                     
                     if (!nameInput || !nameError) return true;
                     
-                    const name = nameInput.value.trim();
+                    var name = nameInput.value.trim();
                     
-                    if (name === '') {
-                        nameError.textContent = '❌ Bitte gib deinen Namen ein.';
-                        nameError.style.display = 'block';
-                        nameInput.classList.add('error');
+                    if (name === "") {
+                        nameError.textContent = "Bitte gib deinen Namen ein.";
+                        nameError.style.display = "block";
+                        nameInput.classList.add("error");
                         return false;
                     }
                     
                     if (name.length < 2) {
-                        nameError.textContent = '❌ Der Name muss mindestens 2 Zeichen lang sein.';
-                        nameError.style.display = 'block';
-                        nameInput.classList.add('error');
+                        nameError.textContent = "Der Name muss mindestens 2 Zeichen lang sein.";
+                        nameError.style.display = "block";
+                        nameInput.classList.add("error");
                         return false;
                     }
                     
-                    // Alles OK
-                    nameError.style.display = 'none';
-                    nameError.textContent = '';
-                    nameInput.classList.remove('error');
+                    nameError.style.display = "none";
+                    nameError.textContent = "";
+                    nameInput.classList.remove("error");
                     return true;
                 }
                 
                 // Validierung für Social Media Links
                 function validateSocialLinks() {
-                    const socialError = document.getElementById('jc-social-error');
-                    const socialInputs = document.querySelectorAll('.jc-social-input');
+                    var socialError = document.getElementById("jc-social-error");
+                    var socialInputs = document.querySelectorAll(".jc-social-input");
                     
                     if (!socialError) return true;
                     
-                    let hasValidLink = false;
-                    let invalidLinks = [];
+                    var hasValidLink = false;
+                    var invalidLinks = [];
                     
-                    // Prüfe ob mindestens ein Link eingegeben wurde
-                    const filledInputs = Array.from(socialInputs).filter(input => input.value.trim() !== '');
+                    var filledInputs = Array.from(socialInputs).filter(function(input) { 
+                        return input.value.trim() !== ""; 
+                    });
                     
                     if (filledInputs.length === 0) {
-                        socialError.textContent = '❌ Bitte gib mindestens einen Social Media Kanal an.';
-                        socialError.style.display = 'block';
-                        socialInputs.forEach(input => input.classList.add('error'));
+                        socialError.textContent = "Bitte gib mindestens einen Social Media Kanal an.";
+                        socialError.style.display = "block";
+                        socialInputs.forEach(function(input) { input.classList.add("error"); });
                         return false;
                     }
                     
-                    // Validiere jeden Link - nur YouTube, Twitch und TikTok erlaubt
                     filledInputs.forEach(function(input, index) {
-                        const value = input.value.trim();
-                        if (value === '') return;
+                        var value = input.value.trim();
+                        if (value === "") return;
                         
-                        let isValid = false;
-                        let platform = '';
+                        var isValid = false;
+                        var valueLower = value.toLowerCase();
                         
-                        // Handle-Format (@username) - nicht erlaubt, nur URLs
-                        if (value.startsWith('@')) {
-                            isValid = false;
-                        } else {
-                            // URL-Format - prüfe ob es eine gültige URL ist
-                            try {
-                                let urlToCheck = value;
-                                // Wenn kein Protokoll, füge https:// hinzu für Validierung
-                                if (!/^https?:\/\//i.test(urlToCheck)) {
-                                    urlToCheck = 'https://' + urlToCheck;
-                                }
-                                const url = new URL(urlToCheck);
-                                const hostname = url.hostname.toLowerCase().replace('www.', '');
-                                
-                                // Prüfe ob es eine Domain hat und zu erlaubten Plattformen gehört
-                                if (hostname && hostname.includes('.')) {
-                                    // Erlaubte Plattformen: YouTube, Twitch, TikTok
-                                    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
-                                        platform = 'youtube';
-                                        isValid = true;
-                                    } else if (hostname.includes('twitch.tv')) {
-                                        platform = 'twitch';
-                                        isValid = true;
-                                    } else if (hostname.includes('tiktok.com')) {
-                                        platform = 'tiktok';
-                                        isValid = true;
-                                    } else {
-                                        isValid = false;
-                                    }
-                                }
-                            } catch (e) {
-                                // Fallback: Prüfe ob es wie eine Domain aussieht und zu erlaubten Plattformen gehört
-                                const valueLower = value.toLowerCase();
-                                if (valueLower.includes('youtube.com') || valueLower.includes('youtu.be')) {
-                                    platform = 'youtube';
-                                    isValid = true;
-                                } else if (valueLower.includes('twitch.tv')) {
-                                    platform = 'twitch';
-                                    isValid = true;
-                                } else if (valueLower.includes('tiktok.com')) {
-                                    platform = 'tiktok';
-                                    isValid = true;
-                                } else {
-                                    isValid = false;
-                                }
-                            }
+                        if (valueLower.includes("youtube.com") || valueLower.includes("youtu.be")) {
+                            isValid = true;
+                        } else if (valueLower.includes("twitch.tv")) {
+                            isValid = true;
+                        } else if (valueLower.includes("tiktok.com")) {
+                            isValid = true;
                         }
                         
                         if (isValid) {
                             hasValidLink = true;
-                            input.classList.remove('error');
+                            input.classList.remove("error");
                         } else {
-                            invalidLinks.push('Link ' + (index + 1));
-                            input.classList.add('error');
+                            invalidLinks.push("Link " + (index + 1));
+                            input.classList.add("error");
                         }
                     });
                     
                     if (invalidLinks.length > 0) {
-                        socialError.textContent = '❌ Ungültiger Link: ' + invalidLinks.join(', ') + '. Es sind nur YouTube, Twitch und TikTok erlaubt. Bitte gib eine gültige URL ein (z.B. youtube.com/@username, twitch.tv/username, tiktok.com/@username).';
-                        socialError.style.display = 'block';
+                        socialError.textContent = "Ungültiger Link: " + invalidLinks.join(", ") + ". Es sind nur YouTube, Twitch und TikTok erlaubt.";
+                        socialError.style.display = "block";
                         return false;
                     }
                     
                     if (!hasValidLink) {
-                        socialError.textContent = '❌ Bitte gib mindestens einen gültigen Social Media Kanal an.';
-                        socialError.style.display = 'block';
+                        socialError.textContent = "Bitte gib mindestens einen gültigen Social Media Kanal an.";
+                        socialError.style.display = "block";
                         return false;
                     }
                     
-                    // Alles OK
-                    socialError.style.display = 'none';
-                    socialError.textContent = '';
-                    socialInputs.forEach(input => input.classList.remove('error'));
+                    socialError.style.display = "none";
+                    socialError.textContent = "";
+                    socialInputs.forEach(function(input) { input.classList.remove("error"); });
                     return true;
                 }
                 
                 // Validierung für "Wie aktiv bist du?"
                 function validateActivity() {
-                    const activityInput = document.getElementById('jc-activity-input');
-                    const activityError = document.getElementById('jc-activity-error');
+                    var activityInput = document.getElementById("jc-activity-input");
+                    var activityError = document.getElementById("jc-activity-error");
                     
                     if (!activityInput || !activityError) return true;
                     
-                    const activity = activityInput.value.trim();
+                    var activity = activityInput.value.trim();
                     
-                    if (activity === '') {
-                        activityError.textContent = '❌ Bitte gib an, wie aktiv du bist.';
-                        activityError.style.display = 'block';
-                        activityInput.classList.add('error');
+                    if (activity === "") {
+                        activityError.textContent = "Bitte gib an, wie aktiv du bist.";
+                        activityError.style.display = "block";
+                        activityInput.classList.add("error");
                         return false;
                     }
                     
                     if (activity.length < 2) {
-                        activityError.textContent = '❌ Bitte gib eine aussagekräftige Antwort ein (mindestens 2 Zeichen).';
-                        activityError.style.display = 'block';
-                        activityInput.classList.add('error');
+                        activityError.textContent = "Bitte gib eine aussagekraeftige Antwort ein (mindestens 2 Zeichen).";
+                        activityError.style.display = "block";
+                        activityInput.classList.add("error");
                         return false;
                     }
                     
-                    // Alles OK
-                    activityError.style.display = 'none';
-                    activityError.textContent = '';
-                    activityInput.classList.remove('error');
+                    activityError.style.display = "none";
+                    activityError.textContent = "";
+                    activityInput.classList.remove("error");
                     return true;
                 }
                 
                 // Event-Listener für Echtzeit-Validierung
                 function initValidation() {
-                    const ageInput = document.getElementById('jc-age-input');
-                    const motivationInput = document.getElementById('jc-motivation-input');
-                    const form = document.getElementById('jc-application-form');
+                    var ageInput = document.getElementById("jc-age-input");
+                    var motivationInput = document.getElementById("jc-motivation-input");
+                    var form = document.getElementById("jc-application-form");
                     
                     if (ageInput) {
-                        ageInput.addEventListener('input', validateAge);
-                        ageInput.addEventListener('blur', validateAge);
-                        ageInput.addEventListener('change', validateAge);
+                        ageInput.addEventListener("input", validateAge);
+                        ageInput.addEventListener("blur", validateAge);
+                        ageInput.addEventListener("change", validateAge);
                     }
                     
                     if (motivationInput) {
-                        motivationInput.addEventListener('input', validateMotivation);
-                        motivationInput.addEventListener('blur', validateMotivation);
+                        motivationInput.addEventListener("input", validateMotivation);
+                        motivationInput.addEventListener("blur", validateMotivation);
                     }
                     
-                    // Form-Submit-Validierung
                     if (form) {
-                        form.addEventListener('submit', function(e) {
-                            const nameValid = validateName();
-                            const ageValid = validateAge();
-                            const socialValid = validateSocialLinks();
-                            const activityValid = validateActivity();
-                            const motivationValid = validateMotivation();
+                        form.addEventListener("submit", function(e) {
+                            var nameValid = validateName();
+                            var ageValid = validateAge();
+                            var socialValid = validateSocialLinks();
+                            var activityValid = validateActivity();
+                            var motivationValid = validateMotivation();
                             
                             if (!nameValid || !ageValid || !socialValid || !activityValid || !motivationValid) {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 
-                                // Scroll zum ersten Fehler
-                                const nameInput = document.getElementById('jc-name-input');
-                                const activityInput = document.getElementById('jc-activity-input');
+                                var nameInput = document.getElementById("jc-name-input");
+                                var activityInput = document.getElementById("jc-activity-input");
                                 if (!nameValid && nameInput) {
-                                    nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    nameInput.scrollIntoView({ behavior: "smooth", block: "center" });
                                     nameInput.focus();
                                 } else if (!ageValid && ageInput) {
-                                    ageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    ageInput.scrollIntoView({ behavior: "smooth", block: "center" });
                                     ageInput.focus();
                                 } else if (!socialValid) {
-                                    const firstSocialInput = document.querySelector('.jc-social-input');
+                                    var firstSocialInput = document.querySelector(".jc-social-input");
                                     if (firstSocialInput) {
-                                        firstSocialInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        firstSocialInput.scrollIntoView({ behavior: "smooth", block: "center" });
                                         firstSocialInput.focus();
                                     }
                                 } else if (!activityValid && activityInput) {
-                                    activityInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    activityInput.scrollIntoView({ behavior: "smooth", block: "center" });
                                     activityInput.focus();
                                 } else if (!motivationValid && motivationInput) {
-                                    motivationInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    motivationInput.scrollIntoView({ behavior: "smooth", block: "center" });
                                     motivationInput.focus();
                                 }
                                 
@@ -2336,9 +2283,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                 }
                 
-                // Initialisierung - sowohl bei DOMContentLoaded als auch sofort
-                if (document.readyState === 'loading') {
-                    document.addEventListener('DOMContentLoaded', initValidation);
+                // Initialisierung
+                if (document.readyState === "loading") {
+                    document.addEventListener("DOMContentLoaded", initValidation);
                 } else {
                     initValidation();
                 }
