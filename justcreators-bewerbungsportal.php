@@ -2651,122 +2651,120 @@ function jc_application_countdown_shortcode() {
 
 // Register inline script for form functionality
 add_action( 'wp_head', function() {
-    ?>
-<script>
-var jcSocialFieldCount = 1;
-var jcMaxSocialFields = 5;
-var jcPlatformIcons = {youtube: "YT", tiktok: "TT", twitch: "TW", unknown: "?"};
-function jcDetectPlatform(url) {
-    var u = (url || "").toLowerCase();
-    if (u.indexOf("youtube.com") > -1 || u.indexOf("youtu.be") > -1) return "youtube";
-    if (u.indexOf("tiktok.com") > -1) return "tiktok";
-    if (u.indexOf("twitch.tv") > -1) return "twitch";
-    return "unknown";
-}
-function jcUpdatePlatformIcon(input, index) {
-    var url = (input.value || "").trim();
-    var iconElement = document.querySelector(".jc-platform-icon[data-index=\"" + index + "\"]");
-    if (!iconElement) return;
-    if (url.length > 3) {
-        var p = jcDetectPlatform(url);
-        iconElement.textContent = jcPlatformIcons[p] || jcPlatformIcons.unknown;
-        iconElement.classList.add("visible");
-    } else {
-        iconElement.classList.remove("visible");
-    }
-}
-document.addEventListener("input", function(e) {
-    if (e.target && e.target.classList.contains("jc-social-input")) {
-        var idx = e.target.getAttribute("data-index") || "0";
-        jcUpdatePlatformIcon(e.target, idx);
-    }
-});
-function jcAddSocialField() {
-    if (jcSocialFieldCount >= jcMaxSocialFields) {
-        alert("Maximal 5 Social Media Kanäle erlaubt.");
-        return;
-    }
-    var container = document.getElementById("jc-social-fields");
-    if (!container) return;
-    var fieldGroup = document.createElement("div");
-    fieldGroup.className = "jc-social-field-group";
-    var wrapper = document.createElement("div");
-    wrapper.className = "jc-social-field-wrapper";
-    var input = document.createElement("input");
-    input.className = "jc-input jc-social-input";
-    input.type = "text";
-    input.name = "social_channels[]";
-    input.placeholder = "z. B. youtube.com/@username";
-    input.setAttribute("data-index", jcSocialFieldCount);
-    var icon = document.createElement("span");
-    icon.className = "jc-platform-icon";
-    icon.setAttribute("data-index", jcSocialFieldCount);
-    wrapper.appendChild(input);
-    wrapper.appendChild(icon);
-    var removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.className = "jc-remove-social-btn";
-    removeBtn.textContent = "X";
-    removeBtn.onclick = function() { jcRemoveSocialField(this); };
-    fieldGroup.appendChild(wrapper);
-    fieldGroup.appendChild(removeBtn);
-    container.appendChild(fieldGroup);
-    jcSocialFieldCount++;
-    var addBtn = document.querySelector(".jc-add-social-btn");
-    if (addBtn && jcSocialFieldCount >= jcMaxSocialFields) {
-        addBtn.style.display = "none";
-    }
-}
-function jcRemoveSocialField(button) {
-    var group = button.closest(".jc-social-field-group");
-    if (!group) return;
-    group.remove();
-    jcSocialFieldCount = Math.max(1, jcSocialFieldCount - 1);
-    var addBtn = document.querySelector(".jc-add-social-btn");
-    if (addBtn && jcSocialFieldCount < jcMaxSocialFields) {
-        addBtn.style.display = "inline-block";
-    }
-}
-function jcValidateForm() {
-    var nameInput = document.getElementById("jc-name-input");
-    var ageInput = document.getElementById("jc-age-input");
-    var activityInput = document.getElementById("jc-activity-input");
-    var motivationInput = document.getElementById("jc-motivation-input");
-    var socialInputs = document.querySelectorAll(".jc-social-input");
-    var isValid = true;
-    if (nameInput && nameInput.value.trim().length < 2) isValid = false;
-    if (ageInput) {
-        var age = parseInt(ageInput.value, 10);
-        if (isNaN(age) || age < 11 || age > 99) isValid = false;
-    }
-    if (activityInput && activityInput.value.trim().length < 2) isValid = false;
-    if (motivationInput && motivationInput.value.replace(/\s/g, "").length < 20) isValid = false;
-    var hasPlatform = false;
-    for (var i = 0; i < socialInputs.length; i++) {
-        var v = socialInputs[i].value.toLowerCase();
-        if (v.indexOf("youtube.com") > -1 || v.indexOf("youtu.be") > -1 || v.indexOf("twitch.tv") > -1 || v.indexOf("tiktok.com") > -1) {
-            hasPlatform = true;
-            break;
-        }
-    }
-    if (!hasPlatform) isValid = false;
-    return isValid;
-}
-function jcInitForm() {
-    var form = document.getElementById("jc-application-form");
-    if (!form) return;
-    form.addEventListener("submit", function(e) {
-        if (!jcValidateForm()) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
-}
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", jcInitForm);
-} else {
-    jcInitForm();
-}
-</script>
-    <?php
+    echo '<script>';
+    echo 'var jcSocialFieldCount = 1;';
+    echo 'var jcMaxSocialFields = 5;';
+    echo 'var jcPlatformIcons = {youtube: "YT", tiktok: "TT", twitch: "TW", unknown: "?"};';
+    echo 'function jcDetectPlatform(url) {';
+    echo '    var u = (url || "").toLowerCase();';
+    echo '    if (u.indexOf("youtube.com") > -1 || u.indexOf("youtu.be") > -1) return "youtube";';
+    echo '    if (u.indexOf("tiktok.com") > -1) return "tiktok";';
+    echo '    if (u.indexOf("twitch.tv") > -1) return "twitch";';
+    echo '    return "unknown";';
+    echo '}';
+    echo 'function jcUpdatePlatformIcon(input, index) {';
+    echo '    var url = (input.value || "").trim();';
+    echo '    var iconElement = document.querySelector(".jc-platform-icon[data-index=\"" + index + "\"]");';
+    echo '    if (!iconElement) return;';
+    echo '    if (url.length > 3) {';
+    echo '        var p = jcDetectPlatform(url);';
+    echo '        iconElement.textContent = jcPlatformIcons[p] || jcPlatformIcons.unknown;';
+    echo '        iconElement.classList.add("visible");';
+    echo '    } else {';
+    echo '        iconElement.classList.remove("visible");';
+    echo '    }';
+    echo '}';
+    echo 'document.addEventListener("input", function(e) {';
+    echo '    if (e.target && e.target.classList.contains("jc-social-input")) {';
+    echo '        var idx = e.target.getAttribute("data-index") || "0";';
+    echo '        jcUpdatePlatformIcon(e.target, idx);';
+    echo '    }';
+    echo '});';
+    echo 'function jcAddSocialField() {';
+    echo '    if (jcSocialFieldCount >= jcMaxSocialFields) {';
+    echo '        alert("Maximal 5 Social Media Kanäle erlaubt.");';
+    echo '        return;';
+    echo '    }';
+    echo '    var container = document.getElementById("jc-social-fields");';
+    echo '    if (!container) return;';
+    echo '    var fieldGroup = document.createElement("div");';
+    echo '    fieldGroup.className = "jc-social-field-group";';
+    echo '    var wrapper = document.createElement("div");';
+    echo '    wrapper.className = "jc-social-field-wrapper";';
+    echo '    var input = document.createElement("input");';
+    echo '    input.className = "jc-input jc-social-input";';
+    echo '    input.type = "text";';
+    echo '    input.name = "social_channels[]";';
+    echo '    input.placeholder = "z. B. youtube.com/@username";';
+    echo '    input.setAttribute("data-index", jcSocialFieldCount);';
+    echo '    var icon = document.createElement("span");';
+    echo '    icon.className = "jc-platform-icon";';
+    echo '    icon.setAttribute("data-index", jcSocialFieldCount);';
+    echo '    wrapper.appendChild(input);';
+    echo '    wrapper.appendChild(icon);';
+    echo '    var removeBtn = document.createElement("button");';
+    echo '    removeBtn.type = "button";';
+    echo '    removeBtn.className = "jc-remove-social-btn";';
+    echo '    removeBtn.textContent = "X";';
+    echo '    removeBtn.onclick = function() { jcRemoveSocialField(this); };';
+    echo '    fieldGroup.appendChild(wrapper);';
+    echo '    fieldGroup.appendChild(removeBtn);';
+    echo '    container.appendChild(fieldGroup);';
+    echo '    jcSocialFieldCount++;';
+    echo '    var addBtn = document.querySelector(".jc-add-social-btn");';
+    echo '    if (addBtn && jcSocialFieldCount >= jcMaxSocialFields) {';
+    echo '        addBtn.style.display = "none";';
+    echo '    }';
+    echo '}';
+    echo 'function jcRemoveSocialField(button) {';
+    echo '    var group = button.closest(".jc-social-field-group");';
+    echo '    if (!group) return;';
+    echo '    group.remove();';
+    echo '    jcSocialFieldCount = Math.max(1, jcSocialFieldCount - 1);';
+    echo '    var addBtn = document.querySelector(".jc-add-social-btn");';
+    echo '    if (addBtn && jcSocialFieldCount < jcMaxSocialFields) {';
+    echo '        addBtn.style.display = "inline-block";';
+    echo '    }';
+    echo '}';
+    echo 'function jcValidateForm() {';
+    echo '    var nameInput = document.getElementById("jc-name-input");';
+    echo '    var ageInput = document.getElementById("jc-age-input");';
+    echo '    var activityInput = document.getElementById("jc-activity-input");';
+    echo '    var motivationInput = document.getElementById("jc-motivation-input");';
+    echo '    var socialInputs = document.querySelectorAll(".jc-social-input");';
+    echo '    var isValid = true;';
+    echo '    if (nameInput && nameInput.value.trim().length < 2) isValid = false;';
+    echo '    if (ageInput) {';
+    echo '        var age = parseInt(ageInput.value, 10);';
+    echo '        if (isNaN(age) || age < 11 || age > 99) isValid = false;';
+    echo '    }';
+    echo '    if (activityInput && activityInput.value.trim().length < 2) isValid = false;';
+    echo '    if (motivationInput && motivationInput.value.replace(/\s/g, "").length < 20) isValid = false;';
+    echo '    var hasPlatform = false;';
+    echo '    for (var i = 0; i < socialInputs.length; i++) {';
+    echo '        var v = socialInputs[i].value.toLowerCase();';
+    echo '        if (v.indexOf("youtube.com") > -1 || v.indexOf("youtu.be") > -1 || v.indexOf("twitch.tv") > -1 || v.indexOf("tiktok.com") > -1) {';
+    echo '            hasPlatform = true;';
+    echo '            break;';
+    echo '        }';
+    echo '    }';
+    echo '    if (!hasPlatform) isValid = false;';
+    echo '    return isValid;';
+    echo '}';
+    echo 'function jcInitForm() {';
+    echo '    var form = document.getElementById("jc-application-form");';
+    echo '    if (!form) return;';
+    echo '    form.addEventListener("submit", function(e) {';
+    echo '        if (!jcValidateForm()) {';
+    echo '            e.preventDefault();';
+    echo '            e.stopPropagation();';
+    echo '        }';
+    echo '    });';
+    echo '}';
+    echo 'if (document.readyState === "loading") {';
+    echo '    document.addEventListener("DOMContentLoaded", jcInitForm);';
+    echo '} else {';
+    echo '    jcInitForm();';
+    echo '}';
+    echo '</script>';
 } );
