@@ -937,11 +937,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
         }
         
         @keyframes jc-dot-bounce {
-            0%, 80%, 100% { 
+            0%, 80%, 100% {
                 transform: scale(0);
                 opacity: 0.5;
             }
-            40% { 
+            40% {
                 transform: scale(1);
                 opacity: 1;
             }
@@ -1543,7 +1543,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <h2 class="jc-status-title"><?php echo $current['title']; ?></h2>
                     <p class="jc-status-desc"><?php echo $current['desc']; ?></p>
                     
-                    <div class="jc-status-info-wrapper" style="margin-top: 30px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.15); text-align: left;"> 
+                    <div class="jc-status-info-wrapper" style="margin-top: 30px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.15); text-align: left;">
                         <div class="jc-status-meta">
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                 <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
@@ -1922,7 +1922,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="jc-add-social-btn" onclick="jcAddSocialField()">
+                    <button type="button" class="jc-add-social-btn" id="jc-add-social-btn">
                         Weiteren Kanal hinzufügen
                     </button>
                     <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
@@ -2026,7 +2026,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
                         '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
                         '</div>' +
-                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
+                        '<button type="button" class="jc-remove-social-btn">X</button>';
 
                     container.appendChild(fieldGroup);
                     window.socialFieldCount += 1;
@@ -2037,10 +2037,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         addBtn.style.display = "none";
                     }
                 }
-                
-                console.log("Defining window.jcAddSocialField...");
                 window.jcAddSocialField = jcAddSocialField;
-                console.log("window.jcAddSocialField is now:", typeof window.jcAddSocialField);
 
                 function jcRemoveSocialField(button) {
                     console.log("jcRemoveSocialField called!");
@@ -2054,6 +2051,25 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                 }
                 window.jcRemoveSocialField = jcRemoveSocialField;
+
+                // Bind clicks instead of inline onclick to avoid ReferenceError
+                var addBtnEl = document.getElementById("jc-add-social-btn");
+                if (addBtnEl) {
+                    addBtnEl.addEventListener("click", function(e) {
+                        e.preventDefault();
+                        jcAddSocialField();
+                    });
+                }
+
+                var socialFieldsEl = document.getElementById("jc-social-fields");
+                if (socialFieldsEl) {
+                    socialFieldsEl.addEventListener("click", function(e) {
+                        if (e.target && e.target.classList.contains("jc-remove-social-btn")) {
+                            e.preventDefault();
+                            jcRemoveSocialField(e.target);
+                        }
+                    });
+                }
 
                 // minimal validation (kept simple to avoid charset issues)
                 function validateAge() {
@@ -2348,7 +2364,7 @@ function jc_admin_bewerbungen_page() {
         
         .jc-stat-card {
             background: #2a2c36;
-            padding: 15px 25px 20px 25px; /* Top-Padding weiter reduziert */
+            padding: 15px 25px 20px 25px;
             border-radius: 14px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2361,31 +2377,16 @@ function jc_admin_bewerbungen_page() {
             box-shadow: 0 8px 30px rgba(0,0,0,0.5);
         }
         
-        .jc-stat-total {
-            border-left-color: #5865F2;
-            background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, #2a2c36 100%);
-        }
-        
-        .jc-stat-pending {
-            border-left-color: #ffc107;
-            background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, #2a2c36 100%);
-        }
-        
-        .jc-stat-accepted {
-            border-left-color: #4ade80;
-            background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, #2a2c36 100%);
-        }
-        
-        .jc-stat-rejected {
-            border-left-color: #f44336;
-            background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, #2a2c36 100%);
-        }
+        .jc-stat-total { border-left-color: #5865F2; background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, #2a2c36 100%); }
+        .jc-stat-pending { border-left-color: #ffc107; background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, #2a2c36 100%); }
+        .jc-stat-accepted { border-left-color: #4ade80; background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, #2a2c36 100%); }
+        .jc-stat-rejected { border-left-color: #f44336; background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, #2a2c36 100%); }
         
         .jc-stat-number {
             font-size: 42px;
             font-weight: 700;
             color: #f0f0f0;
-            margin-bottom: 2px; /* Von 4px auf 2px reduziert */
+            margin-bottom: 2px;
         }
         
         .jc-stat-label {
@@ -2406,7 +2407,6 @@ function jc_admin_bewerbungen_page() {
         .jc-empty-icon {
             font-size: 64px;
             margin-bottom: 20px;
-            animation: jc-fadeIn 0.8s ease-out;
         }
         
         .jc-empty-title {
@@ -2458,17 +2458,9 @@ function jc_admin_bewerbungen_page() {
             transform: scale(1.01);
         }
         
-        .jc-table-row.jc-status-pending {
-            border-left: 3px solid #ffc107;
-        }
-        
-        .jc-table-row.jc-status-accepted {
-            border-left: 3px solid #4ade80;
-        }
-        
-        .jc-table-row.jc-status-rejected {
-            border-left: 3px solid #f44336;
-        }
+        .jc-table-row.jc-status-pending { border-left: 3px solid #ffc107; }
+        .jc-table-row.jc-status-accepted { border-left: 3px solid #4ade80; }
+        .jc-table-row.jc-status-rejected { border-left: 3px solid #f44336; }
         
         .jc-applications-table td {
             padding: 18px 15px;
@@ -2477,62 +2469,17 @@ function jc_admin_bewerbungen_page() {
             font-size: 14px;
         }
         
-        .jc-cell-discord {
-            min-width: 200px;
-        }
+        .jc-cell-discord { min-width: 200px; }
+        .jc-discord-name { color: #f0f0f0; font-size: 15px; display: block; margin-bottom: 5px; }
+        .jc-discord-id { color: #8a8f9b; font-family: monospace; font-size: 12px; }
+        .jc-cell-name strong { color: #f0f0f0; font-size: 15px; }
+        .jc-cell-age { color: #dcddde; }
+        .jc-cell-social small { color: #a0a8b8; line-height: 1.8; display: block; }
+        .jc-motivation-preview { color: #a0a8b8; font-size: 13px; font-style: italic; }
+        .jc-cell-date small { color: #8a8f9b; font-size: 12px; }
+        .jc-status-col { min-width: 180px; }
         
-        .jc-discord-name {
-            color: #f0f0f0;
-            font-size: 15px;
-            display: block;
-            margin-bottom: 5px;
-        }
-        
-        .jc-discord-id {
-            color: #8a8f9b;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        
-        .jc-cell-name strong {
-            color: #f0f0f0;
-            font-size: 15px;
-        }
-        
-        .jc-cell-age {
-            color: #dcddde;
-        }
-        
-        .jc-cell-social small {
-            color: #a0a8b8;
-            line-height: 1.8;
-            display: block;
-        }
-        
-        .jc-cell-activity {
-            color: #dcddde;
-        }
-        
-        .jc-motivation-preview {
-            color: #a0a8b8;
-            font-size: 13px;
-            font-style: italic;
-        }
-        
-        .jc-cell-date small {
-            color: #8a8f9b;
-            font-size: 12px;
-        }
-        
-        .jc-status-col {
-            min-width: 180px;
-        }
-        
-        .jc-status-form {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
+        .jc-status-form { display: flex; flex-direction: column; gap: 8px; }
         
         .jc-status-select {
             padding: 10px 12px;
@@ -2547,7 +2494,7 @@ function jc_admin_bewerbungen_page() {
             transition: all 0.3s ease;
             -webkit-appearance: none;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%<path fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             padding-right: 35px;
@@ -2601,14 +2548,8 @@ function jc_admin_bewerbungen_page() {
         }
         
         @media (max-width: 1200px) {
-            .jc-applications-table {
-                font-size: 12px;
-            }
-            
-            .jc-applications-table th,
-            .jc-applications-table td {
-                padding: 12px 10px;
-            }
+            .jc-applications-table { font-size: 12px; }
+            .jc-applications-table th, .jc-applications-table td { padding: 12px 10px; }
         }
     </style>';
 }
@@ -2673,7 +2614,6 @@ function jc_application_countdown_shortcode() {
             color: #f0f0f0;
             line-height: 1.1;
             display: block;
-            /* Dieser Textschatten gibt den Look eures Designs */
             text-shadow: 0 0 15px rgba(88, 101, 242, 0.5);
         }
         
@@ -2686,29 +2626,15 @@ function jc_application_countdown_shortcode() {
             letter-spacing: 1px;
         }
         
-        #jc-countdown-expired {
-            text-align: center;
-        }
+        #jc-countdown-expired { text-align: center; }
         
-        /* Responsive Anpassungen */
+        /* Responsive */
         @media (max-width: 768px) {
-            .jc-countdown-wrap {
-                padding: 30px 20px;
-            }
-            #jc-countdown-timer {
-                gap: 15px;
-            }
-            .jc-countdown-box {
-                padding: 20px;
-                min-width: 100px;
-            }
-            .jc-countdown-number {
-                font-size: 48px;
-            }
-            .jc-countdown-label {
-                font-size: 14px;
-                margin-top: 5px;
-            }
+            .jc-countdown-wrap { padding: 30px 20px; }
+            #jc-countdown-timer { gap: 15px; }
+            .jc-countdown-box { padding: 20px; min-width: 100px; }
+            .jc-countdown-number { font-size: 48px; }
+            .jc-countdown-label { font-size: 14px; margin-top: 5px; }
         }
         
         @media (max-width: 480px) {
@@ -2717,15 +2643,9 @@ function jc_application_countdown_shortcode() {
                 grid-template-columns: 1fr 1fr;
                 gap: 15px;
             }
-            .jc-countdown-box {
-                min-width: auto;
-                padding: 20px 10px;
-            }
-            .jc-countdown-number {
-                font-size: 40px;
-            }
+            .jc-countdown-box { min-width: auto; padding: 20px 10px; }
+            .jc-countdown-number { font-size: 40px; }
         }
-
     </style>
     
     <div class="jc-countdown-wrap">
@@ -2763,37 +2683,26 @@ function jc_application_countdown_shortcode() {
     
     <script>
     (function() {
-        // Zieldatum (aus PHP übernommen)
         const countDownDate = new Date("<?php echo $target_date_string; ?>").getTime();
+        function formatTime(time) { return time < 10 ? "0" + time : time; }
 
-        // Helfer-Funktion: Fügt eine führende Null hinzu (z.B. 9 -> 09)
-        function formatTime(time) {
-            return time < 10 ? "0" + time : time;
-        }
-
-        // Update den Countdown jede Sekunde
         const x = setInterval(function() {
             const now = new Date().getTime();
             const distance = countDownDate - now;
 
-            // Zeitberechnungen
             const days = Math.floor(distance / (1000 * 60 * 60 * 24));
             const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
-            // HTML-Elemente aktualisieren
             document.getElementById("jc-days").innerHTML = formatTime(days);
             document.getElementById("jc-hours").innerHTML = formatTime(hours);
             document.getElementById("jc-minutes").innerHTML = formatTime(minutes);
             document.getElementById("jc-seconds").innerHTML = formatTime(seconds);
 
-            // Wenn der Countdown abgelaufen ist
             if (distance < 0) {
                 clearInterval(x);
-                // Verstecke den Timer
                 document.getElementById("jc-countdown-timer-wrap").style.display = "none";
-                // Zeige die "Bewerbung geöffnet"-Nachricht an
                 document.getElementById("jc-countdown-expired").style.display = "block";
             }
         }, 1000);
