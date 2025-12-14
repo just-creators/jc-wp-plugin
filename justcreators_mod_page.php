@@ -285,6 +285,88 @@ function jc_mods_fetch_latest_version( $slug, $mc_version ) {
 	return $result;
 }
 
+/**
+ * Check all loaders for a mod
+ */
+function jc_mods_check_all_loaders( $slug, $mc_version ) {
+	$loaders = array( 'fabric', 'forge', 'neoforge' );
+	$results = array();
+
+	foreach ( $loaders as $loader ) {
+		$cache_key = 'jc_mod_v_' . md5( $slug . $mc_version . $loader );
+		$cached    = get_transient( $cache_key );
+		if ( $cached !== false ) {
+			$results[ $loader ] = $cached;
+			continue;
+		}
+
+		$url = add_query_arg(
+			array(
+				'game_versions' => wp_json_encode( array( $mc_version ) ),
+				'loaders'       => wp_json_encode( array( $loader ) ),
+				'featured'      => 'true',
+			),
+			'https://api.modrinth.com/v2/project/' . urlencode( $slug ) . '/version'
+		);
+
+		$resp = wp_remote_get( $url, array( 'timeout' => 10 ) );
+		if ( is_wp_error( $resp ) ) {
+			$result = new WP_Error( 'jc_mods_api', 'API nicht erreichbar.' );
+			$results[ $loader ] = $result;
+			set_transient( $cache_key, $result, 6 * HOUR_IN_SECONDS );
+			continue;
+		}
+
+		$body = wp_remote_retrieve_body( $resp );
+		$data = json_decode( $body, true );
+		$versions = is_array( $data ) ? $data : array();
+
+		if ( empty( $versions ) ) {
+			$result = new WP_Error( 'jc_mods_api', 'Nicht verfügbar' );
+			$results[ $loader ] = $result;
+			set_transient( $cache_key, $result, 6 * HOUR_IN_SECONDS );
+			continue;
+		}
+
+		$version = $versions[0];
+		$files = $version['files'] ?? array();
+		if ( empty( $files ) ) {
+			$result = new WP_Error( 'jc_mods_api', 'Keine Downloads gefunden.' );
+			$results[ $loader ] = $result;
+			set_transient( $cache_key, $result, 6 * HOUR_IN_SECONDS );
+			continue;
+		}
+
+		$file = null;
+		foreach ( $files as $f ) {
+			if ( isset( $f['primary'] ) && $f['primary'] ) {
+				$file = $f;
+				break;
+			}
+		}
+		if ( ! $file ) {
+			$file = $files[0];
+		}
+
+		if ( empty( $file['url'] ) ) {
+			$result = new WP_Error( 'jc_mods_api', 'Keine Downloads gefunden.' );
+			$results[ $loader ] = $result;
+			set_transient( $cache_key, $result, 6 * HOUR_IN_SECONDS );
+			continue;
+		}
+
+		$result = array(
+			'download_url' => $file['url'],
+			'filename'     => $file['filename'] ?? '',
+		);
+
+		$results[ $loader ] = $result;
+		set_transient( $cache_key, $result, 6 * HOUR_IN_SECONDS );
+	}
+
+	return $results;
+}
+
 function jc_mods_render_shortcode() {
 	$mods       = jc_mods_get_list();
 	$mc_version = get_option( JC_MODS_MC_VERSION_OPTION, '1.21.1' );
@@ -299,12 +381,12 @@ function jc_mods_render_shortcode() {
 	<div class="jc-wrap">
 		<section class="jc-hero">
 			<div class="jc-hero-left">
-				<div class="jc-kicker">Fabric only · MC <?php echo esc_html( $mc_version ); ?></div>
+				<div class="jc-kicker">Multi-Loader Support · MC <?php echo esc_html( $mc_version ); ?></div>
 				<h1 class="jc-hero-title">JustCreators Mod Hub</h1>
-				<p class="jc-hero-sub">Kuratiertes Mod-Paket im JustCreators Look. Alle Downloads sind auf Fabric zugeschnitten und wählen automatisch die bevorzugte Minecraft-Version.</p>
+				<p class="jc-hero-sub">Kuratiertes Mod-Paket im JustCreators Look. Filtere nach Fabric, Forge oder NeoForge - unverfügbare Mods werden automatisch markiert.</p>
 				<div class="jc-hero-actions">
 					<div class="jc-pill">MC Version: <strong><?php echo esc_html( $mc_version ); ?></strong></div>
-					<div class="jc-pill jc-pill-ghost">Nur Fabric Builds</div>
+					<div class="jc-pill jc-pill-ghost">Fabric · Forge · NeoForge</div>
 				</div>
 			</div>
 			<div class="jc-hero-right">
@@ -318,20 +400,34 @@ function jc_mods_render_shortcode() {
 				<span class="jc-search-icon">🔍</span>
 				<input id="jc-mods-search" type="search" placeholder="Mods oder Autoren suchen..." aria-label="Mods suchen" />
 			</div>
-			<div class="jc-toolbar-note">Fehlt etwas? Melde dich im Teilnehmer-Discord, wir prüfen neue Mods schnell.</div>
+			<div class="jc-loader-filters">
+				<button class="jc-filter-btn active" data-loader="fabric">Fabric</button>
+				<button class="jc-filter-btn" data-loader="forge">Forge</button>
+				<button class="jc-filter-btn" data-loader="neoforge">NeoForge</button>
+			</div>
 		</section>
+		<div class="jc-toolbar-note">Fehlt etwas? Melde dich im Teilnehmer-Discord, wir prüfen neue Mods schnell.</div>
 
 		<div id="jc-mods-grid" class="jc-mods-grid">
 			<?php foreach ( $mods as $mod ) :
-				$version_info = jc_mods_fetch_latest_version( $mod['slug'], $mc_version );
-				$download     = ! is_wp_error( $version_info ) ? $version_info['download_url'] : '';
-				$version_name = ! is_wp_error( $version_info ) ? ( $version_info['name'] ?: $version_info['version'] ) : '';
-				$error_text   = is_wp_error( $version_info ) ? $version_info->get_error_message() : '';
+				$loaders = jc_mods_check_all_loaders( $mod['slug'], $mc_version );
+				$fabric_available = ! is_wp_error( $loaders['fabric'] );
+				$forge_available = ! is_wp_error( $loaders['forge'] );
+				$neoforge_available = ! is_wp_error( $loaders['neoforge'] );
+				$fabric_url = $fabric_available ? $loaders['fabric']['download_url'] : '';
+				$forge_url = $forge_available ? $loaders['forge']['download_url'] : '';
+				$neoforge_url = $neoforge_available ? $loaders['neoforge']['download_url'] : '';
 			?>
-			<div class="jc-mod-card" data-search="<?php echo esc_attr( strtolower( $mod['title'] . ' ' . $mod['author'] ) ); ?>">
+			<div class="jc-mod-card" 
+				data-search="<?php echo esc_attr( strtolower( $mod['title'] . ' ' . $mod['author'] ) ); ?>" 
+				data-fabric="<?php echo $fabric_available ? '1' : '0'; ?>" 
+				data-forge="<?php echo $forge_available ? '1' : '0'; ?>" 
+				data-neoforge="<?php echo $neoforge_available ? '1' : '0'; ?>"
+				data-fabric-url="<?php echo esc_attr( $fabric_url ); ?>"
+				data-forge-url="<?php echo esc_attr( $forge_url ); ?>"
+				data-neoforge-url="<?php echo esc_attr( $neoforge_url ); ?>">
 				<div class="jc-mod-thumb">
 					<img src="<?php echo esc_url( $mod['icon_url'] ); ?>" alt="<?php echo esc_attr( $mod['title'] ); ?>">
-					<span class="jc-badge">Fabric</span>
 				</div>
 				<div class="jc-mod-body">
 					<div class="jc-mod-top">
@@ -342,11 +438,10 @@ function jc_mods_render_shortcode() {
 						<span class="jc-tag">MC <?php echo esc_html( $mc_version ); ?></span>
 					</div>
 					<div class="jc-mod-bottom">
-						<?php if ( $download ) : ?>
-							<a class="jc-btn" href="<?php echo esc_url( $download ); ?>" target="_blank" rel="noopener noreferrer">⬇️ Download</a>
-						<div class="jc-meta-line">Version: <?php echo esc_html( $version_name ); ?></div>
+						<?php if ( $fabric_available ) : ?>
+							<a class="jc-btn jc-download-btn" href="<?php echo esc_url( $fabric_url ); ?>" target="_blank" rel="noopener noreferrer">⬇️ Download</a>
 						<?php else : ?>
-							<div class="jc-msg jc-error"><?php echo esc_html( $error_text ); ?></div>
+							<button class="jc-btn jc-download-btn" disabled>⬇️ Download</button>
 						<?php endif; ?>
 						<a class="jc-link" href="<?php echo esc_url( $mod['project_url'] ); ?>" target="_blank" rel="noopener noreferrer">Mod auf Modrinth öffnen</a>
 					</div>
@@ -377,14 +472,75 @@ function jc_mods_render_shortcode() {
 	(function(){
 		const search = document.getElementById('jc-mods-search');
 		const cards  = document.querySelectorAll('.jc-mod-card');
-		if (!search) return;
-		search.addEventListener('input', function(){
-			const term = this.value.toLowerCase();
+		const filterBtns = document.querySelectorAll('.jc-filter-btn');
+		let currentLoader = 'fabric';
+
+		function updateCards() {
+			const term = search ? search.value.toLowerCase() : '';
 			cards.forEach(card => {
 				const hay = card.dataset.search;
-				card.style.display = hay.includes(term) ? 'grid' : 'none';
+				const matchesSearch = !term || hay.includes(term);
+				const available = card.dataset[currentLoader] === '1';
+				
+				if (!matchesSearch) {
+					card.style.display = 'none';
+				} else {
+					card.style.display = 'grid';
+					const btn = card.querySelector('.jc-download-btn');
+					
+					if (available) {
+						card.classList.remove('jc-unavailable');
+						if (btn) {
+							const url = card.dataset[currentLoader + 'Url'];
+							if (url) {
+								if (btn.tagName === 'A') {
+									btn.href = url;
+									btn.disabled = false;
+								} else if (btn.tagName === 'BUTTON') {
+									// Konvertiere Button zu Link
+									const newBtn = document.createElement('a');
+									newBtn.className = btn.className;
+									newBtn.href = url;
+									newBtn.target = '_blank';
+									newBtn.rel = 'noopener noreferrer';
+									newBtn.innerHTML = btn.innerHTML;
+									btn.parentNode.replaceChild(newBtn, btn);
+								}
+							}
+						}
+					} else {
+						card.classList.add('jc-unavailable');
+						if (btn) {
+							if (btn.tagName === 'A') {
+								// Konvertiere Link zu disabled Button
+								const newBtn = document.createElement('button');
+								newBtn.className = btn.className;
+								newBtn.disabled = true;
+								newBtn.innerHTML = btn.innerHTML;
+								btn.parentNode.replaceChild(newBtn, btn);
+							} else {
+								btn.disabled = true;
+							}
+						}
+					}
+				}
+			});
+		}
+
+		if (search) {
+			search.addEventListener('input', updateCards);
+		}
+
+		filterBtns.forEach(btn => {
+			btn.addEventListener('click', function() {
+				filterBtns.forEach(b => b.classList.remove('active'));
+				this.classList.add('active');
+				currentLoader = this.dataset.loader;
+				updateCards();
 			});
 		});
+
+		updateCards();
 	})();
 	</script>
 	<?php
@@ -408,15 +564,22 @@ function jc_mods_styles() {
 		.jc-hero-right { position:relative; min-height:180px; display:flex; align-items:center; justify-content:flex-end; }
 		.jc-hero-badge { position:relative; z-index:1; padding:12px 18px; border-radius:14px; background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#040510; font-weight:800; letter-spacing:0.08em; box-shadow:0 18px 40px rgba(108,123,255,0.45); }
 		.jc-hero-glow { position:absolute; inset:20px; border-radius:18px; background:radial-gradient(circle at 50% 50%, rgba(108,123,255,0.25), transparent 55%); filter:blur(20px); opacity:0.9; }
-		.jc-toolbar { margin:18px 0 14px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+		.jc-toolbar { margin:18px 0 8px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+		.jc-toolbar-note { color:var(--jc-muted); font-size:14px; margin-bottom:10px; }
 		.jc-search { flex:1; min-width:260px; position:relative; }
+		.jc-loader-filters { display:flex; gap:8px; }
+		.jc-filter-btn { padding:8px 14px; border-radius:10px; background:rgba(30,39,64,0.6); border:1px solid var(--jc-border); color:var(--jc-muted); font-weight:700; cursor:pointer; transition:all .2s; }
+		.jc-filter-btn:hover { background:rgba(30,39,64,0.9); border-color:rgba(108,123,255,0.4); }
+		.jc-filter-btn.active { background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#050712; border-color:transparent; box-shadow:0 8px 20px rgba(108,123,255,0.35); }
 		.jc-search input { width:100%; padding:12px 44px 12px 40px; background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:12px; color:var(--jc-text); box-shadow:0 12px 32px rgba(0,0,0,0.35); }
 		.jc-search input:focus { outline:none; border-color:var(--jc-accent); box-shadow:0 0 0 3px rgba(108,123,255,0.35); }
 		.jc-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); opacity:0.7; }
-		.jc-toolbar-note { color:var(--jc-muted); font-size:14px; }
 		.jc-mods-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; }
 		.jc-mod-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; padding:22px; display:grid; grid-template-columns:170px 1fr; gap:20px; position:relative; overflow:hidden; box-shadow:0 20px 54px rgba(0,0,0,0.4); transition:transform .2s, border-color .2s, box-shadow .2s; }
 		.jc-mod-card:hover { transform:translateY(-5px); border-color:rgba(108,123,255,0.5); box-shadow:0 24px 68px rgba(0,0,0,0.5); }
+		.jc-mod-card.jc-unavailable { opacity:0.5; border-color:rgba(244,67,54,0.35); }
+		.jc-mod-card.jc-unavailable:hover { transform:none; border-color:rgba(244,67,54,0.5); }
+		.jc-mod-card.jc-unavailable .jc-btn:disabled { opacity:0.6; cursor:not-allowed; background:rgba(100,100,120,0.3); box-shadow:none; }
 		.jc-mod-thumb { position:relative; min-height:150px; }
 		.jc-mod-thumb img { width:100%; height:100%; min-height:150px; max-height:220px; object-fit:cover; border-radius:14px; background:#050712; border:1px solid var(--jc-border); }
 		.jc-badge { position:absolute; bottom:8px; left:8px; background:rgba(108,123,255,0.9); color:#050712; padding:6px 10px; border-radius:10px; font-weight:700; font-size:12px; }
