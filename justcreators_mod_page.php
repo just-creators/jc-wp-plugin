@@ -429,7 +429,7 @@ function jc_mods_check_all_loaders( $slug, $mc_version ) {
 
 function jc_mods_render_shortcode() {
 	$mods       = jc_mods_get_list();
-	$mc_version = get_option( JC_MODS_MC_VERSION_OPTION, '1.21.1' );
+	$mc_version = get_option( JC_MODS_MC_VERSION_OPTION, '1.21.11' );
 
 	if ( empty( $mods ) ) {
 		return '<p>Keine Mods hinterlegt.</p>';
@@ -467,7 +467,7 @@ function jc_mods_render_shortcode() {
 			</div>
 		</section>
 		<div class="jc-version-notice" style="background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);border-radius:12px;padding:12px 16px;margin-bottom:16px;color:#ffc107;font-size:14px;">
-			⚠️ Hinweis: Die meisten Mods sind für Minecraft 1.21.1 noch nicht verfügbar, da die Version erst kürzlich erschienen ist.
+			⚠️ Hinweis: Die meisten Mods sind für Minecraft 1.21.11 noch nicht verfügbar, da die Version erst kürzlich erschienen ist.
 		</div>
 		<div class="jc-toolbar-note">Fehlt etwas? Melde dich im Teilnehmer-Discord, wir prüfen neue Mods schnell.</div>
 
