@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Constants
+// Constants (option keys + defaults)
 define( 'JC_SUPPORT_DISCORD_CLIENT_ID', 'jc_support_discord_client_id' );
 define( 'JC_SUPPORT_DISCORD_CLIENT_SECRET', 'jc_support_discord_client_secret' );
 define( 'JC_SUPPORT_DISCORD_SERVER_ID', 'jc_support_discord_server_id' );
@@ -53,6 +53,35 @@ function jc_support_session_start() {
 	@session_start();
 }
 
+// Credential / Config Getter (nutzt wp-config Konstanten falls vorhanden)
+function jc_support_get_client_id() {
+	if ( defined( 'JC_DISCORD_CLIENT_ID' ) && JC_DISCORD_CLIENT_ID ) {
+		return JC_DISCORD_CLIENT_ID;
+	}
+	return get_option( JC_SUPPORT_DISCORD_CLIENT_ID );
+}
+
+function jc_support_get_client_secret() {
+	if ( defined( 'JC_DISCORD_CLIENT_SECRET' ) && JC_DISCORD_CLIENT_SECRET ) {
+		return JC_DISCORD_CLIENT_SECRET;
+	}
+	return get_option( JC_SUPPORT_DISCORD_CLIENT_SECRET );
+}
+
+function jc_support_get_server_id() {
+	if ( defined( 'JC_DISCORD_SERVER_ID' ) && JC_DISCORD_SERVER_ID ) {
+		return JC_DISCORD_SERVER_ID;
+	}
+	return get_option( JC_SUPPORT_DISCORD_SERVER_ID );
+}
+
+function jc_support_get_member_role_id() {
+	if ( defined( 'JC_DISCORD_MEMBER_ROLE_ID' ) && JC_DISCORD_MEMBER_ROLE_ID ) {
+		return JC_DISCORD_MEMBER_ROLE_ID;
+	}
+	return get_option( JC_SUPPORT_DISCORD_MEMBER_ROLE_ID );
+}
+
 /**
  * Custom Post Type für Tickets.
  */
@@ -79,8 +108,8 @@ function jc_support_handle_discord_callback() {
 	jc_support_session_start();
 
 	$code          = sanitize_text_field( wp_unslash( $_GET['code'] ) );
-	$client_id     = get_option( JC_SUPPORT_DISCORD_CLIENT_ID );
-	$client_secret = get_option( JC_SUPPORT_DISCORD_CLIENT_SECRET );
+	$client_id     = jc_support_get_client_id();
+	$client_secret = jc_support_get_client_secret();
 	$redirect_uri  = home_url( '/?jc_discord_callback=1' );
 
 	// Token anfordern
@@ -138,7 +167,7 @@ function jc_support_handle_discord_callback() {
  * Prüfe Discord-Server Mitgliedschaft via User-Token.
  */
 function jc_support_check_membership( $user_id, $access_token ) {
-	$server_id = get_option( JC_SUPPORT_DISCORD_SERVER_ID );
+	$server_id = jc_support_get_server_id();
 	if ( ! $server_id ) {
 		return false;
 	}
@@ -156,7 +185,7 @@ function jc_support_check_membership( $user_id, $access_token ) {
  * Login-URL bauen.
  */
 function jc_support_get_discord_login_url( $return_url = '' ) {
-	$client_id    = get_option( JC_SUPPORT_DISCORD_CLIENT_ID );
+	$client_id    = jc_support_get_client_id();
 	$redirect_uri = home_url( '/?jc_discord_callback=1' );
 	if ( ! $return_url ) {
 		$return_url = home_url();
