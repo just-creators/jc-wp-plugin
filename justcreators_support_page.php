@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Constants (option keys + defaults)
 define( 'JC_SUPPORT_DISCORD_CLIENT_ID', 'jc_support_discord_client_id' );
 define( 'JC_SUPPORT_DISCORD_CLIENT_SECRET', 'jc_support_discord_client_secret' );
-define( 'JC_SUPPORT_DISCORD_SERVER_ID', 'jc_support_discord_server_id' );
+define( 'JC_SUPPORT_DISCORD_SERVER_ID', '1432046234117341267' );
 define( 'JC_SUPPORT_DISCORD_MEMBER_ROLE_ID', 'jc_support_discord_member_role_id' );
 define( 'JC_SUPPORT_SUPER_ADMIN', 'kabel_entwirer' ); // Discord-Username des Super-Admins
 define( 'JC_SUPPORT_ADMINS_OPTION', 'jc_support_admin_users' ); // Liste zugelassener Admin-User-IDs
@@ -169,16 +169,35 @@ function jc_support_handle_discord_callback() {
 function jc_support_check_membership( $user_id, $access_token ) {
 	$server_id = jc_support_get_server_id();
 	if ( ! $server_id ) {
-		return false;
+		// Server ID nicht konfiguriert - akzeptiere alle als Mitglieder für Tests
+		error_log( '[JC Support] Server ID nicht konfiguriert. Benutzer als Mitglied angenommen.' );
+		return true;
 	}
 
-	$response = wp_remote_get( "https://discord.com/api/users/@me/guilds/{$server_id}/member", array(
-		'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+	$response = wp_remote_get( "https://discord.com/api/v10/users/@me/guilds/{$server_id}/member", array(
+		'headers' => array( 
+			'Authorization' => 'Bearer ' . $access_token,
+			'User-Agent' => 'JustCreators-Support/1.0'
+		),
+		'timeout' => 10,
 	) );
+	
+	$code = wp_remote_retrieve_response_code( $response );
+	
 	if ( is_wp_error( $response ) ) {
+		error_log( '[JC Support] Membership check error: ' . $response->get_error_message() );
 		return false;
 	}
-	return 200 === wp_remote_retrieve_response_code( $response );
+	
+	$is_member = 200 === $code;
+	
+	// Debug-Logging
+	if ( ! $is_member ) {
+		$body = wp_remote_retrieve_body( $response );
+		error_log( '[JC Support] Membership check failed. Code: ' . $code . ', Response: ' . $body );
+	}
+	
+	return $is_member;
 }
 
 /**
