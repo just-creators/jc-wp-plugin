@@ -1,137 +1,137 @@
 <?php
-/**
- * Plugin Name: JustCreators Support
- * Description: Discord-basiertes Support-System für Bug Reports, Hacker Reports, Mod Suggestions und allgemeinen Support
- * Version: 1.0.0
- * Author: JustCreators Team
- */
+		<?php else : ?>
+			<!-- Logged In Screen -->
+			<div class="jc-support-header">
+				<div class="jc-support-user">
+					<img src="https://cdn.discordapp.com/avatars/<?php echo esc_attr( $discord_user['id'] ); ?>/<?php echo esc_attr( $discord_user['avatar'] ); ?>.png" alt="Avatar" class="jc-user-avatar">
+					<div>
+						<div class="jc-user-name"><?php echo esc_html( $discord_user['username'] ); ?></div>
+						<div class="jc-user-badges">
+							<?php if ( $is_super_admin ) : ?>
+								<span class="jc-user-badge jc-badge-super-admin">👑 Super Admin</span>
+							<?php elseif ( $is_admin ) : ?>
+								<span class="jc-user-badge jc-badge-admin">👨‍💼 Admin</span>
+							<?php elseif ( $discord_user['is_member'] ) : ?>
+								<span class="jc-user-badge">✓ Teilnehmer</span>
+							<?php else : ?>
+								<span class="jc-user-badge jc-badge-error">Kein Teilnehmer</span>
+							<?php endif; ?>
+						</div>
+					</div>
+				</div>
+				<a href="?jc_logout=1" class="jc-logout-btn">Abmelden</a>
+			</div>
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+			<?php if ( $is_admin ) : ?>
+				<!-- ADMIN VIEW -->
+				<?php jc_support_render_admin_view( $discord_user, $is_super_admin ); ?>
 
-// Constants
-define( 'JC_SUPPORT_DISCORD_CLIENT_ID', 'jc_support_discord_client_id' );
-define( 'JC_SUPPORT_DISCORD_CLIENT_SECRET', 'jc_support_discord_client_secret' );
-define( 'JC_SUPPORT_DISCORD_SERVER_ID', 'jc_support_discord_server_id' );
-define( 'JC_SUPPORT_DISCORD_MEMBER_ROLE_ID', 'jc_support_discord_member_role_id' );
-define( 'JC_SUPPORT_SUPER_ADMIN', 'kabel_entwirer' ); // Super Admin Discord Username
-define( 'JC_SUPPORT_ADMINS_OPTION', 'jc_support_admin_users' ); // List of admin user IDs
+			<?php elseif ( ! $discord_user['is_member'] ) : ?>
+				<div class="jc-error-notice">
+					⚠️ Du bist kein verifizierter Teilnehmer. Tritt dem Discord-Server bei, um Support-Anfragen zu erstellen.
+				</div>
+			<?php else : ?>
 
-// Hooks
-add_action( 'init', 'jc_support_session_start', 1 );
-add_action( 'init', 'jc_support_register_post_type' );
-add_action( 'init', 'jc_support_handle_discord_callback' );
-add_action( 'init', 'jc_support_handle_frontend_actions' );
-add_shortcode( 'jc_support', 'jc_support_render_shortcode' );
+				<!-- Ticket Creation Form -->
+				<div class="jc-ticket-form-container">
+					<h2 class="jc-section-title">Neues Ticket erstellen</h2>
+					<form method="post" class="jc-ticket-form">
+						<div class="jc-form-group">
+							<label>Kategorie</label>
+							<select name="ticket_category" required class="jc-select">
+								<option value="">Wähle eine Kategorie</option>
+								<option value="Bug Report">🐛 Bug Report</option>
+								<option value="Hacker Report">🚫 Hacker Report</option>
+								<option value="Mod Suggestion">💡 Mod Suggestion</option>
+								<option value="Allgemeiner Support">❓ Allgemeiner Support</option>
+							</select>
+						</div>
 
-/**
- * Start PHP session safely (single place)
- */
-function jc_support_session_start() {
-	// Avoid restarting if already active
-	if ( session_status() === PHP_SESSION_ACTIVE ) {
-		return;
-	}
+						<div class="jc-form-group">
+							<label>Titel</label>
+							<input type="text" name="ticket_title" required class="jc-input" placeholder="Kurze Beschreibung des Problems">
+						</div>
 
-	// Configure cookie params (adjust domain if needed)
-	$domain = parse_url( home_url(), PHP_URL_HOST );
-	if ( ! empty( $domain ) ) {
-		// Ensure leading dot for subdomains
-		if ( substr( $domain, 0, 1 ) !== '.' ) {
-			$domain = '.' . $domain;
-		}
-	}
+						<div class="jc-form-group">
+							<label>Nachricht</label>
+							<textarea name="ticket_message" rows="6" required class="jc-textarea" placeholder="Beschreibe dein Anliegen ausführlich..."></textarea>
+						</div>
 
-	$secure   = is_ssl();
-	$httponly = true;
+						<button type="submit" name="jc_submit_ticket" class="jc-submit-btn">Ticket erstellen</button>
+					</form>
+				</div>
 
-	// Set cookie params before starting session
-	session_set_cookie_params( array(
-		'lifetime' => 0,
-		'path'     => '/',
-		'domain'   => $domain ?: '',
-		'secure'   => $secure,
-		'httponly' => $httponly,
-		'samesite' => 'Lax',
-	) );
+				<!-- User's Tickets -->
+				<div class="jc-tickets-container">
+					<h2 class="jc-section-title">Deine Tickets</h2>
+					
+					<?php
+					$user_tickets = get_posts( array(
+						'post_type' => 'jc_support_ticket',
+						'posts_per_page' => -1,
+						'meta_query' => array(
+							array(
+								'key' => '_jc_ticket_discord_user',
+								'value' => serialize( $discord_user['id'] ),
+								'compare' => 'LIKE',
+							),
+						),
+					) );
 
-	@session_start();
-}
+					if ( empty( $user_tickets ) ) : ?>
+						<p class="jc-no-tickets">Du hast noch keine Tickets erstellt.</p>
+					<?php else : ?>
+						<div class="jc-tickets-grid">
+							<?php foreach ( $user_tickets as $ticket ) :
+								$category = get_post_meta( $ticket->ID, '_jc_ticket_category', true );
+								$status = get_post_meta( $ticket->ID, '_jc_ticket_status', true ) ?: 'open';
+								$replies = get_post_meta( $ticket->ID, '_jc_ticket_replies', true ) ?: array();
+							?>
+							<div class="jc-ticket-card" data-status="<?php echo esc_attr( $status ); ?>">
+								<div class="jc-ticket-header">
+									<span class="jc-ticket-category"><?php echo esc_html( $category ); ?></span>
+									<span class="jc-ticket-status jc-status-<?php echo esc_attr( $status ); ?>">
+										<?php
+										$status_map = array( 'open' => 'Offen', 'answered' => 'Beantwortet', 'closed' => 'Geschlossen' );
+										echo esc_html( $status_map[ $status ] ?? 'Offen' );
+										?>
+									</span>
+								</div>
 
-/**
- * Register custom post type for tickets
- */
-function jc_support_register_post_type() {
-	register_post_type( 'jc_support_ticket', array(
-		'labels' => array(
-			'name' => 'Support Tickets',
-			'singular_name' => 'Ticket',
-		),
-		'public' => false,
-		'show_ui' => false,
-		'capability_type' => 'post',
-		'supports' => array( 'title', 'editor', 'author' ),
-	) );
-}
+								<h3 class="jc-ticket-title"><?php echo esc_html( $ticket->post_title ); ?></h3>
+								<p class="jc-ticket-message"><?php echo esc_html( wp_trim_words( $ticket->post_content, 30 ) ); ?></p>
 
-/**
- * Handle Discord OAuth callback
- */
-function jc_support_handle_discord_callback() {
-	if ( ! isset( $_GET['jc_discord_callback'], $_GET['code'] ) ) {
-		return;
-	}
+								<?php if ( ! empty( $replies ) ) : ?>
+									<div class="jc-ticket-replies">
+										<div class="jc-replies-header">💬 <?php echo count( $replies ); ?> Antwort(en)</div>
+										<?php foreach ( $replies as $reply ) : ?>
+											<div class="jc-reply <?php echo $reply['is_admin'] ? 'jc-reply-admin' : ''; ?>">
+												<div class="jc-reply-author">
+													<?php echo $reply['is_admin'] ? '👨‍💼 ' : ''; ?>
+													<?php echo esc_html( $reply['author'] ); ?>
+													<span class="jc-reply-date"><?php echo esc_html( date_i18n( 'd.m.Y H:i', strtotime( $reply['date'] ) ) ); ?></span>
+												</div>
+												<div class="jc-reply-message"><?php echo nl2br( esc_html( $reply['message'] ) ); ?></div>
+										</div>
+									<?php endforeach; ?>
+								</div>
 
-	jc_support_session_start();
+								<?php if ( $status !== 'closed' ) : ?>
+									<form method="post" class="jc-reply-form">
+										<input type="hidden" name="ticket_id" value="<?php echo esc_attr( $ticket->ID ); ?>">
+										<textarea name="user_reply_message" rows="3" placeholder="Deine Antwort..." class="jc-reply-textarea" required></textarea>
+										<button type="submit" name="jc_ticket_user_reply" class="jc-reply-btn">Antworten</button>
+									</form>
+								<?php endif; ?>
+							</div>
+							<?php endforeach; ?>
+						</div>
+					<?php endif; ?>
+				</div>
 
-	$code = sanitize_text_field( wp_unslash( $_GET['code'] ) );
-
-	$client_id = get_option( JC_SUPPORT_DISCORD_CLIENT_ID );
-	$client_secret = get_option( JC_SUPPORT_DISCORD_CLIENT_SECRET );
-	$redirect_uri = home_url( '/?jc_discord_callback=1' );
-
-	// Exchange code for token
-	$token_response = wp_remote_post( 'https://discord.com/api/oauth2/token', array(
-		'body' => array(
-			'client_id' => $client_id,
-			'client_secret' => $client_secret,
-			'grant_type' => 'authorization_code',
-			'code' => $code,
-			'redirect_uri' => $redirect_uri,
-		),
-		'headers' => array(
-			'Content-Type' => 'application/x-www-form-urlencoded',
-		),
-	) );
-
-	if ( is_wp_error( $token_response ) ) {
-		wp_die( 'Discord Login fehlgeschlagen.' );
-	}
-
-	$token_data = json_decode( wp_remote_retrieve_body( $token_response ), true );
-	if ( empty( $token_data['access_token'] ) ) {
-		wp_die( 'Discord Login fehlgeschlagen: Kein Access Token.' );
-	}
-
-	$access_token = $token_data['access_token'];
-
-	// Get user info
-	$user_response = wp_remote_get( 'https://discord.com/api/users/@me', array(
-		'headers' => array(
-			'Authorization' => 'Bearer ' . $access_token,
-		),
-	) );
-
-	if ( is_wp_error( $user_response ) ) {
-		wp_die( 'Fehler beim Abrufen der Discord-Daten.' );
-	}
-
-	$user_data = json_decode( wp_remote_retrieve_body( $user_response ), true );
-	if ( empty( $user_data['id'] ) ) {
-		wp_die( 'Fehler beim Abrufen der Discord-Daten.' );
-	}
-
-	// Check server membership
-	$is_member = jc_support_check_server_membership( $user_data['id'], $access_token );
+			<?php endif; ?>
+		<?php endif; ?>
+	</div>
 
 	// Store in session
 	$_SESSION['jc_discord_user'] = array(
