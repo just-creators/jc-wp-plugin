@@ -23,6 +23,7 @@ add_action( 'init', 'jc_support_session_start', 1 );
 add_action( 'init', 'jc_support_register_post_type' );
 add_action( 'init', 'jc_support_handle_discord_callback' );
 add_action( 'init', 'jc_support_handle_frontend_actions' );
+add_action( 'admin_menu', 'jc_support_register_admin_menu' );
 add_shortcode( 'jc_support', 'jc_support_render_shortcode' );
 
 /**
@@ -80,6 +81,112 @@ function jc_support_get_member_role_id() {
 		return JC_DISCORD_MEMBER_ROLE_ID;
 	}
 	return get_option( JC_SUPPORT_DISCORD_MEMBER_ROLE_ID );
+}
+
+/**
+ * Admin-Menu für Settings registrieren (nur Super-Admin).
+ */
+function jc_support_register_admin_menu() {
+	$super_admin = get_option( 'jc_support_super_admin_user' ) ?: JC_SUPPORT_SUPER_ADMIN;
+	add_menu_page(
+		'JC Support Settings',
+		'Support Settings',
+		'manage_options',
+		'jc-support-settings',
+		'jc_support_render_admin_page',
+		'dashicons-sos',
+		99
+	);
+}
+
+/**
+ * Admin-Seite für Settings rendern.
+ */
+function jc_support_render_admin_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'Zugriff verweigert.' );
+	}
+
+	// Save Webhooks
+	if ( isset( $_POST['jc_save_webhooks'] ) && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'jc_support_webhooks' ) ) {
+		$webhook_url = isset( $_POST['jc_webhook_url'] ) ? esc_url_raw( $_POST['jc_webhook_url'] ) : '';
+		update_option( 'jc_support_webhook_url', $webhook_url );
+		echo '<div class="updated"><p>Webhook gespeichert!</p></div>';
+	}
+
+	$webhook_url = get_option( 'jc_support_webhook_url', '' );
+	$tickets = get_posts( array( 'post_type' => 'jc_support_ticket', 'numberposts' => -1 ) );
+
+	?>
+	<div class="wrap">
+		<h1>Support System Settings</h1>
+
+		<div style="max-width:900px; margin:20px 0;">
+			<h2>🔗 Discord Webhooks</h2>
+			<p>Webhooks werden verwendet um neue Tickets und Replies im Discord-Server zu posten.</p>
+			<form method="post">
+				<?php wp_nonce_field( 'jc_support_webhooks' ); ?>
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="webhook_url">Webhook URL</label></th>
+						<td>
+							<input type="url" name="jc_webhook_url" id="webhook_url" class="regular-text" value="<?php echo esc_attr( $webhook_url ); ?>" placeholder="https://discordapp.com/api/webhooks/...">
+							<p class="description">URL für Discord-Webhooks um Benachrichtigungen zu senden.</p>
+						</td>
+					</tr>
+				</table>
+				<p class="submit"><button type="submit" name="jc_save_webhooks" class="button button-primary">Speichern</button></p>
+			</form>
+		</div>
+
+		<hr>
+
+		<div style="max-width:900px; margin:20px 0;">
+			<h2>📊 Ticket-Statistik</h2>
+			<p>Gesamt Tickets: <strong><?php echo count( $tickets ); ?></strong></p>
+			<p style="margin-top:20px;"><a href="edit.php?post_type=jc_support_ticket" class="button">Tickets im WP-Admin anzeigen</a></p>
+		</div>
+	</div>
+	<?php
+}
+
+/**
+ * Helper: Generiere eindeutige Ticket-ID.
+ */
+function jc_support_generate_ticket_id() {
+	$last_ticket = get_posts( array(
+		'post_type'      => 'jc_support_ticket',
+		'posts_per_page' => 1,
+		'orderby'        => 'ID',
+		'order'          => 'DESC',
+	) );
+
+	$next_num = 1;
+	if ( ! empty( $last_ticket ) ) {
+		$last_meta = get_post_meta( $last_ticket[0]->ID, '_jc_ticket_number', true );
+		$next_num  = ( $last_meta ? intval( $last_meta ) : 0 ) + 1;
+	}
+
+	return str_pad( $next_num, 4, '0', STR_PAD_LEFT );
+}
+
+/**
+ * Helper: Sende Webhook-Benachrichtigung.
+ */
+function jc_support_send_webhook( $message ) {
+	$webhook_url = get_option( 'jc_support_webhook_url', '' );
+	if ( ! $webhook_url ) {
+		return;
+	}
+
+	$response = wp_remote_post( $webhook_url, array(
+		'body' => json_encode( $message ),
+		'headers' => array( 'Content-Type' => 'application/json' ),
+	) );
+
+	if ( is_wp_error( $response ) ) {
+		error_log( '[JC Support] Webhook error: ' . $response->get_error_message() );
+	}
 }
 
 /**
@@ -354,6 +461,22 @@ function jc_support_handle_frontend_actions() {
 			);
 			update_post_meta( $ticket_id, '_jc_ticket_replies', $replies );
 			update_post_meta( $ticket_id, '_jc_ticket_status', 'answered' );
+
+			// Webhook senden - Admin Reply Benachrichtigung
+			$ticket_number = get_post_meta( $ticket_id, '_jc_ticket_number', true );
+			$ticket = get_post( $ticket_id );
+			jc_support_send_webhook( array(
+				'content' => '💬 **Admin hat geantwortet auf Ticket #' . $ticket_number . '**',
+				'embeds' => array( array(
+					'description' => $reply,
+					'color' => 6571543,
+					'fields' => array(
+						array( 'name' => 'Admin', 'value' => $discord_user['username'], 'inline' => true ),
+						array( 'name' => 'Ticket', 'value' => $ticket->post_title, 'inline' => true ),
+					),
+				) ),
+			) );
+
 			wp_safe_redirect( remove_query_arg( array() ) );
 			exit;
 		}
@@ -391,10 +514,27 @@ function jc_support_render_shortcode() {
 				'post_status'  => 'publish',
 			) );
 			if ( $ticket_id ) {
+				$ticket_number = jc_support_generate_ticket_id();
+				update_post_meta( $ticket_id, '_jc_ticket_number', $ticket_number );
 				update_post_meta( $ticket_id, '_jc_ticket_category', $category );
 				update_post_meta( $ticket_id, '_jc_ticket_status', 'open' );
 				update_post_meta( $ticket_id, '_jc_ticket_discord_user', $discord_user );
-				echo '<div style="background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);color:#4caf50;padding:12px;border-radius:8px;margin-bottom:20px;">Ticket erfolgreich erstellt!</div>';
+				
+				// Webhook senden
+				jc_support_send_webhook( array(
+					'content' => '🎫 **Neues Support Ticket**',
+					'embeds' => array( array(
+						'title' => "#$ticket_number - $title",
+						'description' => $message,
+						'color' => 6570280,
+						'fields' => array(
+							array( 'name' => 'Kategorie', 'value' => $category, 'inline' => true ),
+							array( 'name' => 'Von', 'value' => $discord_user['username'], 'inline' => true ),
+						),
+					) ),
+				) );
+
+				echo '<div style="background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);color:#4caf50;padding:12px;border-radius:8px;margin-bottom:20px;">✅ Ticket #' . esc_html( $ticket_number ) . ' erfolgreich erstellt!</div>';
 			}
 		}
 	}
