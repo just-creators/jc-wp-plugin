@@ -35,6 +35,12 @@ function jc_mods_handle_actions() {
 		return;
 	}
 
+	if ( isset( $_POST['jc_mods_download_zip'] ) ) {
+		check_admin_referer( 'jc_mods_download_zip' );
+		jc_mods_create_zip_download();
+		exit;
+	}
+
 	if ( isset( $_POST['jc_mods_save_mc_version'] ) ) {
 		check_admin_referer( 'jc_mods_mc_version' );
 		$version = isset( $_POST['jc_mc_version'] ) ? sanitize_text_field( wp_unslash( $_POST['jc_mc_version'] ) ) : '';
@@ -174,11 +180,11 @@ function jc_mods_render_admin_page() {
 			</div>
 
 			<div class="jc-admin-card" style="background:#0f1220;padding:20px;border-radius:14px;border:1px solid #1f2740;box-shadow:0 16px 40px rgba(0,0,0,0.35);">
-				<h2 style="margin:0 0 8px;color:#f8f9ff;">Mods aus Config importieren</h2>
-				<p style="margin:0 0 14px;color:#9eb3d5;">Lädt alle Mods aus der mods-config.json Datei.</p>
+				<h2 style="margin:0 0 8px;color:#f8f9ff;">Mods als ZIP downloaden</h2>
+				<p style="margin:0 0 14px;color:#9eb3d5;">Alle kompatiblen Mods für MC <?php echo esc_html( $mc_version ); ?> in einer ZIP-Datei.</p>
 				<form method="post">
-					<?php wp_nonce_field( 'jc_mods_import_config' ); ?>
-					<button type="submit" name="jc_mods_import_config" class="button button-secondary">Config importieren</button>
+					<?php wp_nonce_field( 'jc_mods_download_zip' ); ?>
+					<button type="submit" name="jc_mods_download_zip" class="button button-secondary">ZIP downloaden</button>
 				</form>
 			</div>
 		</div>
@@ -425,6 +431,92 @@ function jc_mods_check_all_loaders( $slug, $mc_version ) {
 	}
 
 	return $results;
+}
+
+/**
+ * Create ZIP file with all compatible mods for download
+ */
+function jc_mods_create_zip_download() {
+	$mods = jc_mods_get_list();
+	$mc_version = get_option( JC_MODS_MC_VERSION_OPTION, '1.21.1' );
+
+	if ( empty( $mods ) ) {
+		wp_die( 'Keine Mods zum Herunterladen.' );
+	}
+
+	require_once ABSPATH . 'wp-admin/includes/file.php';
+	WP_Filesystem();
+
+	global $wp_filesystem;
+
+	$temp_dir = wp_get_temp_dir() . 'jc_mods_' . time() . '/';
+	$wp_filesystem->mkdir( $temp_dir );
+
+	$downloaded = 0;
+	$failed = 0;
+
+	foreach ( $mods as $mod ) {
+		$loaders = jc_mods_check_all_loaders( $mod['slug'], $mc_version );
+		$fabric_info = $loaders['fabric'];
+
+		if ( is_wp_error( $fabric_info ) ) {
+			$failed++;
+			continue;
+		}
+
+		$url = $fabric_info['download_url'];
+		$filename = $fabric_info['filename'] ?: $mod['slug'] . '.jar';
+
+		$response = wp_remote_get( $url, array(
+			'timeout' => 30,
+			'stream' => true,
+			'filename' => $temp_dir . $filename,
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			$failed++;
+			continue;
+		}
+
+		$downloaded++;
+	}
+
+	if ( $downloaded === 0 ) {
+		wp_die( 'Keine kompatiblen Mods zum Herunterladen.' );
+	}
+
+	// Create ZIP
+	$zip_path = wp_get_temp_dir() . 'justcreators-mods-' . $mc_version . '.zip';
+	$zip = new ZipArchive();
+
+	if ( true !== $zip->open( $zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+		wp_die( 'ZIP-Datei konnte nicht erstellt werden.' );
+	}
+
+	$files = glob( $temp_dir . '*' );
+	foreach ( $files as $file ) {
+		if ( is_file( $file ) ) {
+			$zip->addFile( $file, basename( $file ) );
+		}
+	}
+
+	$zip->close();
+
+	// Clean up temp files
+	foreach ( $files as $file ) {
+		if ( is_file( $file ) ) {
+			unlink( $file );
+		}
+	}
+	rmdir( $temp_dir );
+
+	// Send file
+	header( 'Content-Type: application/zip' );
+	header( 'Content-Disposition: attachment; filename="justcreators-mods-' . $mc_version . '.zip"' );
+	header( 'Content-Length: ' . filesize( $zip_path ) );
+	readfile( $zip_path );
+
+	unlink( $zip_path );
 }
 
 function jc_mods_render_shortcode() {
