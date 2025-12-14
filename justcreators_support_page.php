@@ -208,7 +208,56 @@ function jc_support_is_super_admin( $discord_user ) {
 
 /**
  * Check if user is admin
- */Handle frontend actions (admin actions, ticket management)
+ */
+function jc_support_is_admin( $discord_user ) {
+	if ( ! $discord_user ) {
+		return false;
+	}
+	
+	if ( jc_support_is_super_admin( $discord_user ) ) {
+		return true;
+	}
+
+	$admins = get_option( JC_SUPPORT_ADMINS_OPTION, array() );
+	return in_array( $discord_user['id'], $admins, true );
+}
+
+/**
+ * Get admin list
+ */
+function jc_support_get_admin_list() {
+	return get_option( JC_SUPPORT_ADMINS_OPTION, array() );
+}
+
+/**
+ * Add admin
+ */
+function jc_support_add_admin( $user_id ) {
+	$admins = jc_support_get_admin_list();
+	if ( ! in_array( $user_id, $admins, true ) ) {
+		$admins[] = $user_id;
+		update_option( JC_SUPPORT_ADMINS_OPTION, $admins );
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Remove admin
+ */
+function jc_support_remove_admin( $user_id ) {
+	$admins = jc_support_get_admin_list();
+	$key = array_search( $user_id, $admins, true );
+	if ( $key !== false ) {
+		unset( $admins[ $key ] );
+		update_option( JC_SUPPORT_ADMINS_OPTION, array_values( $admins ) );
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Handle frontend actions (admin actions, ticket management)
  */
 function jc_support_handle_frontend_actions() {
 	if ( ! session_id() ) {
