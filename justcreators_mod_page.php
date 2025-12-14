@@ -466,6 +466,9 @@ function jc_mods_render_shortcode() {
 				<button class="jc-filter-btn" data-loader="neoforge">NeoForge</button>
 			</div>
 		</section>
+		<div class="jc-version-notice" style="background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);border-radius:12px;padding:12px 16px;margin-bottom:16px;color:#ffc107;font-size:14px;">
+			⚠️ Hinweis: Die meisten Mods sind für Minecraft 1.21.1 noch nicht verfügbar, da die Version erst kürzlich erschienen ist.
+		</div>
 		<div class="jc-toolbar-note">Fehlt etwas? Melde dich im Teilnehmer-Discord, wir prüfen neue Mods schnell.</div>
 
 		<div id="jc-mods-grid" class="jc-mods-grid">
@@ -493,7 +496,6 @@ function jc_mods_render_shortcode() {
 					<div class="jc-mod-top">
 						<div>
 							<div class="jc-mod-title"><?php echo esc_html( $mod['title'] ); ?></div>
-							<div class="jc-mod-author">von <?php echo esc_html( $mod['author'] ); ?></div>
 						</div>
 						<span class="jc-tag">MC <?php echo esc_html( $mc_version ); ?></span>
 					</div>
