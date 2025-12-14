@@ -444,13 +444,14 @@ function jc_mods_create_zip_download() {
 		wp_die( 'Keine Mods zum Herunterladen.' );
 	}
 
-	require_once ABSPATH . 'wp-admin/includes/file.php';
-	WP_Filesystem();
-
-	global $wp_filesystem;
+	if ( ! class_exists( 'ZipArchive' ) ) {
+		wp_die( 'ZIP-Erweiterung nicht verfügbar auf diesem Server.' );
+	}
 
 	$temp_dir = wp_get_temp_dir() . 'jc_mods_' . time() . '/';
-	$wp_filesystem->mkdir( $temp_dir );
+	if ( ! @mkdir( $temp_dir, 0755, true ) ) {
+		wp_die( 'Fehler beim Erstellen des temporären Verzeichnisses.' );
+	}
 
 	$downloaded = 0;
 	$failed = 0;
@@ -465,15 +466,25 @@ function jc_mods_create_zip_download() {
 		}
 
 		$url = $fabric_info['download_url'];
-		$filename = $fabric_info['filename'] ?: $mod['slug'] . '.jar';
+		$filename = $fabric_info['filename'] ?: sanitize_file_name( $mod['slug'] . '.jar' );
+		$file_path = $temp_dir . $filename;
 
-		$response = wp_remote_get( $url, array(
-			'timeout' => 30,
-			'stream' => true,
-			'filename' => $temp_dir . $filename,
-		) );
+		$response = wp_safe_remote_get( $url, array( 'timeout' => 30 ) );
 
 		if ( is_wp_error( $response ) ) {
+			$failed++;
+			continue;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$code = wp_remote_retrieve_response_code( $response );
+
+		if ( 200 !== $code || empty( $body ) ) {
+			$failed++;
+			continue;
+		}
+
+		if ( ! file_put_contents( $file_path, $body ) ) {
 			$failed++;
 			continue;
 		}
@@ -482,14 +493,18 @@ function jc_mods_create_zip_download() {
 	}
 
 	if ( $downloaded === 0 ) {
+		@array_map( 'unlink', glob( "$temp_dir*" ) );
+		@rmdir( $temp_dir );
 		wp_die( 'Keine kompatiblen Mods zum Herunterladen.' );
 	}
 
 	// Create ZIP
-	$zip_path = wp_get_temp_dir() . 'justcreators-mods-' . $mc_version . '.zip';
+	$zip_path = wp_get_temp_dir() . 'justcreators-mods-' . sanitize_file_name( $mc_version ) . '-' . time() . '.zip';
 	$zip = new ZipArchive();
 
 	if ( true !== $zip->open( $zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+		@array_map( 'unlink', glob( "$temp_dir*" ) );
+		@rmdir( $temp_dir );
 		wp_die( 'ZIP-Datei konnte nicht erstellt werden.' );
 	}
 
@@ -505,18 +520,24 @@ function jc_mods_create_zip_download() {
 	// Clean up temp files
 	foreach ( $files as $file ) {
 		if ( is_file( $file ) ) {
-			unlink( $file );
+			@unlink( $file );
 		}
 	}
-	rmdir( $temp_dir );
+	@rmdir( $temp_dir );
 
 	// Send file
-	header( 'Content-Type: application/zip' );
-	header( 'Content-Disposition: attachment; filename="justcreators-mods-' . $mc_version . '.zip"' );
-	header( 'Content-Length: ' . filesize( $zip_path ) );
-	readfile( $zip_path );
+	if ( ! is_file( $zip_path ) ) {
+		wp_die( 'ZIP-Datei konnte nicht erstellt werden.' );
+	}
 
-	unlink( $zip_path );
+	header( 'Content-Type: application/zip' );
+	header( 'Content-Disposition: attachment; filename="justcreators-mods-' . sanitize_file_name( $mc_version ) . '.zip"' );
+	header( 'Content-Length: ' . filesize( $zip_path ) );
+	header( 'Pragma: no-cache' );
+	header( 'Expires: 0' );
+
+	readfile( $zip_path );
+	@unlink( $zip_path );
 }
 
 function jc_mods_render_shortcode() {
