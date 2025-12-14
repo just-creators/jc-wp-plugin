@@ -11,6 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // Optionen
 define( 'JC_MODS_OPTION_KEY', 'jc_modrinth_mods' );
 define( 'JC_MODS_MC_VERSION_OPTION', 'jc_modrinth_mc_version' );
+define( 'JC_MODS_MODPACK_URL', 'https://modrinth.com/modpack/justcreators' );
 
 // Hooks
 add_action( 'admin_menu', 'jc_mods_register_menu' );
@@ -219,12 +220,40 @@ function jc_mods_fetch_latest_version( $slug, $mc_version ) {
 	}
 
 	$versions = json_decode( wp_remote_retrieve_body( $response ), true );
-	if ( empty( $versions[0]['files'][0]['url'] ) ) {
+	if ( empty( $versions ) ) {
 		return new WP_Error( 'jc_mods_api', 'Keine Fabric-Downloads für diese Mod gefunden.' );
 	}
 
 	$version = $versions[0];
-	$file    = $version['files'][0];
+
+	// Wähle Datei: zuerst primary, sonst filename mit "fabric", sonst erste Datei.
+	$files = $version['files'] ?? array();
+	if ( empty( $files ) ) {
+		return new WP_Error( 'jc_mods_api', 'Keine Fabric-Downloads für diese Mod gefunden.' );
+	}
+
+	$file = null;
+	foreach ( $files as $f ) {
+		if ( isset( $f['primary'] ) && $f['primary'] ) {
+			$file = $f;
+			break;
+		}
+	}
+	if ( ! $file ) {
+		foreach ( $files as $f ) {
+			if ( isset( $f['filename'] ) && stripos( $f['filename'], 'fabric' ) !== false ) {
+				$file = $f;
+				break;
+			}
+		}
+	}
+	if ( ! $file ) {
+		$file = $files[0];
+	}
+
+	if ( empty( $file['url'] ) ) {
+		return new WP_Error( 'jc_mods_api', 'Keine Fabric-Downloads für diese Mod gefunden.' );
+	}
 
 	$result = array(
 		'name'          => $version['name'] ?? ( $version['version_number'] ?? '' ),
@@ -297,7 +326,8 @@ function jc_mods_render_shortcode() {
 					</div>
 					<div class="jc-mod-bottom">
 						<?php if ( $download ) : ?>
-							<a class="jc-btn" href="<?php echo esc_url( $download ); ?>" target="_blank" rel="noopener noreferrer">⬇️ Download (<?php echo esc_html( $version_name ); ?>)</a>
+							<a class="jc-btn" href="<?php echo esc_url( $download ); ?>" target="_blank" rel="noopener noreferrer">⬇️ Download</a>
+						<div class="jc-meta-line">Version: <?php echo esc_html( $version_name ); ?></div>
 						<?php else : ?>
 							<div class="jc-msg jc-error"><?php echo esc_html( $error_text ); ?></div>
 						<?php endif; ?>
@@ -312,6 +342,16 @@ function jc_mods_render_shortcode() {
 			<div>
 				<h3>Neue Mod vorschlagen</h3>
 				<p>Schreib im Teilnehmer-Discord, welche Fabric-Mod du brauchst. Unser Team prüft und fügt sie bei Freigabe hinzu.</p>
+			</div>
+		</section>
+
+		<section class="jc-callout jc-modpack">
+			<div>
+				<h3>JustCreators Modpack auf Modrinth</h3>
+				<p>Alle freigegebenen Mods gesammelt als Modpack. Perfekt zum Komplett-Download.</p>
+			</div>
+			<div>
+				<a class="jc-btn" href="<?php echo esc_url( JC_MODS_MODPACK_URL ); ?>" target="_blank" rel="noopener noreferrer">Modpack ansehen</a>
 			</div>
 		</section>
 	</div>
@@ -369,6 +409,7 @@ function jc_mods_styles() {
 		.jc-mod-author { color:var(--jc-muted); font-size:13px; margin-top:4px; }
 		.jc-tag { background:rgba(86,216,255,0.12); color:#c9eeff; padding:6px 10px; border-radius:12px; font-size:12px; font-weight:700; border:1px solid rgba(86,216,255,0.35); }
 		.jc-mod-bottom { display:flex; flex-direction:column; gap:8px; }
+		.jc-meta-line { color:var(--jc-muted); font-size:13px; }
 		.jc-btn { display:inline-flex; align-items:center; gap:8px; justify-content:center; padding:12px 16px; border-radius:12px; background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#050712; text-decoration:none; font-weight:800; letter-spacing:0.01em; box-shadow:0 14px 34px rgba(108,123,255,0.45); transition:transform .2s, box-shadow .2s; }
 		.jc-btn:hover { transform:translateY(-2px); box-shadow:0 16px 40px rgba(86,216,255,0.5); color:#050712; }
 		.jc-link { color:var(--jc-muted); text-decoration:none; font-weight:700; font-size:14px; }
@@ -378,6 +419,7 @@ function jc_mods_styles() {
 		.jc-callout { margin-top:18px; padding:18px 18px 20px; border-radius:16px; background:linear-gradient(120deg, rgba(108,123,255,0.16), rgba(86,216,255,0.12)); border:1px solid rgba(108,123,255,0.35); box-shadow:0 18px 48px rgba(0,0,0,0.35); }
 		.jc-callout h3 { margin:0 0 6px; color:var(--jc-text); }
 		.jc-callout p { margin:0; color:var(--jc-muted); line-height:1.6; }
+		.jc-callout.jc-modpack { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 		@media (max-width: 900px) {
 			.jc-hero { grid-template-columns:1fr; }
 			.jc-hero-right { justify-content:flex-start; min-height:120px; }
