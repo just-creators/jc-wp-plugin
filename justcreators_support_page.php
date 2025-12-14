@@ -18,6 +18,7 @@ define( 'JC_SUPPORT_ADMINS_OPTION', 'jc_support_admin_users' ); // List of admin
 
 // Hooks
 add_action( 'admin_menu', 'jc_support_register_menu' );
+add_action( 'init', 'jc_support_session_start', 1 );
 add_action( 'init', 'jc_support_register_post_type' );
 add_action( 'init', 'jc_support_handle_discord_callback' );
 add_action( 'init', 'jc_support_handle_frontend_actions' );
@@ -48,6 +49,40 @@ function jc_support_register_menu() {
 }
 
 /**
+ * Start PHP session safely (single place)
+ */
+function jc_support_session_start() {
+	// Avoid restarting if already active
+	if ( session_status() === PHP_SESSION_ACTIVE ) {
+		return;
+	}
+
+	// Configure cookie params (adjust domain if needed)
+	$domain = parse_url( home_url(), PHP_URL_HOST );
+	if ( ! empty( $domain ) ) {
+		// Ensure leading dot for subdomains
+		if ( substr( $domain, 0, 1 ) !== '.' ) {
+			$domain = '.' . $domain;
+		}
+	}
+
+	$secure   = is_ssl();
+	$httponly = true;
+
+	// Set cookie params before starting session
+	session_set_cookie_params( array(
+		'lifetime' => 0,
+		'path'     => '/',
+		'domain'   => $domain ?: '',
+		'secure'   => $secure,
+		'httponly' => $httponly,
+		'samesite' => 'Lax',
+	) );
+
+	@session_start();
+}
+
+/**
  * Register custom post type for tickets
  */
 function jc_support_register_post_type() {
@@ -70,6 +105,8 @@ function jc_support_handle_discord_callback() {
 	if ( ! isset( $_GET['jc_discord_callback'], $_GET['code'] ) ) {
 		return;
 	}
+
+	jc_support_session_start();
 
 	$code = sanitize_text_field( wp_unslash( $_GET['code'] ) );
 
@@ -122,10 +159,6 @@ function jc_support_handle_discord_callback() {
 	$is_member = jc_support_check_server_membership( $user_data['id'], $access_token );
 
 	// Store in session
-	if ( ! session_id() ) {
-		session_start();
-	}
-
 	$_SESSION['jc_discord_user'] = array(
 		'id' => $user_data['id'],
 		'username' => $user_data['username'],
@@ -190,11 +223,8 @@ function jc_support_get_discord_login_url( $return_url = '' ) {
  * Get current Discord user from session
  */
 function jc_support_get_current_user() {
-	if ( ! session_id() ) {
-		session_start();
-	}
-
-	
+	jc_support_session_start();
+	return isset( $_SESSION['jc_discord_user'] ) ? $_SESSION['jc_discord_user'] : null;
 
 /**
  * Check if user is super admin
@@ -502,12 +532,11 @@ function jc_support_render_settings_page() {
  * Frontend shortcode
  */
 function jc_support_render_shortcode() {
-	if ( ! session_id() ) {
-		session_start();
-	}
+	jc_support_session_start();
 
 	$discord_user = jc_support_get_current_user();
-	$is_admin = current_user_can( 'manage_options' ) && is_user_logged_in();
+	$is_admin = jc_support_is_admin( $discord_user );
+	$is_super_admin = jc_support_is_super_admin( $discord_user );
 
 	// Handle logout
 	if ( isset( $_GET['jc_logout'] ) ) {
