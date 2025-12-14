@@ -17,36 +17,11 @@ define( 'JC_SUPPORT_SUPER_ADMIN', 'kabel_entwirer' ); // Super Admin Discord Use
 define( 'JC_SUPPORT_ADMINS_OPTION', 'jc_support_admin_users' ); // List of admin user IDs
 
 // Hooks
-add_action( 'admin_menu', 'jc_support_register_menu' );
 add_action( 'init', 'jc_support_session_start', 1 );
 add_action( 'init', 'jc_support_register_post_type' );
 add_action( 'init', 'jc_support_handle_discord_callback' );
 add_action( 'init', 'jc_support_handle_frontend_actions' );
 add_shortcode( 'jc_support', 'jc_support_render_shortcode' );
-
-/**
- * Register admin menu
- */
-function jc_support_register_menu() {
-	add_menu_page(
-		'JustCreators Support',
-		'Support',
-		'manage_options',
-		'jc-support',
-		'jc_support_render_admin_page',
-		'dashicons-sos',
-		59
-	);
-
-	add_submenu_page(
-		'jc-support',
-		'Support Einstellungen',
-		'Einstellungen',
-		'manage_options',
-		'jc-support-settings',
-		'jc_support_render_settings_page'
-	);
-}
 
 /**
  * Start PHP session safely (single place)
@@ -388,67 +363,7 @@ function jc_support_render_admin_page() {
 		<p>Das Support-System wird komplett im Frontend verwaltet. Verwende den Shortcode <code>[jc_support]</code> auf einer Seite.</p>
 		<p>Super Admin: <strong><?php echo esc_html( JC_SUPPORT_SUPER_ADMIN ); ?></strong></p>
 		<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=jc-support-settings' ) ); ?>" class="button button-primary">Einstellungen</a></p>
-	</divstrong><?php echo esc_html( $discord_user['username'] ?? 'Unbekannt' ); ?></strong>
-						</div>
-					</div>
-					<span style="background:<?php echo esc_attr( $status_colors[ $status ] ); ?>;color:#050712;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;">
-						<?php echo esc_html( $status_labels[ $status ] ); ?>
-					</span>
-				</div>
-
-				<div style="background:#0b0f1d;padding:12px;border-radius:8px;margin-bottom:12px;">
-					<div style="color:#6c7bff;font-size:11px;font-weight:700;text-transform:uppercase;margin-bottom:6px;">
-						<?php echo esc_html( $category ); ?>
-					</div>
-					<div style="color:#e9ecf7;font-size:13px;line-height:1.5;">
-						<?php echo nl2br( esc_html( wp_trim_words( $ticket->post_content, 30 ) ) ); ?>
-					</div>
-				</div>
-
-				<?php if ( ! empty( $replies ) ) : ?>
-				<div style="color:#9eb3d5;font-size:12px;margin-bottom:8px;">
-					💬 <?php echo count( $replies ); ?> Antwort(en)
-				</div>
-				<?php endif; ?>
-
-				<div style="display:flex;gap:8px;">
-					<button onclick="showReplyForm(<?php echo esc_js( $ticket->ID ); ?>)" class="button button-primary button-small">Antworten</button>
-					<?php if ( $status !== 'closed' ) : ?>
-					<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=jc-support&jc_close_ticket=' . $ticket->ID ), 'jc_close_' . $ticket->ID ) ); ?>" class="button button-small">Schließen</a>
-					<?php endif; ?>
-				</div>
-
-				<div id="reply-form-<?php echo esc_attr( $ticket->ID ); ?>" style="display:none;margin-top:12px;">
-					<form method="post">
-						<?php wp_nonce_field( 'jc_ticket_reply' ); ?>
-						<input type="hidden" name="ticket_id" value="<?php echo esc_attr( $ticket->ID ); ?>">
-						<textarea name="reply_message" rows="4" style="width:100%;margin-bottom:8px;padding:8px;border-radius:6px;border:1px solid #1f2740;background:#0b0f1d;color:#e9ecf7;" required></textarea>
-						<button type="submit" name="jc_ticket_reply" class="button button-primary button-small">Senden</button>
-						<button type="button" onclick="hideReplyForm(<?php echo esc_js( $ticket->ID ); ?>)" class="button button-small">Abbrechen</button>
-					</form>
-				</div>
-			</div>
-			<?php endforeach; ?>
-		</div>
-
-		<?php if ( empty( $tickets ) ) : ?>
-			<p style="color:#9eb3d5;text-align:center;padding:40px;">Keine Tickets vorhanden.</p>
-		<?php endif; ?>
 	</div>
-
-	<script>
-	function showReplyForm(id) {
-		document.getElementById('reply-form-' + id).style.display = 'block';
-	}
-	function hideReplyForm(id) {
-		document.getElementById('reply-form-' + id).style.display = 'none';
-	}
-	</script>
-
-	<style>
-		.wrap { background:#050712; padding:20px; border-radius:12px; }
-		.wrap h1 { color:#f8f9ff; }
-	</style>
 	<?php
 }
 
