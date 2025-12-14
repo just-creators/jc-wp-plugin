@@ -84,6 +84,21 @@ function jc_support_get_member_role_id() {
 }
 
 /**
+ * Kategorien aus Optionen laden
+ */
+function jc_support_get_categories_default() {
+	return array( 'Bug Report', 'Hacker Report', 'Mod Suggestion', 'Allgemeiner Support' );
+}
+
+function jc_support_get_categories() {
+	$cats = get_option( 'jc_support_categories', jc_support_get_categories_default() );
+	if ( ! is_array( $cats ) || empty( $cats ) ) {
+		$cats = jc_support_get_categories_default();
+	}
+	return $cats;
+}
+
+/**
  * Admin-Menu für Settings registrieren (nur Super-Admin).
  */
 function jc_support_register_admin_menu() {
@@ -111,10 +126,15 @@ function jc_support_render_admin_page() {
 	if ( isset( $_POST['jc_save_webhooks'] ) && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'jc_support_webhooks' ) ) {
 		$webhook_url = isset( $_POST['jc_webhook_url'] ) ? esc_url_raw( $_POST['jc_webhook_url'] ) : '';
 		update_option( 'jc_support_webhook_url', $webhook_url );
+		// Save categories
+		$cats_raw = sanitize_textarea_field( wp_unslash( $_POST['jc_categories'] ?? '' ) );
+		$cats = array_filter( array_map( 'trim', explode( "\n", $cats_raw ) ) );
+		update_option( 'jc_support_categories', $cats );
 		echo '<div class="updated"><p>Webhook gespeichert!</p></div>';
 	}
 
 	$webhook_url = get_option( 'jc_support_webhook_url', '' );
+	$categories  = get_option( 'jc_support_categories', jc_support_get_categories_default() );
 	$tickets = get_posts( array( 'post_type' => 'jc_support_ticket', 'numberposts' => -1 ) );
 
 	?>
@@ -122,8 +142,8 @@ function jc_support_render_admin_page() {
 		<h1>Support System Settings</h1>
 
 		<div style="max-width:900px; margin:20px 0;">
-			<h2>🔗 Discord Webhooks</h2>
-			<p>Webhooks werden verwendet um neue Tickets und Replies im Discord-Server zu posten.</p>
+			<h2>🔗 Discord Webhooks & Kategorien</h2>
+			<p>Webhooks werden verwendet um neue Tickets und Replies im Discord-Server zu posten. Darunter kannst du Kategorien anpassen.</p>
 			<form method="post">
 				<?php wp_nonce_field( 'jc_support_webhooks' ); ?>
 				<table class="form-table">
@@ -132,6 +152,13 @@ function jc_support_render_admin_page() {
 						<td>
 							<input type="url" name="jc_webhook_url" id="webhook_url" class="regular-text" value="<?php echo esc_attr( $webhook_url ); ?>" placeholder="https://discordapp.com/api/webhooks/...">
 							<p class="description">URL für Discord-Webhooks um Benachrichtigungen zu senden.</p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="jc_categories">Ticket-Kategorien</label></th>
+						<td>
+							<textarea name="jc_categories" id="jc_categories" class="large-text" rows="6" placeholder="Eine Kategorie pro Zeile (z.B. Bug Report)"><?php echo esc_textarea( implode("\n", $categories ) ); ?></textarea>
+							<p class="description">Diese Kategorien erscheinen im Ticket-Formular und in den Filter-Dropdowns.</p>
 						</td>
 					</tr>
 				</table>
@@ -497,6 +524,18 @@ function jc_support_render_shortcode() {
 	$is_admin       = jc_support_is_admin( $discord_user );
 	$is_super_admin = jc_support_is_super_admin( $discord_user );
 
+	// Vollbild-Chat-Ansicht eines Tickets öffnen
+	if ( $discord_user && isset( $_GET['jc_ticket'] ) ) {
+		$ticket_id = intval( $_GET['jc_ticket'] );
+		$ticket    = get_post( $ticket_id );
+		if ( $ticket && $ticket->post_type === 'jc_support_ticket' ) {
+			ob_start();
+			jc_support_styles();
+			jc_support_render_chat_view( $ticket_id, $discord_user, $is_admin, $is_super_admin );
+			return ob_get_clean();
+		}
+	}
+
 	// Logout
 	if ( isset( $_GET['jc_logout'] ) ) {
 		jc_support_logout();
@@ -611,10 +650,9 @@ function jc_support_render_shortcode() {
 							<label>Kategorie</label>
 							<select name="ticket_category" required class="jc-select">
 								<option value="">Wähle eine Kategorie</option>
-								<option value="Bug Report">🐛 Bug Report</option>
-								<option value="Hacker Report">🚫 Hacker Report</option>
-								<option value="Mod Suggestion">💡 Mod Suggestion</option>
-								<option value="Allgemeiner Support">❓ Allgemeiner Support</option>
+								<?php foreach ( jc_support_get_categories() as $cat ) : ?>
+									<option value="<?php echo esc_attr( $cat ); ?>"><?php echo esc_html( $cat ); ?></option>
+								<?php endforeach; ?>
 							</select>
 						</div>
 						<div class="jc-form-group">
@@ -631,18 +669,58 @@ function jc_support_render_shortcode() {
 
 				<div class="jc-tickets-container">
 					<h2 class="jc-section-title">Deine Tickets</h2>
+					<form method="get" class="jc-filter-bar" style="display:flex; gap:10px; margin:10px 0 16px;">
+						<input type="hidden" name="page_id" value="<?php echo esc_attr( get_queried_object_id() ); ?>">
+						<select name="jc_cat" class="jc-select" style="max-width:200px;">
+							<option value="">Alle Kategorien</option>
+							<?php foreach ( jc_support_get_categories() as $cat ) : ?>
+								<option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $_GET['jc_cat'] ?? '', $cat ); ?>><?php echo esc_html( $cat ); ?></option>
+							<?php endforeach; ?>
+						</select>
+						<select name="jc_status" class="jc-select" style="max-width:180px;">
+							<option value="">Alle Stati</option>
+							<option value="open" <?php selected( $_GET['jc_status'] ?? '', 'open' ); ?>>Offen</option>
+							<option value="answered" <?php selected( $_GET['jc_status'] ?? '', 'answered' ); ?>>Beantwortet</option>
+							<option value="closed" <?php selected( $_GET['jc_status'] ?? '', 'closed' ); ?>>Geschlossen</option>
+						</select>
+						<input type="text" name="jc_search" class="jc-input" placeholder="#Ticket-ID oder Text" value="<?php echo esc_attr( $_GET['jc_search'] ?? '' ); ?>" style="flex:1;">
+						<button type="submit" class="jc-submit-btn">Filtern</button>
+					</form>
 					<?php
-					$user_tickets = get_posts( array(
+					$filter_cat    = sanitize_text_field( wp_unslash( $_GET['jc_cat'] ?? '' ) );
+					$filter_status = sanitize_text_field( wp_unslash( $_GET['jc_status'] ?? '' ) );
+					$filter_search = sanitize_text_field( wp_unslash( $_GET['jc_search'] ?? '' ) );
+					$meta_query    = array(
+						array(
+							'key'     => '_jc_ticket_discord_user',
+							'value'   => serialize( $discord_user['id'] ),
+							'compare' => 'LIKE',
+						)
+					);
+					if ( $filter_cat ) {
+						$meta_query[] = array(
+							'key'   => '_jc_ticket_category',
+							'value' => $filter_cat,
+						);
+					}
+					if ( $filter_status ) {
+						$meta_query[] = array(
+							'key'   => '_jc_ticket_status',
+							'value' => $filter_status,
+						);
+					}
+					$args = array(
 						'post_type'      => 'jc_support_ticket',
 						'posts_per_page' => -1,
-						'meta_query'     => array(
-							array(
-								'key'     => '_jc_ticket_discord_user',
-								'value'   => serialize( $discord_user['id'] ),
-								'compare' => 'LIKE',
-							),
-						),
-					) );
+						'orderby'        => 'date',
+						'order'          => 'DESC',
+						'meta_query'     => $meta_query,
+					);
+					if ( $filter_search ) {
+						// Search by content/title and by ticket number
+						$args['s'] = ltrim( $filter_search, '#' );
+					}
+					$user_tickets = get_posts( $args );
 					if ( empty( $user_tickets ) ) : ?>
 						<p class="jc-no-tickets">Du hast noch keine Tickets erstellt.</p>
 					<?php else : ?>
@@ -651,14 +729,18 @@ function jc_support_render_shortcode() {
 								$category = get_post_meta( $ticket->ID, '_jc_ticket_category', true );
 								$status   = get_post_meta( $ticket->ID, '_jc_ticket_status', true ) ?: 'open';
 								$replies  = get_post_meta( $ticket->ID, '_jc_ticket_replies', true ) ?: array();
+								$ticket_number = get_post_meta( $ticket->ID, '_jc_ticket_number', true );
 							?>
 							<div class="jc-ticket-card" data-status="<?php echo esc_attr( $status ); ?>">
 								<div class="jc-ticket-header">
 									<span class="jc-ticket-category"><?php echo esc_html( $category ); ?></span>
 									<span class="jc-ticket-status jc-status-<?php echo esc_attr( $status ); ?>"><?php echo esc_html( array('open'=>'Offen','answered'=>'Beantwortet','closed'=>'Geschlossen')[ $status ] ?? 'Offen' ); ?></span>
 								</div>
-								<h3 class="jc-ticket-title"><?php echo esc_html( $ticket->post_title ); ?></h3>
+								<h3 class="jc-ticket-title">#<?php echo esc_html( $ticket_number ); ?> · <?php echo esc_html( $ticket->post_title ); ?></h3>
 								<p class="jc-ticket-message"><?php echo esc_html( wp_trim_words( $ticket->post_content, 30 ) ); ?></p>
+								<div class="jc-card-actions">
+									<a class="jc-open-chat-btn" href="<?php echo esc_url( add_query_arg( array( 'jc_ticket' => $ticket->ID ) ) ); ?>">Chat öffnen</a>
+								</div>
 								<?php if ( ! empty( $replies ) ) : ?>
 									<div class="jc-ticket-replies">
 										<div class="jc-replies-header">💬 <?php echo count( $replies ); ?> Antwort(en)</div>
@@ -696,12 +778,39 @@ function jc_support_render_shortcode() {
  * Admin-View (Frontend für Admins / Super-Admin).
  */
 function jc_support_render_admin_view( $discord_user, $is_super_admin ) {
-	$tickets = get_posts( array(
+	// Filter Controls
+	$filter_cat    = sanitize_text_field( wp_unslash( $_GET['jc_cat'] ?? '' ) );
+	$filter_status = sanitize_text_field( wp_unslash( $_GET['jc_status'] ?? '' ) );
+	$filter_search = sanitize_text_field( wp_unslash( $_GET['jc_search'] ?? '' ) );
+	$filter_member = sanitize_text_field( wp_unslash( $_GET['jc_member'] ?? '' ) ); // username or ID
+
+	$meta_query = array();
+	if ( $filter_cat ) {
+		$meta_query[] = array( 'key' => '_jc_ticket_category', 'value' => $filter_cat );
+	}
+	if ( $filter_status ) {
+		$meta_query[] = array( 'key' => '_jc_ticket_status', 'value' => $filter_status );
+	}
+	if ( $filter_member ) {
+		// Match by stored discord user data
+		$meta_query[] = array(
+			'key'     => '_jc_ticket_discord_user',
+			'value'   => $filter_member,
+			'compare' => 'LIKE',
+		);
+	}
+
+	$args = array(
 		'post_type'      => 'jc_support_ticket',
 		'posts_per_page' => -1,
 		'orderby'        => 'date',
 		'order'          => 'DESC',
-	) );
+		'meta_query'     => $meta_query,
+	);
+	if ( $filter_search ) {
+		$args['s'] = ltrim( $filter_search, '#' );
+	}
+	$tickets = get_posts( $args );
 	$admin_list = jc_support_get_admin_list();
 	?>
 	<?php if ( $is_super_admin ) : ?>
@@ -733,6 +842,24 @@ function jc_support_render_admin_view( $discord_user, $is_super_admin ) {
 
 	<div class="jc-admin-tickets-container">
 		<h2 class="jc-section-title">🎫 Alle Support Tickets (<?php echo count( $tickets ); ?>)</h2>
+		<form method="get" class="jc-filter-bar" style="display:flex; gap:10px; margin:10px 0 16px;">
+			<input type="hidden" name="page_id" value="<?php echo esc_attr( get_queried_object_id() ); ?>">
+			<select name="jc_cat" class="jc-select" style="max-width:200px;">
+				<option value="">Alle Kategorien</option>
+				<?php foreach ( jc_support_get_categories() as $cat ) : ?>
+					<option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $_GET['jc_cat'] ?? '', $cat ); ?>><?php echo esc_html( $cat ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<select name="jc_status" class="jc-select" style="max-width:180px;">
+				<option value="">Alle Stati</option>
+				<option value="open" <?php selected( $_GET['jc_status'] ?? '', 'open' ); ?>>Offen</option>
+				<option value="answered" <?php selected( $_GET['jc_status'] ?? '', 'answered' ); ?>>Beantwortet</option>
+				<option value="closed" <?php selected( $_GET['jc_status'] ?? '', 'closed' ); ?>>Geschlossen</option>
+			</select>
+			<input type="text" name="jc_member" class="jc-input" placeholder="Mitglied (Name oder ID)" value="<?php echo esc_attr( $_GET['jc_member'] ?? '' ); ?>" style="max-width:220px;">
+			<input type="text" name="jc_search" class="jc-input" placeholder="#Ticket-ID oder Text" value="<?php echo esc_attr( $_GET['jc_search'] ?? '' ); ?>" style="flex:1;">
+			<button type="submit" class="jc-submit-btn">Filtern</button>
+		</form>
 		<?php if ( empty( $tickets ) ) : ?>
 			<p class="jc-no-tickets">Keine Tickets vorhanden.</p>
 		<?php else : ?>
@@ -744,6 +871,7 @@ function jc_support_render_admin_view( $discord_user, $is_super_admin ) {
 					$replies             = get_post_meta( $ticket->ID, '_jc_ticket_replies', true ) ?: array();
 					$claimed_by          = get_post_meta( $ticket->ID, '_jc_ticket_claimed_by', true );
 					$claimed_by_username = get_post_meta( $ticket->ID, '_jc_ticket_claimed_by_username', true );
+					$ticket_number       = get_post_meta( $ticket->ID, '_jc_ticket_number', true );
 				?>
 				<div class="jc-ticket-card jc-admin-ticket-card" data-status="<?php echo esc_attr( $status ); ?>">
 					<div class="jc-ticket-header">
@@ -764,7 +892,10 @@ function jc_support_render_admin_view( $discord_user, $is_super_admin ) {
 						<a href="<?php echo esc_url( wp_nonce_url( add_query_arg( array( 'jc_claim_ticket' => $ticket->ID ) ), 'jc_claim_ticket' ) ); ?>" class="jc-claim-btn">📌 Ticket claimen</a>
 					<?php endif; ?>
 
-					<h3 class="jc-ticket-title"><?php echo esc_html( $ticket->post_title ); ?></h3>
+					<h3 class="jc-ticket-title">
+						<a href="<?php echo esc_url( add_query_arg( array( 'jc_ticket' => $ticket->ID ) ) ); ?>" style="color:var(--jc-text); text-decoration:none;"><?php echo esc_html( $ticket->post_title ); ?></a>
+					</h3>
+					<div class="jc-ticket-meta"><strong>Ticket:</strong> #<?php echo esc_html( $ticket_number ); ?></div>
 					<p class="jc-ticket-message"><?php echo nl2br( esc_html( $ticket->post_content ) ); ?></p>
 
 					<?php if ( ! empty( $replies ) ) : ?>
@@ -839,6 +970,8 @@ function jc_support_styles() {
 		.jc-tickets-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; }
 		.jc-ticket-card { border-radius:18px; padding:22px; display:grid; grid-template-columns:1fr; gap:12px; position:relative; overflow:hidden; background:var(--jc-panel); border:1px solid var(--jc-border); box-shadow:0 20px 54px rgba(0,0,0,0.4); transition:transform .2s, border-color .2s, box-shadow .2s; }
 		.jc-ticket-card:hover { transform:translateY(-5px); border-color:rgba(108,123,255,0.5); box-shadow:0 24px 68px rgba(0,0,0,0.5); }
+		.jc-card-actions { display:flex; justify-content:flex-end; }
+		.jc-open-chat-btn { display:inline-block; padding:8px 14px; border-radius:10px; background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); color:var(--jc-accent); text-decoration:none; font-weight:800; }
 		.jc-ticket-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
 		.jc-ticket-category { padding:6px 10px; border-radius:12px; background:rgba(86,216,255,0.12); color:#c9eeff; border:1px solid rgba(86,216,255,0.35); font-weight:700; font-size:12px; }
 		.jc-ticket-status { padding:6px 10px; border-radius:10px; font-weight:800; font-size:12px; }
@@ -862,8 +995,81 @@ function jc_support_styles() {
 		.jc-admin-id { color:var(--jc-text); font-weight:800; }
 		.jc-remove-btn { padding:6px 10px; background:rgba(244,67,54,0.12); border:1px solid rgba(244,67,54,0.35); color:#f44336; border-radius:10px; text-decoration:none; font-weight:800; }
 		.jc-no-tickets { color:var(--jc-muted); padding:20px 0; }
+		/* Vollbild Chat Ansicht */
+		.jc-chat-overlay { position:fixed; inset:0; background:rgba(5,7,18,0.96); backdrop-filter:saturate(140%) blur(8px); z-index:9999; display:flex; align-items:center; justify-content:center; padding:24px; }
+		.jc-chat-container { width:min(1100px, 96vw); height:min(90vh, 900px); background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; box-shadow:0 34px 98px rgba(0,0,0,0.6); display:grid; grid-template-rows:auto 1fr auto; }
+		.jc-chat-header { display:flex; justify-content:space-between; align-items:center; padding:16px 18px; border-bottom:1px solid var(--jc-border); }
+		.jc-chat-title { font-weight:800; font-size:18px; }
+		.jc-chat-meta { color:var(--jc-muted); font-size:12px; }
+		.jc-chat-close { padding:8px 12px; border-radius:10px; background:rgba(244,67,54,0.12); border:1px solid rgba(244,67,54,0.35); color:#f44336; text-decoration:none; font-weight:800; }
+		.jc-chat-body { overflow:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+		.jc-chat-message { background:rgba(11,15,29,0.7); border:1px solid var(--jc-border); border-radius:12px; padding:10px; }
+		.jc-chat-message-admin { border-left:3px solid var(--jc-accent); }
+		.jc-chat-footer { border-top:1px solid var(--jc-border); padding:12px; display:grid; grid-template-columns:1fr auto; gap:10px; }
+		.jc-chat-input { width:100%; padding:10px 12px; background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:12px; color:var(--jc-text); }
 		@media (max-width:900px) { .jc-support-header { grid-template-columns:1fr; } }
 		@media (max-width:640px) { .jc-ticket-card { grid-template-columns:1fr; } .jc-support-header { flex-direction:column; align-items:flex-start; } }
 	</style>
+	<?php
+}
+
+/**
+ * Vollbild-Chat-Ansicht rendering
+ */
+function jc_support_render_chat_view( $ticket_id, $discord_user, $is_admin, $is_super_admin ) {
+	$ticket   = get_post( $ticket_id );
+	$category = get_post_meta( $ticket_id, '_jc_ticket_category', true );
+	$status   = get_post_meta( $ticket_id, '_jc_ticket_status', true ) ?: 'open';
+	$replies  = get_post_meta( $ticket_id, '_jc_ticket_replies', true ) ?: array();
+	$author   = get_post_meta( $ticket_id, '_jc_ticket_discord_user', true );
+	$ticket_number = get_post_meta( $ticket_id, '_jc_ticket_number', true );
+
+	// Zugriffsprüfung: User darf nur eigenes Ticket sehen; Admins alles
+	$can_view = $is_admin || ( isset( $author['id'] ) && $author['id'] === $discord_user['id'] );
+	if ( ! $can_view ) {
+		echo '<div class="jc-support-wrap"><div class="jc-error-notice">Du hast keinen Zugriff auf dieses Ticket.</div></div>';
+		return;
+	}
+
+	?>
+	<div class="jc-chat-overlay">
+		<div class="jc-chat-container">
+			<div class="jc-chat-header">
+				<div>
+					<div class="jc-chat-title">#<?php echo esc_html( $ticket_number ); ?> · <?php echo esc_html( $ticket->post_title ); ?></div>
+					<div class="jc-chat-meta">Kategorie: <?php echo esc_html( $category ); ?> · Status: <?php echo esc_html( array('open'=>'Offen','answered'=>'Beantwortet','closed'=>'Geschlossen')[ $status ] ?? 'Offen' ); ?> · Von: <?php echo esc_html( $author['username'] ?? 'Unbekannt' ); ?></div>
+				</div>
+				<a class="jc-chat-close" href="<?php echo esc_url( remove_query_arg( 'jc_ticket' ) ); ?>">Schließen</a>
+			</div>
+			<div class="jc-chat-body">
+				<div class="jc-chat-message">
+					<div style="font-weight:800; margin-bottom:6px;">Problem</div>
+					<div><?php echo nl2br( esc_html( $ticket->post_content ) ); ?></div>
+				</div>
+				<?php foreach ( $replies as $reply ) : ?>
+					<div class="jc-chat-message <?php echo $reply['is_admin'] ? 'jc-chat-message-admin' : ''; ?>">
+						<div style="display:flex; justify-content:space-between; font-weight:700;">
+							<span><?php echo $reply['is_admin'] ? '👨‍💼 ' : '🙋 '; ?><?php echo esc_html( $reply['author'] ); ?></span>
+							<span style="color:var(--jc-muted); font-size:12px;"><?php echo esc_html( date_i18n( 'd.m.Y H:i', strtotime( $reply['date'] ) ) ); ?></span>
+						</div>
+						<div><?php echo nl2br( esc_html( $reply['message'] ) ); ?></div>
+					</div>
+				<?php endforeach; ?>
+			</div>
+			<div class="jc-chat-footer">
+				<form method="post" style="display:contents;">
+					<input type="hidden" name="ticket_id" value="<?php echo esc_attr( $ticket_id ); ?>">
+					<?php if ( $is_admin ) : ?>
+						<?php wp_nonce_field( 'jc_admin_reply' ); ?>
+						<textarea name="admin_reply_message" rows="3" class="jc-chat-input" placeholder="Deine Antwort als Admin..." required></textarea>
+						<button type="submit" name="jc_admin_reply" class="jc-reply-btn">Senden</button>
+					<?php else : ?>
+						<textarea name="user_reply_message" rows="3" class="jc-chat-input" placeholder="Deine Antwort..." required></textarea>
+						<button type="submit" name="jc_ticket_user_reply" class="jc-reply-btn">Senden</button>
+					<?php endif; ?>
+				</form>
+			</div>
+		</div>
+	</div>
 	<?php
 }
