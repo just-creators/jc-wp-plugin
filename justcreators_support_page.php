@@ -199,8 +199,12 @@ function jc_support_register_post_type() {
 			'singular_name' => 'Ticket',
 		),
 		'public' => false,
-		'show_ui' => false,
-		'supports' => array( 'title', 'editor', 'author' ),
+		'show_ui' => true,
+		'show_in_menu' => true,
+		'capability_type' => 'post',
+		'map_meta_cap' => true,
+		'supports' => array( 'title', 'editor', 'author', 'custom-fields' ),
+		'menu_icon' => 'dashicons-sos',
 	) );
 }
 
