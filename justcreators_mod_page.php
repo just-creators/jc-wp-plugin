@@ -226,21 +226,38 @@ function jc_mods_fetch_latest_version( $slug, $mc_version ) {
 
 	$version = $versions[0];
 
-	// Wähle Datei: zuerst primary, sonst filename mit "fabric", sonst erste Datei.
+	// Wähle Datei: überspringe NeoForge/Forge, bevorzuge Fabric im Dateinamen
 	$files = $version['files'] ?? array();
 	if ( empty( $files ) ) {
 		return new WP_Error( 'jc_mods_api', 'Keine Fabric-Downloads für diese Mod gefunden.' );
 	}
 
-	$file = null;
+	// Filtere NeoForge/Forge-Dateien aus
+	$fabric_files = array();
 	foreach ( $files as $f ) {
+		$filename = isset( $f['filename'] ) ? strtolower( $f['filename'] ) : '';
+		// Überspringe Dateien mit neoforge, forge (aber nicht fabric+forge)
+		if ( stripos( $filename, 'neoforge' ) !== false || 
+		     ( stripos( $filename, 'forge' ) !== false && stripos( $filename, 'fabric' ) === false ) ) {
+			continue;
+		}
+		$fabric_files[] = $f;
+	}
+
+	if ( empty( $fabric_files ) ) {
+		return new WP_Error( 'jc_mods_api', 'Keine Fabric-Downloads für diese Mod gefunden (nur NeoForge/Forge verfügbar).' );
+	}
+
+	// Wähle aus gefilterten Dateien: primary oder mit "fabric" im Namen
+	$file = null;
+	foreach ( $fabric_files as $f ) {
 		if ( isset( $f['primary'] ) && $f['primary'] ) {
 			$file = $f;
 			break;
 		}
 	}
 	if ( ! $file ) {
-		foreach ( $files as $f ) {
+		foreach ( $fabric_files as $f ) {
 			if ( isset( $f['filename'] ) && stripos( $f['filename'], 'fabric' ) !== false ) {
 				$file = $f;
 				break;
@@ -248,7 +265,7 @@ function jc_mods_fetch_latest_version( $slug, $mc_version ) {
 		}
 	}
 	if ( ! $file ) {
-		$file = $files[0];
+		$file = $fabric_files[0];
 	}
 
 	if ( empty( $file['url'] ) ) {
