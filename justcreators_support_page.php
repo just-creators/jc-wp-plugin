@@ -477,8 +477,7 @@ function jc_support_render_shortcode() {
 			if ( $ticket_id ) {
 				update_post_meta( $ticket_id, '_jc_ticket_category', $category );
 				update_post_meta( $ticket_id, '_jc_ticket_status', 'open' );
-				update_pojc_support_is_admin( $discord_user );
-	$is_super_admin = jc_support_is_super_admin( $discord_user ser );
+				update_post_meta( $ticket_id, '_jc_ticket_discord_user', $discord_user );
 				
 				echo '<div style="background:rgba(76,175,80,0.1);border:1px solid rgba(76,175,80,0.3);color:#4caf50;padding:12px;border-radius:8px;margin-bottom:20px;">Ticket erfolgreich erstellt!</div>';
 			}
