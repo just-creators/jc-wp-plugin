@@ -35,10 +35,12 @@ function jc_mods_handle_actions() {
 		return;
 	}
 
+	// Handle ZIP download separately to avoid header conflicts
 	if ( isset( $_POST['jc_mods_download_zip'] ) ) {
 		check_admin_referer( 'jc_mods_download_zip' );
-		jc_mods_create_zip_download();
-		exit;
+		// Delay execution to after WordPress is fully loaded
+		add_action( 'shutdown', 'jc_mods_create_zip_download' );
+		return;
 	}
 
 	if ( isset( $_POST['jc_mods_save_mc_version'] ) ) {
@@ -437,107 +439,152 @@ function jc_mods_check_all_loaders( $slug, $mc_version ) {
  * Create ZIP file with all compatible mods for download
  */
 function jc_mods_create_zip_download() {
+	// Only run on admin
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+
 	$mods = jc_mods_get_list();
 	$mc_version = get_option( JC_MODS_MC_VERSION_OPTION, '1.21.1' );
 
 	if ( empty( $mods ) ) {
-		wp_die( 'Keine Mods zum Herunterladen.' );
+		return;
 	}
 
+	// Check requirements
 	if ( ! class_exists( 'ZipArchive' ) ) {
-		wp_die( 'ZIP-Erweiterung nicht verfügbar auf diesem Server.' );
+		error_log( 'JC Mods: ZipArchive not available' );
+		return;
 	}
 
-	$temp_dir = wp_get_temp_dir() . 'jc_mods_' . time() . '/';
+	// Increase timeout and memory for download
+	set_time_limit( 300 );
+	if ( defined( 'WP_MEMORY_LIMIT' ) ) {
+		wp_raise_memory_limit( 'admin' );
+	}
+
+	$temp_dir = wp_get_temp_dir() . 'jc_mods_' . uniqid() . '/';
 	if ( ! @mkdir( $temp_dir, 0755, true ) ) {
-		wp_die( 'Fehler beim Erstellen des temporären Verzeichnisses.' );
+		error_log( 'JC Mods: Cannot create temp directory' );
+		return;
 	}
 
-	$downloaded = 0;
-	$failed = 0;
+	$downloaded = array();
+	$failed_mods = array();
 
 	foreach ( $mods as $mod ) {
-		$loaders = jc_mods_check_all_loaders( $mod['slug'], $mc_version );
-		$fabric_info = $loaders['fabric'];
+		try {
+			$loaders = jc_mods_check_all_loaders( $mod['slug'], $mc_version );
+			$fabric_info = $loaders['fabric'];
 
-		if ( is_wp_error( $fabric_info ) ) {
-			$failed++;
+			if ( is_wp_error( $fabric_info ) ) {
+				$failed_mods[] = $mod['title'];
+				continue;
+			}
+
+			$url = $fabric_info['download_url'];
+			if ( empty( $url ) ) {
+				$failed_mods[] = $mod['title'];
+				continue;
+			}
+
+			$filename = ! empty( $fabric_info['filename'] ) ? $fabric_info['filename'] : sanitize_file_name( $mod['slug'] . '.jar' );
+			$file_path = $temp_dir . $filename;
+
+			// Use wp_remote_get for better compatibility
+			$response = wp_remote_get( $url, array( 'timeout' => 30, 'sslverify' => false ) );
+
+			if ( is_wp_error( $response ) ) {
+				error_log( 'JC Mods: Download error for ' . $mod['slug'] . ': ' . $response->get_error_message() );
+				$failed_mods[] = $mod['title'];
+				continue;
+			}
+
+			$body = wp_remote_retrieve_body( $response );
+			$code = wp_remote_retrieve_response_code( $response );
+
+			if ( 200 !== intval( $code ) || empty( $body ) ) {
+				error_log( 'JC Mods: Bad response code ' . $code . ' for ' . $mod['slug'] );
+				$failed_mods[] = $mod['title'];
+				continue;
+			}
+
+			if ( ! file_put_contents( $file_path, $body ) ) {
+				error_log( 'JC Mods: Cannot write file ' . $file_path );
+				$failed_mods[] = $mod['title'];
+				continue;
+			}
+
+			$downloaded[] = $filename;
+		} catch ( Exception $e ) {
+			error_log( 'JC Mods: Exception - ' . $e->getMessage() );
+			$failed_mods[] = $mod['title'];
 			continue;
 		}
-
-		$url = $fabric_info['download_url'];
-		$filename = $fabric_info['filename'] ?: sanitize_file_name( $mod['slug'] . '.jar' );
-		$file_path = $temp_dir . $filename;
-
-		$response = wp_safe_remote_get( $url, array( 'timeout' => 30 ) );
-
-		if ( is_wp_error( $response ) ) {
-			$failed++;
-			continue;
-		}
-
-		$body = wp_remote_retrieve_body( $response );
-		$code = wp_remote_retrieve_response_code( $response );
-
-		if ( 200 !== $code || empty( $body ) ) {
-			$failed++;
-			continue;
-		}
-
-		if ( ! file_put_contents( $file_path, $body ) ) {
-			$failed++;
-			continue;
-		}
-
-		$downloaded++;
 	}
 
-	if ( $downloaded === 0 ) {
+	if ( empty( $downloaded ) ) {
 		@array_map( 'unlink', glob( "$temp_dir*" ) );
 		@rmdir( $temp_dir );
-		wp_die( 'Keine kompatiblen Mods zum Herunterladen.' );
+		error_log( 'JC Mods: No mods downloaded' );
+		return;
 	}
 
 	// Create ZIP
-	$zip_path = wp_get_temp_dir() . 'justcreators-mods-' . sanitize_file_name( $mc_version ) . '-' . time() . '.zip';
-	$zip = new ZipArchive();
+	$zip_filename = 'justcreators-mods-' . sanitize_file_name( $mc_version ) . '-' . date( 'Y-m-d-His' ) . '.zip';
+	$zip_path = wp_get_temp_dir() . $zip_filename;
 
-	if ( true !== $zip->open( $zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+	try {
+		$zip = new ZipArchive();
+
+		if ( true !== $zip->open( $zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+			throw new Exception( 'Cannot open ZIP file' );
+		}
+
+		$files = glob( $temp_dir . '*' );
+		foreach ( $files as $file ) {
+			if ( is_file( $file ) ) {
+				$zip->addFile( $file, basename( $file ) );
+			}
+		}
+
+		$zip->close();
+
+		// Clean up temp files
+		foreach ( $files as $file ) {
+			if ( is_file( $file ) ) {
+				@unlink( $file );
+			}
+		}
+		@rmdir( $temp_dir );
+
+		// Verify ZIP exists and has content
+		if ( ! is_file( $zip_path ) || filesize( $zip_path ) === 0 ) {
+			throw new Exception( 'ZIP file is empty' );
+		}
+
+		// Send headers
+		nocache_headers();
+		header( 'Content-Type: application/zip; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="' . $zip_filename . '"' );
+		header( 'Content-Length: ' . filesize( $zip_path ) );
+
+		// Output file
+		readfile( $zip_path );
+
+		// Clean up ZIP after sending
+		@unlink( $zip_path );
+
+		exit;
+	} catch ( Exception $e ) {
+		error_log( 'JC Mods: ZIP creation error - ' . $e->getMessage() );
 		@array_map( 'unlink', glob( "$temp_dir*" ) );
 		@rmdir( $temp_dir );
-		wp_die( 'ZIP-Datei konnte nicht erstellt werden.' );
-	}
-
-	$files = glob( $temp_dir . '*' );
-	foreach ( $files as $file ) {
-		if ( is_file( $file ) ) {
-			$zip->addFile( $file, basename( $file ) );
+		if ( is_file( $zip_path ) ) {
+			@unlink( $zip_path );
 		}
+		return;
 	}
-
-	$zip->close();
-
-	// Clean up temp files
-	foreach ( $files as $file ) {
-		if ( is_file( $file ) ) {
-			@unlink( $file );
-		}
-	}
-	@rmdir( $temp_dir );
-
-	// Send file
-	if ( ! is_file( $zip_path ) ) {
-		wp_die( 'ZIP-Datei konnte nicht erstellt werden.' );
-	}
-
-	header( 'Content-Type: application/zip' );
-	header( 'Content-Disposition: attachment; filename="justcreators-mods-' . sanitize_file_name( $mc_version ) . '.zip"' );
-	header( 'Content-Length: ' . filesize( $zip_path ) );
-	header( 'Pragma: no-cache' );
-	header( 'Expires: 0' );
-
-	readfile( $zip_path );
-	@unlink( $zip_path );
 }
 
 function jc_mods_render_shortcode() {
