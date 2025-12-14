@@ -357,8 +357,8 @@ function jc_mods_styles() {
 		.jc-search input:focus { outline:none; border-color:var(--jc-accent); box-shadow:0 0 0 3px rgba(108,123,255,0.35); }
 		.jc-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); opacity:0.7; }
 		.jc-toolbar-note { color:var(--jc-muted); font-size:14px; }
-		.jc-mods-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
-		.jc-mod-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:16px; padding:18px; display:grid; grid-template-columns:150px 1fr; gap:18px; position:relative; overflow:hidden; box-shadow:0 18px 48px rgba(0,0,0,0.38); transition:transform .2s, border-color .2s, box-shadow .2s; }
+		.jc-mods-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; }
+		.jc-mod-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; padding:22px; display:grid; grid-template-columns:170px 1fr; gap:20px; position:relative; overflow:hidden; box-shadow:0 20px 54px rgba(0,0,0,0.4); transition:transform .2s, border-color .2s, box-shadow .2s; }
 		.jc-mod-card:hover { transform:translateY(-5px); border-color:rgba(108,123,255,0.5); box-shadow:0 24px 68px rgba(0,0,0,0.5); }
 		.jc-mod-thumb { position:relative; min-height:150px; }
 		.jc-mod-thumb img { width:100%; height:100%; min-height:150px; max-height:220px; object-fit:cover; border-radius:14px; background:#050712; border:1px solid var(--jc-border); }
