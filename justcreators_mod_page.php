@@ -44,6 +44,57 @@ function jc_mods_handle_actions() {
 		}
 	}
 
+	if ( isset( $_POST['jc_mods_import_config'] ) ) {
+		check_admin_referer( 'jc_mods_import_config' );
+		$config_file = plugin_dir_path( __FILE__ ) . 'mods-config.json';
+		
+		if ( ! file_exists( $config_file ) ) {
+			add_settings_error( 'jc_mods', 'jc_mods_no_config', 'mods-config.json nicht gefunden.', 'error' );
+			return;
+		}
+
+		$config_content = file_get_contents( $config_file );
+		$config = json_decode( $config_content, true );
+
+		if ( ! $config || ! isset( $config['mods'] ) || ! is_array( $config['mods'] ) ) {
+			add_settings_error( 'jc_mods', 'jc_mods_invalid_config', 'Ungültige Config-Datei.', 'error' );
+			return;
+		}
+
+		$mods = jc_mods_get_list();
+		$added = 0;
+		$skipped = 0;
+		$errors = 0;
+
+		foreach ( $config['mods'] as $slug ) {
+			$slug = trim( $slug );
+			
+			if ( isset( $mods[ $slug ] ) ) {
+				$skipped++;
+				continue;
+			}
+
+			$project = jc_mods_fetch_project( $slug );
+			if ( is_wp_error( $project ) ) {
+				$errors++;
+				continue;
+			}
+
+			$mods[ $slug ] = array(
+				'slug'        => $project['slug'],
+				'title'       => $project['title'],
+				'author'      => $project['author'],
+				'icon_url'    => $project['icon_url'],
+				'project_url' => $project['project_url'],
+				'added_at'    => current_time( 'mysql' ),
+			);
+			$added++;
+		}
+
+		update_option( JC_MODS_OPTION_KEY, $mods );
+		add_settings_error( 'jc_mods', 'jc_mods_imported', sprintf( 'Import abgeschlossen: %d hinzugefügt, %d übersprungen, %d Fehler.', $added, $skipped, $errors ), 'updated' );
+	}
+
 	if ( isset( $_POST['jc_mods_add_mod'] ) ) {
 		check_admin_referer( 'jc_mods_add' );
 		$input = isset( $_POST['jc_modrinth_link'] ) ? sanitize_text_field( wp_unslash( $_POST['jc_modrinth_link'] ) ) : '';
@@ -119,6 +170,15 @@ function jc_mods_render_admin_page() {
 					<?php wp_nonce_field( 'jc_mods_add' ); ?>
 					<input type="text" name="jc_modrinth_link" class="regular-text" placeholder="https://modrinth.com/mod/your-mod" required style="flex:1;min-width:220px;">
 					<button type="submit" name="jc_mods_add_mod" class="button">Hinzufügen</button>
+				</form>
+			</div>
+
+			<div class="jc-admin-card" style="background:#0f1220;padding:20px;border-radius:14px;border:1px solid #1f2740;box-shadow:0 16px 40px rgba(0,0,0,0.35);">
+				<h2 style="margin:0 0 8px;color:#f8f9ff;">Mods aus Config importieren</h2>
+				<p style="margin:0 0 14px;color:#9eb3d5;">Lädt alle Mods aus der mods-config.json Datei.</p>
+				<form method="post">
+					<?php wp_nonce_field( 'jc_mods_import_config' ); ?>
+					<button type="submit" name="jc_mods_import_config" class="button button-secondary">Config importieren</button>
 				</form>
 			</div>
 		</div>
