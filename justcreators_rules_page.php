@@ -510,7 +510,7 @@ function jc_rules_discord_invite( $member, $discord_name ) {
                     <h3 style="color: #f44336; margin: 0 0 15px 0; font-size: 24px; font-weight: 700;">❌ Fehler</h3>
                     <p style="color: #dcddde; line-height: 1.8; margin-bottom: 30px; font-size: 16px;">
                         Dein Profil ist vollständig, aber wir konnten gerade keinen persönlichen Einladungslink generieren.<br>
-                        Bitte kontaktiere einen kabel_entwirer im JustCreators Bewerbungs-Discord.
+                        Bitte kontaktiere kabel_entwirer im JustCreators Bewerbungs-Discord.
                     </p>
                 </div>
             <?php endif; ?>
