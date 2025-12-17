@@ -1950,9 +1950,32 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="jc-add-social-btn" id="jc-add-social-btn">
+                    <button type="button" class="jc-add-social-btn" id="jc-add-social-btn" onclick="return window.jcInlineAddSocial ? window.jcInlineAddSocial() : false;">
                         Weiteren Kanäle hinzufügen
                     </button>
+                    <script>
+                    // Notfall-Fallback: Fügt ein Feld hinzu, auch wenn das Hauptscript nicht läuft.
+                    window.jcInlineAddSocial = window.jcInlineAddSocial || function() {
+                        try {
+                            const c = document.getElementById('jc-social-fields');
+                            if (!c) { alert('Kein Social-Container gefunden.'); return false; }
+                            const MAX = 5;
+                            const count = c.querySelectorAll('.jc-social-field-group').length;
+                            if (count >= MAX) { alert('Maximal ' + MAX + ' Social Media Kanäle erlaubt.'); return false; }
+                            const idx = count;
+                            const div = document.createElement('div');
+                            div.className = 'jc-social-field-group';
+                            div.innerHTML = '<div class="jc-social-field-wrapper">' +
+                                            '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + idx + '" />' +
+                                            '<span class="jc-platform-icon" data-index="' + idx + '"></span>' +
+                                            '</div>' +
+                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="this.closest(\".jc-social-field-group\").remove(); return false;">X</button>';
+                            c.appendChild(div);
+                            try { div.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+                        } catch (e) { alert('Fehler: ' + e); }
+                        return false;
+                    };
+                    </script>
                     <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
                     
                     <label class="jc-label">📊 Wie aktiv bist du? *</label>
