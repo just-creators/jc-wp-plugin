@@ -2203,6 +2203,24 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             input.dataset.platform = valid ? p : '';
                             return { valid, platform: p };
                         }
+                        function bindInputListeners(input) {
+                            if (!input || input.dataset.listenerBound) return;
+                            jcLog('bindInputListeners', { idx: input.getAttribute('data-index') });
+                            input.addEventListener('input', function() {
+                                jcLog('input:event:fired', { val: this.value, idx: this.getAttribute('data-index') });
+                                jcSendLog('input:event:fired', { val: this.value, idx: this.getAttribute('data-index') });
+                                updateIconForInput(this);
+                            });
+                            input.addEventListener('keyup', function() {
+                                jcLog('keyup:event:fired', { val: this.value });
+                                updateIconForInput(this);
+                            });
+                            input.addEventListener('change', function() {
+                                jcLog('change:event:fired', { val: this.value });
+                                updateIconForInput(this);
+                            });
+                            input.dataset.listenerBound = '1';
+                        }
                         function updateIconForInput(input) {
                             const idx = input.getAttribute('data-index') || '0';
                             const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
@@ -2279,6 +2297,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             jcLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
                             jcSendLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
                             updateAddBtnVisibility();
+                            // Binde Input-Listener auf das neue Feld
+                            try {
+                                const newInput = container.querySelector('input.jc-social-input[data-index="' + (nextIndex - 1) + '"]');
+                                if (newInput) {
+                                    bindInputListeners(newInput);
+                                    jcLog('addField:listener-bound', { idx: nextIndex - 1 });
+                                }
+                            } catch (e) { jcLog('addField:listener-bind-error', { error: e.message }); }
                             try {
                                 const last = container.querySelector('.jc-social-field-group[data-added="1"]:last-child') || container.querySelector('.jc-social-field-group:last-child');
                                 if (last) {
@@ -2351,8 +2377,17 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 removeField(target);
                             }
                         });
+                        // Delegierte Input-Listener (Fallback)
                         container.addEventListener('input', function(e) {
                             if (e.target && e.target.classList.contains('jc-social-input')) {
+                                jcLog('container:input:delegated', { val: e.target.value });
+                                jcSendLog('container:input:delegated', { val: e.target.value });
+                                updateIconForInput(e.target);
+                            }
+                        }, true);
+                        container.addEventListener('keyup', function(e) {
+                            if (e.target && e.target.classList.contains('jc-social-input')) {
+                                jcLog('container:keyup:delegated', { val: e.target.value });
                                 updateIconForInput(e.target);
                             }
                         }, true);
@@ -2365,6 +2400,12 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 group.appendChild(hint);
                             }
                         });
+                        // Binde direkte Input-Listener auf alle existierenden Inputs
+                        container.querySelectorAll('input.jc-social-input').forEach(function(input) {
+                            bindInputListeners(input);
+                        });
+                        jcLog('init:listeners-bound', { count: container.querySelectorAll('input.jc-social-input').length });
+                        jcSendLog('init:listeners-bound', { count: container.querySelectorAll('input.jc-social-input').length });
                         const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
                         if (firstInput) updateIconForInput(firstInput);
                         jcLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
