@@ -95,7 +95,26 @@ add_action('rest_api_init', function() {
         'callback' => 'jc_api_update_status',
         'permission_callback' => 'jc_verify_api_secret' // Dieselbe Sicherheit
     ));
+
+    // Frontend logging endpoint (public; logs only)
+    register_rest_route('jc/v1', '/frontend-log', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_frontend_log',
+        'permission_callback' => '__return_true'
+    ));
 });
+function jc_handle_frontend_log( $request ) {
+    $params = $request->get_json_params();
+    $event = isset($params['event']) ? sanitize_text_field($params['event']) : 'unknown';
+    $level = isset($params['level']) ? sanitize_text_field($params['level']) : 'info';
+    $sid = isset($params['sid']) ? sanitize_text_field($params['sid']) : ( function_exists('session_id') ? session_id() : '' );
+    $url = isset($params['url']) ? esc_url_raw($params['url']) : '';
+    $ua = isset($params['ua']) ? substr( sanitize_text_field($params['ua']), 0, 200 ) : '';
+    $payload = isset($params['payload']) ? wp_json_encode($params['payload']) : '';
+    $ts = isset($params['ts']) ? intval($params['ts']) : 0;
+    error_log( sprintf('JC FE [%s] sid=%s event=%s ts=%s url=%s ua=%s payload=%s', $level, $sid, $event, $ts ?: '0', $url, $ua, $payload) );
+    return array( 'ok' => true );
+}
 function jc_handle_status_sync( $request ) {
     $params = $request->get_json_params();
    
@@ -1968,7 +1987,30 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 <script>
                 (function() {
                     const JC_DEBUG = true;
+                    const JC_REMOTE_DEBUG = true;
+                    const JC_FE_ENDPOINT = '<?php echo esc_url( rest_url( 'jc/v1/frontend-log' ) ); ?>';
+                    const JC_SID = '<?php echo esc_js( session_id() ); ?>';
                     window.JCLogHistory = window.JCLogHistory || [];
+                    function jcSendLog(event, payload, level) {
+                        try {
+                            if (!JC_REMOTE_DEBUG) return;
+                            const body = JSON.stringify({
+                                event: event || 'unknown',
+                                level: level || 'info',
+                                ts: Date.now(),
+                                url: location.href,
+                                ua: navigator.userAgent,
+                                sid: JC_SID,
+                                payload: payload || {}
+                            });
+                            if (navigator.sendBeacon) {
+                                const blob = new Blob([body], { type: 'application/json' });
+                                navigator.sendBeacon(JC_FE_ENDPOINT, blob);
+                            } else {
+                                fetch(JC_FE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
                     function jcLog() {
                         try {
                             if (JC_DEBUG) {
@@ -1981,13 +2023,16 @@ add_shortcode( 'discord_application_form', function( $atts ) {
 
                     function setup() {
                         jcLog('setup:start', { readyState: document.readyState });
+                        jcSendLog('setup:start', { readyState: document.readyState });
                         const MAX_FIELDS = 5;
                         const container = document.getElementById('jc-social-fields');
                         const addBtn = document.getElementById('jc-add-social-btn');
                         jcLog('setup:elements', { container: !!container, addBtn: !!addBtn });
-                        if (!container) { jcLog('setup:abort:no-container'); return; } // Falls DOM noch nicht bereit
+                        jcSendLog('setup:elements', { container: !!container, addBtn: !!addBtn });
+                        if (!container) { jcLog('setup:abort:no-container'); jcSendLog('setup:abort:no-container'); return; } // Falls DOM noch nicht bereit
                         let nextIndex = getInitialNextIndex();
                         jcLog('setup:nextIndex:init', nextIndex);
+                        jcSendLog('setup:nextIndex:init', { nextIndex });
 
                         const icons = { youtube:'YT', tiktok:'TT', twitch:'TW', twitter:'TW', instagram:'IG', handle:'@', unknown:'?' };
                         function detectPlatform(url) {
@@ -2010,12 +2055,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             });
                             const initIdx = maxIdx + 1;
                             jcLog('compute:initialNextIndex', { maxIdx, initIdx });
+                            jcSendLog('compute:initialNextIndex', { maxIdx, initIdx });
                             return initIdx;
                         }
                         function updateAddBtnVisibility() {
                             if (!addBtn) return;
                             addBtn.style.display = getGroupCount() >= MAX_FIELDS ? 'none' : 'inline-block';
                             jcLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
+                            jcSendLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
                         }
                         function updateIconForInput(input) {
                             const idx = input.getAttribute('data-index') || '0';
@@ -2033,9 +2080,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         }
                         function addField() {
                             jcLog('addField:clicked', { count: getGroupCount(), nextIndex });
+                            jcSendLog('addField:clicked', { count: getGroupCount(), nextIndex });
                             if (getGroupCount() >= MAX_FIELDS) {
                                 alert('Maximal ' + MAX_FIELDS + ' Social Media Kanäle erlaubt.');
                                 jcLog('addField:blocked:max-reached');
+                                jcSendLog('addField:blocked:max-reached', { count: getGroupCount() });
                                 return;
                             }
                             const group = document.createElement('div');
@@ -2049,8 +2098,10 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             );
                             container.appendChild(group);
                             jcLog('addField:appended', { newIndex: nextIndex });
+                            jcSendLog('addField:appended', { newIndex: nextIndex });
                             nextIndex += 1;
                             jcLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
+                            jcSendLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
                             updateAddBtnVisibility();
                         }
                         function removeField(btn) {
@@ -2059,6 +2110,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             if (!group) return;
                             if (count <= 1) {
                                 jcLog('removeField:clearing-last');
+                                jcSendLog('removeField:clearing-last');
                                 const input = group.querySelector('input.jc-social-input');
                                 if (input) {
                                     input.value = '';
@@ -2068,11 +2120,12 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             }
                             group.remove();
                             jcLog('removeField:removed', { newCount: getGroupCount() });
+                            jcSendLog('removeField:removed', { newCount: getGroupCount() });
                             updateAddBtnVisibility();
                         }
                         // Event binding
                         if (addBtn) {
-                            addBtn.addEventListener('click', function(e) { e.preventDefault(); jcLog('addBtn:direct-click'); addField(); });
+                            addBtn.addEventListener('click', function(e) { e.preventDefault(); jcLog('addBtn:direct-click'); jcSendLog('addBtn:direct-click'); addField(); });
                         }
                         // Fallback Delegation (falls Button neu gerendert wird)
                         document.addEventListener('click', function(e) {
@@ -2080,6 +2133,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             if (target && (target.id === 'jc-add-social-btn' || (target.closest && target.closest('#jc-add-social-btn')))) {
                                 e.preventDefault();
                                 jcLog('addBtn:delegated-click');
+                                jcSendLog('addBtn:delegated-click');
                                 addField();
                             }
                         });
@@ -2087,6 +2141,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             if (e.target && e.target.classList.contains('jc-remove-social-btn')) {
                                 e.preventDefault();
                                 jcLog('removeBtn:click');
+                                jcSendLog('removeBtn:click');
                                 removeField(e.target);
                             }
                         });
@@ -2099,6 +2154,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
                         if (firstInput) updateIconForInput(firstInput);
                         jcLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
+                        jcSendLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
                         updateAddBtnVisibility();
 
                         // Validation
@@ -2145,20 +2201,22 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 };
                                 const ok = checks.name && checks.age && checks.social && checks.activity && checks.motivation;
                                 jcLog('form:submit:validation', { ok, checks });
+                                if (!ok) jcSendLog('form:submit:validation:fail', { checks });
                                 if (!ok) { e.preventDefault(); e.stopPropagation(); }
                             });
                         }
                         if (document.readyState === 'loading') {
-                            document.addEventListener('DOMContentLoaded', function(){ jcLog('validation:init:DOMContentLoaded'); initValidation(); });
+                            document.addEventListener('DOMContentLoaded', function(){ jcLog('validation:init:DOMContentLoaded'); jcSendLog('validation:init:DOMContentLoaded'); initValidation(); });
                         } else {
                             jcLog('validation:init:immediate');
+                            jcSendLog('validation:init:immediate');
                             initValidation();
                         }
                     }
                     // Initial attempt
                     setup();
                     // Safety: run again on DOMContentLoaded in case of late rendering
-                    document.addEventListener('DOMContentLoaded', function(){ jcLog('setup:rerun:DOMContentLoaded'); setup(); });
+                    document.addEventListener('DOMContentLoaded', function(){ jcLog('setup:rerun:DOMContentLoaded'); jcSendLog('setup:rerun:DOMContentLoaded'); setup(); });
                 })();
                 </script>
                 <?php
