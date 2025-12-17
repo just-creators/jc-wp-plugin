@@ -173,6 +173,17 @@ function jc_teilnehmer_handle_actions() {
 			add_settings_error( 'jc_teilnehmer', 'order_updated', 'Reihenfolge gespeichert!', 'updated' );
 		}
 	}
+
+	// Automatischer Import aus Bewerbungs-DB
+	if ( isset( $_POST['jc_teilnehmer_import_from_db'] ) ) {
+		check_admin_referer( 'jc_teilnehmer_import_db' );
+		$result = jc_teilnehmer_import_from_applications();
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'jc_teilnehmer', 'import_error', $result->get_error_message(), 'error' );
+		} else {
+			add_settings_error( 'jc_teilnehmer', 'import_success', $result['message'], 'updated' );
+		}
+	}
 }
 
 /**
@@ -334,6 +345,93 @@ function jc_teilnehmer_extract_twitch_username( $url ) {
 }
 
 /**
+ * Importiere akzeptierte Bewerbungen aus der Discord-Applications-Tabelle
+ */
+function jc_teilnehmer_import_from_applications() {
+	global $wpdb;
+	$teilnehmer_table = $wpdb->prefix . JC_TEILNEHMER_TABLE;
+	$applications_table = $wpdb->prefix . 'jc_discord_applications';
+
+	// Prüfe ob Applications-Tabelle existiert
+	if ( $wpdb->get_var( "SHOW TABLES LIKE '$applications_table'" ) !== $applications_table ) {
+		return new WP_Error( 'no_table', 'Bewerbungs-Tabelle nicht gefunden. Bewerbungsportal muss aktiv sein.' );
+	}
+
+	// Hole alle akzeptierten Bewerbungen
+	$accepted = $wpdb->get_results( 
+		"SELECT * FROM $applications_table WHERE status = 'accepted' ORDER BY created_at DESC"
+	);
+
+	if ( empty( $accepted ) ) {
+		return new WP_Error( 'no_applications', 'Keine akzeptierten Bewerbungen gefunden.' );
+	}
+
+	$imported = 0;
+	$skipped = 0;
+	$errors = 0;
+
+	foreach ( $accepted as $app ) {
+		// Prüfe ob bereits vorhanden (anhand discord_id oder Name)
+		$exists = $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM $teilnehmer_table WHERE display_name = %s LIMIT 1",
+			$app->applicant_name
+		) );
+
+		if ( $exists ) {
+			$skipped++;
+			continue;
+		}
+
+		// Parse Social Channels
+		$channels_array = json_decode( $app->social_channels, true );
+		if ( ! is_array( $channels_array ) ) {
+			$channels_array = array();
+		}
+
+		// Filter leere Einträge
+		$channels_array = array_filter( $channels_array, function( $ch ) {
+			return ! empty( $ch ) && ! empty( $ch['url'] ) && $ch['url'] !== 'null';
+		} );
+		$channels_array = array_values( $channels_array );
+
+		$channels_json = wp_json_encode( $channels_array );
+
+		// Hole Profilbild
+		$profile_image = jc_teilnehmer_get_profile_image( $channels_array );
+
+		// Füge Teilnehmer hinzu
+		$inserted = $wpdb->insert(
+			$teilnehmer_table,
+			array(
+				'display_name' => $app->applicant_name,
+				'title' => 'Creator', // Standard-Titel
+				'social_channels' => $channels_json,
+				'profile_image_url' => $profile_image,
+				'sort_order' => 0,
+				'is_active' => 1,
+			),
+			array( '%s', '%s', '%s', '%s', '%d', '%d' )
+		);
+
+		if ( $inserted ) {
+			$imported++;
+		} else {
+			$errors++;
+		}
+	}
+
+	return array(
+		'success' => true,
+		'message' => sprintf(
+			'Import abgeschlossen: %d importiert, %d übersprungen, %d Fehler.',
+			$imported,
+			$skipped,
+			$errors
+		)
+	);
+}
+
+/**
  * Admin-Seite rendern
  */
 function jc_teilnehmer_render_admin_page() {
@@ -405,9 +503,21 @@ function jc_teilnehmer_render_admin_page() {
 				</form>
 			</div>
 		<?php else : ?>
+			<!-- Import aus DB -->
+			<div class="card" style="max-width: 800px; background: linear-gradient(135deg, rgba(108,123,255,0.08), rgba(86,216,255,0.06)); border: 1px solid rgba(108,123,255,0.25);">
+				<h2>📥 Automatischer Import</h2>
+				<p>Importiere alle akzeptierten Bewerbungen automatisch als Teilnehmer. Bereits vorhandene werden übersprungen.</p>
+				<form method="post" action="" style="margin-top: 15px;">
+					<?php wp_nonce_field( 'jc_teilnehmer_import_db' ); ?>
+					<button type="submit" name="jc_teilnehmer_import_from_db" class="button button-primary button-hero" style="background: linear-gradient(135deg, #6c7bff, #56d8ff); border: none; box-shadow: 0 4px 12px rgba(108,123,255,0.35);">
+						🚀 Jetzt aus Bewerbungs-DB importieren
+					</button>
+				</form>
+			</div>
+
 			<!-- Hinzufügen-Formular -->
-			<div class="card" style="max-width: 800px;">
-				<h2>➕ Neuen Teilnehmer hinzufügen</h2>
+			<div class="card" style="max-width: 800px; margin-top: 20px;">
+				<h2>➕ Neuen Teilnehmer manuell hinzufügen</h2>
 				<form method="post" action="">
 					<?php wp_nonce_field( 'jc_teilnehmer_add' ); ?>
 
@@ -670,8 +780,7 @@ function jc_teilnehmer_get_platform_label( $platform ) {
  * Styles (analog zu Mods)
  */
 function jc_teilnehmer_styles() {
-	?>
-	<style>
+	echo '<style>';
 		:root { --jc-bg:#050712; --jc-panel:#0b0f1d; --jc-border:#1e2740; --jc-text:#e9ecf7; --jc-muted:#9eb3d5; --jc-accent:#6c7bff; --jc-accent-2:#56d8ff; }
 		.jc-wrap { max-width: 1220px; margin: 26px auto; padding: 0 18px 40px; color: var(--jc-text); font-family: "Space Grotesk", "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif; }
 		.jc-hero { display:grid; grid-template-columns:2fr 1fr; gap:22px; background: radial-gradient(120% 140% at 10% 10%, rgba(108,123,255,0.12), transparent 50%), radial-gradient(110% 120% at 90% 20%, rgba(86,216,255,0.1), transparent 45%), var(--jc-panel); border:1px solid var(--jc-border); border-radius:20px; padding:28px; position:relative; overflow:hidden; box-shadow:0 22px 60px rgba(0,0,0,0.45); }
@@ -718,6 +827,5 @@ function jc_teilnehmer_styles() {
 			.jc-teilnehmer-grid { grid-template-columns:1fr; }
 			.jc-hero { padding:22px; }
 		}
-	</style>
-	<?php
+	</style>';
 }
