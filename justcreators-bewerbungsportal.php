@@ -1143,6 +1143,41 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             transform: translateY(-1px) !important;
         }
         
+        .jc-input.error, .jc-textarea.error {
+            border-color: #f44336 !important;
+            background: rgba(244, 67, 54, 0.08) !important;
+            animation: jc-shake 0.4s ease-in-out !important;
+        }
+        
+        .jc-input.error:focus, .jc-textarea.error:focus {
+            box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.2) !important;
+        }
+        
+        @keyframes jc-shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        
+        .jc-validation-hint {
+            display: block !important;
+            margin-top: 6px !important;
+            font-size: 13px !important;
+            color: #f44336 !important;
+            opacity: 0 !important;
+            transform: translateY(-4px) !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .jc-validation-hint.visible {
+            opacity: 1 !important;
+            transform: translateY(0) !important;
+        }
+        
+        .jc-validation-hint::before {
+            content: '⚠️ ' !important;
+        }
+        
         .jc-social-field-group {
             display: flex !important;
             gap: 12px !important;
@@ -2171,17 +2206,36 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         function updateIconForInput(input) {
                             const idx = input.getAttribute('data-index') || '0';
                             const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
-                            if (!el) return;
+                            const group = input.closest('.jc-social-field-group');
+                            let hint = group ? group.querySelector('.jc-validation-hint') : null;
+                            
                             const val = (input.value || '').trim();
                             // Reset classes
-                            platformClasses.forEach(function(c){ el.classList.remove(c); });
+                            if (el) platformClasses.forEach(function(c){ el.classList.remove(c); });
+                            
                             if (val.length > 3) {
                                 const { valid, platform } = validateLink(input);
                                 const cls = valid ? 'icon-' + platform : 'icon-unknown';
-                                el.classList.add(cls, 'visible');
-                                jcLog('icon:update', { idx, val, platform: valid ? platform : 'unknown' });
+                                if (el) el.classList.add(cls, 'visible');
+                                
+                                // Live-Feedback: Zeige Fehlermeldung bei ungültigen Links
+                                if (!valid) {
+                                    if (!hint && group) {
+                                        hint = document.createElement('span');
+                                        hint.className = 'jc-validation-hint';
+                                        hint.textContent = 'Bitte gib einen gültigen YouTube-, TikTok-, Twitch- oder Instagram-Link ein.';
+                                        group.appendChild(hint);
+                                    }
+                                    if (hint) hint.classList.add('visible');
+                                } else {
+                                    if (hint) hint.classList.remove('visible');
+                                }
+                                
+                                jcLog('icon:update', { idx, val, valid, platform: valid ? platform : 'unknown' });
                             } else {
-                                el.classList.remove('visible');
+                                if (el) el.classList.remove('visible');
+                                if (hint) hint.classList.remove('visible');
+                                input.classList.remove('error');
                             }
                         }
                         function addField() {
@@ -2200,6 +2254,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                                                         '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
                                                                     '</div>' +
                                                                     '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>' +
+                                                                    '<span class="jc-validation-hint">Bitte gib einen gültigen YouTube-, TikTok-, Twitch- oder Instagram-Link ein.</span>' +
                                                                 '</div>'
                                                         );
                             const before = getGroupCount();
@@ -2301,7 +2356,15 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 updateIconForInput(e.target);
                             }
                         }, true);
-                        // Initial state
+                        // Initial state: Füge Fehler-Hinweise zu allen existierenden Feldern hinzu
+                        container.querySelectorAll('.jc-social-field-group').forEach(function(group) {
+                            if (!group.querySelector('.jc-validation-hint')) {
+                                const hint = document.createElement('span');
+                                hint.className = 'jc-validation-hint';
+                                hint.textContent = 'Bitte gib einen gültigen YouTube-, TikTok-, Twitch- oder Instagram-Link ein.';
+                                group.appendChild(hint);
+                            }
+                        });
                         const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
                         if (firstInput) updateIconForInput(firstInput);
                         jcLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
