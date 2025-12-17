@@ -1178,14 +1178,36 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             right: 14px !important;
             top: 50% !important;
             transform: translateY(-50%) !important;
-            font-size: 24px !important;
+            width: 22px !important;
+            height: 22px !important;
+            font-size: 0 !important;
             pointer-events: none !important;
             opacity: 0 !important;
             transition: opacity 0.3s ease !important;
+            background-size: contain !important;
+            background-repeat: no-repeat !important;
+            background-position: center !important;
         }
         
         .jc-platform-icon.visible {
             opacity: 1 !important;
+        }
+
+        /* Platform icon backgrounds */
+        .jc-platform-icon.icon-youtube {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%23FF0000'/%3E%3Cpath d='M10 8l6 4-6 4z' fill='%23fff'/%3E%3C/svg%3E");
+        }
+        .jc-platform-icon.icon-twitch {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h16v11l-4 4h-4l-2 2H8v-2H4z' fill='%239146FF'/%3E%3Crect x='13' y='7' width='2' height='4' fill='%23fff'/%3E%3Crect x='9' y='7' width='2' height='4' fill='%23fff'/%3E%3C/svg%3E");
+        }
+        .jc-platform-icon.icon-tiktok {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23000000'/%3E%3Cpath d='M14.5 6.5c.6 1 1.4 1.7 2.5 1.9v2.2c-.9 0-1.8-.3-2.5-.8v3.8c0 2-1.6 3.6-3.6 3.6-2 0-3.6-1.6-3.6-3.6 0-1.8 1.3-3.3 3-3.6v2c-.6.2-1 .8-1 1.5 0 .9.7 1.6 1.6 1.6.9 0 1.6-.7 1.6-1.6V6.5h1z' fill='%2340c4ff'/%3E%3Cpath d='M14.5 6.5c.6 1 1.4 1.7 2.5 1.9v2.2c-.9 0-1.8-.3-2.5-.8v3.8c0 2-1.6 3.6-3.6 3.6-2 0-3.6-1.6-3.6-3.6 0-1.8 1.3-3.3 3-3.6v2c-.6.2-1 .8-1 1.5 0 .9.7 1.6 1.6 1.6.9 0 1.6-.7 1.6-1.6V6.5h1z' fill='%23ff1a52' fill-opacity='.6'/%3E%3C/svg%3E");
+        }
+        .jc-platform-icon.icon-instagram {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23f58529'/%3E%3Cstop offset='25%25' stop-color='%23dd2a7b'/%3E%3Cstop offset='50%25' stop-color='%23813dbb'/%3E%3Cstop offset='75%25' stop-color='%23515bd4'/%3E%3Cstop offset='100%25' stop-color='%23516bd4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2.5' y='2.5' width='19' height='19' rx='5' fill='url(%23g)'/%3E%3Ccircle cx='12' cy='12' r='4.5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='17.5' cy='6.5' r='1.3' fill='%23fff'/%3E%3C/svg%3E");
+        }
+        .jc-platform-icon.icon-unknown {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%238a8f9e'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12' fill='%23fff' font-family='Arial' font-weight='bold'>?</text%3E%3C/svg%3E");
         }
         
         .jc-add-social-btn, .jc-remove-social-btn {
@@ -1955,6 +1977,21 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     </button>
                     <script>
                     // Notfall-Fallback: Fügt ein Feld hinzu, auch wenn das Hauptscript nicht läuft.
+                    window.jcInlineRemove = window.jcInlineRemove || function(btn) {
+                        try {
+                            const c = document.getElementById('jc-social-fields');
+                            if (!c) return false;
+                            const count = c.querySelectorAll('.jc-social-field-group').length;
+                            const group = btn.closest('.jc-social-field-group');
+                            if (count <= 1) {
+                                const input = group ? group.querySelector('input.jc-social-input') : c.querySelector('input.jc-social-input');
+                                if (input) { input.value = ''; }
+                                return false;
+                            }
+                            if (group) group.remove();
+                        } catch (e) { alert('Fehler: ' + e); }
+                        return false;
+                    };
                     window.jcInlineAddSocial = window.jcInlineAddSocial || function() {
                         try {
                             const c = document.getElementById('jc-social-fields');
@@ -1969,7 +2006,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                             '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + idx + '" />' +
                                             '<span class="jc-platform-icon" data-index="' + idx + '"></span>' +
                                             '</div>' +
-                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="(function(btn){const c=document.getElementById(\"jc-social-fields\");if(!c)return false;const count=c.querySelectorAll(\".jc-social-field-group\").length;if(count<=1){const input=c.querySelector(\".jc-social-field-group input.jc-social-input\");if(input){input.value=\"\";}return false;}btn.closest(\".jc-social-field-group\").remove();return false;})(this);">×</button>';
+                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>';
                             c.appendChild(div);
                             try { div.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
                         } catch (e) { alert('Fehler: ' + e); }
@@ -2072,7 +2109,23 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         jcLog('setup:nextIndex:init', nextIndex);
                         jcSendLog('setup:nextIndex:init', { nextIndex });
 
-                        const icons = { youtube:'🎥', tiktok:'🎵', twitch:'🎮', twitter:'🐦', instagram:'📸', handle:'@', unknown:'🔗' };
+                        const platformClasses = ['icon-youtube','icon-tiktok','icon-twitch','icon-instagram','icon-unknown'];
+                        function inlineRemove(btn) {
+                            try {
+                                const c = document.getElementById('jc-social-fields');
+                                if (!c) return false;
+                                const count = c.querySelectorAll('.jc-social-field-group').length;
+                                const group = btn.closest('.jc-social-field-group');
+                                if (count <= 1) {
+                                    const input = group ? group.querySelector('input.jc-social-input') : c.querySelector('input.jc-social-input');
+                                    if (input) { input.value = ''; updateIconForInput(input); }
+                                    return false;
+                                }
+                                if (group) group.remove();
+                                updateAddBtnVisibility();
+                            } catch (e) { /* ignore */ }
+                            return false;
+                        }
                         function detectPlatform(url) {
                             const u = (url || '').toLowerCase();
                             if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
@@ -2120,16 +2173,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
                             if (!el) return;
                             const val = (input.value || '').trim();
+                            // Reset classes
+                            platformClasses.forEach(function(c){ el.classList.remove(c); });
                             if (val.length > 3) {
                                 const { valid, platform } = validateLink(input);
-                                if (valid) {
-                                    el.textContent = icons[platform] || icons.unknown;
-                                    el.classList.add('visible');
-                                    jcLog('icon:update', { idx, val, platform });
-                                } else {
-                                    el.textContent = icons.unknown;
-                                    el.classList.add('visible');
-                                }
+                                const cls = valid ? 'icon-' + platform : 'icon-unknown';
+                                el.classList.add(cls, 'visible');
+                                jcLog('icon:update', { idx, val, platform: valid ? platform : 'unknown' });
                             } else {
                                 el.classList.remove('visible');
                             }
@@ -2143,15 +2193,15 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 jcSendLog('addField:blocked:max-reached', { count: getGroupCount() });
                                 return;
                             }
-                            const html = (
-                                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
-                                  '<div class="jc-social-field-wrapper">' +
-                                    '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                                    '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                                  '</div>' +
-                                  '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>' +
-                                '</div>'
-                            );
+                                                        const html = (
+                                                                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
+                                                                    '<div class="jc-social-field-wrapper">' +
+                                                                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
+                                                                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
+                                                                    '</div>' +
+                                                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>' +
+                                                                '</div>'
+                                                        );
                             const before = getGroupCount();
                             try {
                                 container.insertAdjacentHTML('beforeend', html);
@@ -2163,7 +2213,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                         '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
                                         '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
                                     '</div>' +
-                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>'
+                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>'
                                 );
                                 container.appendChild(group);
                             }
@@ -2227,20 +2277,23 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 addField();
                             }
                         });
+                        // Delegate remove buttons (click + touch)
                         container.addEventListener('click', function(e) {
-                            if (e.target && e.target.classList.contains('jc-remove-social-btn')) {
+                            const target = e.target;
+                            if (target && target.classList.contains('jc-remove-social-btn')) {
                                 e.preventDefault();
                                 jcLog('removeBtn:click');
                                 jcSendLog('removeBtn:click');
-                                removeField(e.target);
+                                removeField(target);
                             }
                         });
                         container.addEventListener('pointerdown', function(e) {
-                            if (e.pointerType === 'touch' && e.target && e.target.classList.contains('jc-remove-social-btn')) {
+                            const target = e.target;
+                            if (e.pointerType === 'touch' && target && target.classList.contains('jc-remove-social-btn')) {
                                 e.preventDefault();
                                 jcLog('removeBtn:pointer');
                                 jcSendLog('removeBtn:pointer');
-                                removeField(e.target);
+                                removeField(target);
                             }
                         });
                         container.addEventListener('input', function(e) {
