@@ -883,3 +883,4 @@ function jc_teilnehmer_get_css() {
 			.jc-hero { padding:22px; }
 		}
 	';
+}
