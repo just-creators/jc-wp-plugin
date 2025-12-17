@@ -1159,29 +1159,13 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             75% { transform: translateX(8px); }
         }
         
-        .jc-validation-hint {
-            display: none !important;
-            margin-top: 8px !important;
-            font-size: 13px !important;
-            color: #f44336 !important;
-            padding: 8px 12px !important;
-            background: rgba(244, 67, 54, 0.1) !important;
-            border-left: 3px solid #f44336 !important;
-            border-radius: 6px !important;
-            transition: all 0.3s ease !important;
-        }
-        
-        .jc-validation-hint.visible {
-            display: block !important;
-            animation: jc-slideIn 0.3s ease-out !important;
-        }
-        
-        .jc-validation-hint::before {
-            content: '⚠️ ' !important;
-        }
+
         
         .jc-social-field-group {
+            display: flex !important;
+            gap: 12px !important;
             margin-bottom: 15px !important;
+            align-items: center !important;
             animation: jc-slideIn 0.3s ease-out !important;
             position: relative !important;
             padding: 12px !important;
@@ -1720,14 +1704,10 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             $channel_clean = sanitize_text_field( wp_unslash( $channel ) );
                             if ( ! empty( $channel_clean ) ) {
                                 $validation = jc_validate_social_link( $channel_clean );
-                                if ( $validation['valid'] ) {
-                                    $social_channels[] = array(
-                                        'url' => $validation['url'],
-                                        'platform' => $validation['platform']
-                                    );
-                                } else {
-                                    $field_errors['social'][] = 'Ungültiger Link: ' . esc_html( $channel_clean );
-                                }
+                                $social_channels[] = array(
+                                    'url' => $validation['url'],
+                                    'platform' => $validation['platform']
+                                );
                             }
                         }
                     }
@@ -2011,13 +1991,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <button type="button" class="jc-add-social-btn" id="jc-add-social-btn" onclick="return window.jcInlineAddSocial ? window.jcInlineAddSocial() : false;">
                         Weiteren Kanäle hinzufügen
                     </button>
-                    <?php if ( ! empty( $field_errors['social'] ) ): ?>
-                        <div class="jc-field-error" style="display: block; margin-top: 12px; padding: 12px; background: rgba(244, 67, 54, 0.1); border-left: 3px solid #f44336; border-radius: 6px;">
-                            <?php foreach ( $field_errors['social'] as $err ): ?>
-                                <div style="margin-bottom: 4px;">⚠️ <?php echo $err; ?></div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
+                    <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
                     <script>
                     // Notfall-Fallback: Fügt ein Feld hinzu, auch wenn das Hauptscript nicht läuft.
                     window.jcInlineRemove = window.jcInlineRemove || function(btn) {
@@ -2200,16 +2174,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         }
                         function validateLink(input) {
                             const val = (input.value || '').trim();
-                            if (!val) { input.classList.remove('error'); input.dataset.platform = ''; return { valid:false, platform:null }; }
+                            if (!val) return { valid: false, platform: null };
                             const p = detectPlatform(val);
-                            const valid = ['youtube','tiktok','twitch','instagram'].includes(p) && (val.includes('http://') || val.includes('https://') || val.includes('www.') || val.includes('.'));
-                            if (!valid) {
-                                input.classList.add('error');
-                            } else {
-                                input.classList.remove('error');
-                            }
-                            input.dataset.platform = valid ? p : '';
-                            return { valid, platform: p };
+                            return { valid: true, platform: p };
                         }
                         function bindInputListeners(input) {
                             if (!input || input.dataset.listenerBound) return;
@@ -2232,42 +2199,18 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         function updateIconForInput(input) {
                             const idx = input.getAttribute('data-index') || '0';
                             const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
-                            const group = input.closest('.jc-social-field-group');
-                            let hint = group ? group.querySelector('.jc-validation-hint') : null;
-                            
                             const val = (input.value || '').trim();
+                            
                             // Reset classes
                             if (el) platformClasses.forEach(function(c){ el.classList.remove(c); });
                             
                             if (val.length > 3) {
-                                const { valid, platform } = validateLink(input);
-                                const cls = valid ? 'icon-' + platform : 'icon-unknown';
+                                const p = detectPlatform(val);
+                                const cls = 'icon-' + p;
                                 if (el) el.classList.add(cls, 'visible');
-                                
-                                // Live-Feedback: Zeige Fehlermeldung bei ungültigen Links
-                                if (!valid) {
-                                    if (!hint && group) {
-                                        hint = document.createElement('span');
-                                        hint.className = 'jc-validation-hint';
-                                        hint.textContent = 'Bitte gib einen gültigen YouTube-, TikTok-, Twitch- oder Instagram-Link ein.';
-                                        group.appendChild(hint);
-                                    }
-                                    if (hint) {
-                                        hint.classList.add('visible');
-                                        jcLog('validation:show-error', { idx });
-                                    }
-                                } else {
-                                    if (hint) {
-                                        hint.classList.remove('visible');
-                                        jcLog('validation:hide-error', { idx });
-                                    }
-                                }
-                                
-                                jcLog('icon:update', { idx, val, valid, platform: valid ? platform : 'unknown' });
+                                jcLog('icon:update', { idx, val, platform: p });
                             } else {
                                 if (el) el.classList.remove('visible');
-                                if (hint) hint.classList.remove('visible');
-                                input.classList.remove('error');
                             }
                         }
                         function addField() {
@@ -2281,14 +2224,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             }
                                                         const html = (
                                                                 '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
-                                                                    '<div style="display: flex; gap: 12px; align-items: center;">' +
-                                                                        '<div class="jc-social-field-wrapper" style="flex: 1;">' +
-                                                                            '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                                                                            '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                                                                        '</div>' +
-                                                                        '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>' +
+                                                                    '<div class="jc-social-field-wrapper">' +
+                                                                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
+                                                                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
                                                                     '</div>' +
-                                                                    '<span class="jc-validation-hint">Bitte gib einen gültigen YouTube-, TikTok-, Twitch- oder Instagram-Link ein.</span>' +
+                                                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>' +
                                                                 '</div>'
                                                         );
                             const before = getGroupCount();
@@ -2407,15 +2347,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 updateIconForInput(e.target);
                             }
                         }, true);
-                        // Initial state: Füge Fehler-Hinweise zu allen existierenden Feldern hinzu
-                        container.querySelectorAll('.jc-social-field-group').forEach(function(group) {
-                            if (!group.querySelector('.jc-validation-hint')) {
-                                const hint = document.createElement('span');
-                                hint.className = 'jc-validation-hint';
-                                hint.textContent = 'Bitte gib einen gültigen YouTube-, TikTok-, Twitch- oder Instagram-Link ein.';
-                                group.appendChild(hint);
-                            }
-                        });
+                        // Initial state
                         // Binde direkte Input-Listener auf alle existierenden Inputs
                         container.querySelectorAll('input.jc-social-input').forEach(function(input) {
                             bindInputListeners(input);
@@ -2444,10 +2376,17 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         }
                         function validateSocialLinks() {
                             const inputs = document.querySelectorAll('.jc-social-input');
-                            return Array.from(inputs).some(function(input) {
-                                const res = validateLink(input);
-                                return res.valid;
+                            const hasValue = Array.from(inputs).some(function(input) {
+                                return (input.value || '').trim().length > 0;
                             });
+                            const errorEl = document.getElementById('jc-social-error');
+                            if (!hasValue && errorEl) {
+                                errorEl.textContent = 'Bitte gib mindestens einen Social Media Kanal an.';
+                                errorEl.style.display = 'block';
+                            } else if (errorEl) {
+                                errorEl.style.display = 'none';
+                            }
+                            return hasValue;
                         }
                         function validateActivity() {
                             const a = document.getElementById('jc-activity-input');
