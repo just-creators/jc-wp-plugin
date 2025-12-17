@@ -646,9 +646,10 @@ function jc_teilnehmer_render_shortcode( $atts ) {
         return '<p style="text-align: center; color: #999;">Noch keine Teilnehmer vorhanden.</p>';
     }
 
+    // Output buffering starten, um Probleme mit echo zu vermeiden
     ob_start();
     
-    // Minified CSS Output
+    // Minified CSS Output (in einer Zeile, damit wpautop das nicht kaputt macht)
     echo '<style>' . jc_teilnehmer_get_css() . '</style>';
     ?>
     <div class="jc-wrap">
