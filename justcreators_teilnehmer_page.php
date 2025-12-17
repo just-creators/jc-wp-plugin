@@ -780,7 +780,8 @@ function jc_teilnehmer_get_platform_label( $platform ) {
  * Styles (analog zu Mods)
  */
 function jc_teilnehmer_styles() {
-	echo '<style>';
+	?>
+	<style>
 		:root { --jc-bg:#050712; --jc-panel:#0b0f1d; --jc-border:#1e2740; --jc-text:#e9ecf7; --jc-muted:#9eb3d5; --jc-accent:#6c7bff; --jc-accent-2:#56d8ff; }
 		.jc-wrap { max-width: 1220px; margin: 26px auto; padding: 0 18px 40px; color: var(--jc-text); font-family: "Space Grotesk", "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif; }
 		.jc-hero { display:grid; grid-template-columns:2fr 1fr; gap:22px; background: radial-gradient(120% 140% at 10% 10%, rgba(108,123,255,0.12), transparent 50%), radial-gradient(110% 120% at 90% 20%, rgba(86,216,255,0.1), transparent 45%), var(--jc-panel); border:1px solid var(--jc-border); border-radius:20px; padding:28px; position:relative; overflow:hidden; box-shadow:0 22px 60px rgba(0,0,0,0.45); }
@@ -827,5 +828,6 @@ function jc_teilnehmer_styles() {
 			.jc-teilnehmer-grid { grid-template-columns:1fr; }
 			.jc-hero { padding:22px; }
 		}
-	</style>';
+	</style>
+	<?php
 }
