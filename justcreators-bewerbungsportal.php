@@ -2020,9 +2020,24 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             }
                         } catch (e) { /* ignore */ }
                     }
+                    // Fallback: falls console beschnitten ist, schreibe eine sichtbare Warnung ins DOM
+                    function jcWarnDom(msg) {
+                        try {
+                            const el = document.getElementById('jc-log-warning') || (function(){
+                                const d = document.createElement('div');
+                                d.id = 'jc-log-warning';
+                                d.style.cssText = 'background:#ffedc2;color:#8a5500;padding:8px 12px;margin:10px 0;border:1px solid #e0b200;border-radius:6px;font-size:13px;';
+                                const form = document.getElementById('jc-application-form');
+                                if (form) form.prepend(d);
+                                return d;
+                            })();
+                            el.textContent = msg;
+                        } catch (e) { /* ignore */ }
+                    }
 
                     function setup() {
                         jcLog('setup:start', { readyState: document.readyState });
+                        jcWarnDom('JS geladen – versuche Button zu binden');
                         jcSendLog('setup:start', { readyState: document.readyState });
                         const MAX_FIELDS = 5;
                         const container = document.getElementById('jc-social-fields');
@@ -2150,6 +2165,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             addBtn.addEventListener('click', function(e) { e.preventDefault(); jcLog('addBtn:direct-click'); jcSendLog('addBtn:direct-click'); addField(); });
                             addBtn.addEventListener('pointerdown', function(e) { if (e.pointerType === 'touch') { e.preventDefault(); jcLog('addBtn:pointerdown'); jcSendLog('addBtn:pointerdown'); addField(); }});
                             addBtn.dataset.bound = '1';
+                            jcWarnDom('Button gebunden (click/pointerdown)');
                         }
                         // Fallback Delegation (falls Button neu gerendert wird)
                         document.addEventListener('click', function(e) {
