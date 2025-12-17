@@ -1195,19 +1195,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
 
         /* Platform icon backgrounds */
         .jc-platform-icon.icon-youtube {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='4' fill='%23FF0000'/%3E%3Cpath d='M10 8l6 4-6 4z' fill='%23fff'/%3E%3C/svg%3E");
+            background-image: url('https://cdn.simpleicons.org/youtube/FF0000');
         }
         .jc-platform-icon.icon-twitch {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h16v11l-4 4h-4l-2 2H8v-2H4z' fill='%239146FF'/%3E%3Crect x='13' y='7' width='2' height='4' fill='%23fff'/%3E%3Crect x='9' y='7' width='2' height='4' fill='%23fff'/%3E%3C/svg%3E");
+            background-image: url('https://cdn.simpleicons.org/twitch/9146FF');
         }
         .jc-platform-icon.icon-tiktok {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%23000000'/%3E%3Cpath d='M14.5 6.5c.6 1 1.4 1.7 2.5 1.9v2.2c-.9 0-1.8-.3-2.5-.8v3.8c0 2-1.6 3.6-3.6 3.6-2 0-3.6-1.6-3.6-3.6 0-1.8 1.3-3.3 3-3.6v2c-.6.2-1 .8-1 1.5 0 .9.7 1.6 1.6 1.6.9 0 1.6-.7 1.6-1.6V6.5h1z' fill='%2340c4ff'/%3E%3Cpath d='M14.5 6.5c.6 1 1.4 1.7 2.5 1.9v2.2c-.9 0-1.8-.3-2.5-.8v3.8c0 2-1.6 3.6-3.6 3.6-2 0-3.6-1.6-3.6-3.6 0-1.8 1.3-3.3 3-3.6v2c-.6.2-1 .8-1 1.5 0 .9.7 1.6 1.6 1.6.9 0 1.6-.7 1.6-1.6V6.5h1z' fill='%23ff1a52' fill-opacity='.6'/%3E%3C/svg%3E");
+            background-image: url('https://cdn.simpleicons.org/tiktok/000000');
         }
         .jc-platform-icon.icon-instagram {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23f58529'/%3E%3Cstop offset='25%25' stop-color='%23dd2a7b'/%3E%3Cstop offset='50%25' stop-color='%23813dbb'/%3E%3Cstop offset='75%25' stop-color='%23515bd4'/%3E%3Cstop offset='100%25' stop-color='%23516bd4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='2.5' y='2.5' width='19' height='19' rx='5' fill='url(%23g)'/%3E%3Ccircle cx='12' cy='12' r='4.5' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Ccircle cx='17.5' cy='6.5' r='1.3' fill='%23fff'/%3E%3C/svg%3E");
+            background-image: url('https://cdn.simpleicons.org/instagram/E4405F');
         }
         .jc-platform-icon.icon-unknown {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='%238a8f9e'/%3E%3Ctext x='12' y='16' text-anchor='middle' font-size='12' fill='%23fff' font-family='Arial' font-weight='bold'>?</text%3E%3C/svg%3E");
+            background-image: url('https://cdn.simpleicons.org/link/8a8f9e');
         }
         
         .jc-add-social-btn, .jc-remove-social-btn {
