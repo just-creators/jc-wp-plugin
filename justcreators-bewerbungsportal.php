@@ -1951,7 +1951,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         </div>
                     </div>
                     <button type="button" class="jc-add-social-btn" id="jc-add-social-btn">
-                        Weiteren Kanal hinzufügen
+                        Weiteren Kanäle hinzufügen
                     </button>
                     <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
                     
