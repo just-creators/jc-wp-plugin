@@ -57,23 +57,23 @@ add_action( 'init', function() {
 function jc_verify_api_secret( $request ) {
     $auth_header = $request->get_header( 'authorization' );
     $expected = 'Bearer ' . jc_get_bot_api_secret();
+   
+    error_log( "JC API Auth: Header=" . substr($auth_header, 0, 20) . "..., Expected=" . substr($expected, 0, 20) . "..." );
+    error_log( "JC API Auth Match: " . ($auth_header === $expected ? 'YES' : 'NO') );
+   
+    return $auth_header === $expected;
+}
+add_action('rest_api_init', function() {
+    register_rest_route('jc/v1', '/status-sync', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_status_sync',
+        'permission_callback' => 'jc_verify_api_secret'
+    ));
+    
+    register_rest_route('jc/v1', '/check-discord-join', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_check_discord_join',
         'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
-    // 1. ZUERST in die Haupt-DB einfügen, um die ID zu bekommen
-    $inserted = $wpdb->insert( $main_table, array(
-        'discord_id' => $temp_application->discord_id,
-        'discord_name' => $temp_application->discord_name,
-        'applicant_name' => $temp_application->applicant_name,
-        'age' => $temp_application->age,
-        'social_channels' => $temp_application->social_channels,
-        'social_activity' => $temp_application->social_activity,
-        'motivation' => $temp_application->motivation,
-        'privacy_accepted_at' => $temp_application->privacy_accepted_at, // <-- NEU (v6.17)
-        'status' => 'pending'
-    ), array(
-        '%s','%s','%s','%s','%s','%s','%s',
-        '%s', // <-- NEU (v6.17) für privacy_accepted_at
-        '%s'
-    ) );
     ));
     
     register_rest_route('jc/v1', '/send-application', array(
