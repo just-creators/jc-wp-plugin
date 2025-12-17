@@ -1969,7 +1969,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                             '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + idx + '" />' +
                                             '<span class="jc-platform-icon" data-index="' + idx + '"></span>' +
                                             '</div>' +
-                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="this.parentNode.parentNode.remove(); return false;">×</button>';
+                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="(function(btn){const c=document.getElementById(\"jc-social-fields\");if(!c)return false;const count=c.querySelectorAll(\".jc-social-field-group\").length;if(count<=1){const input=c.querySelector(\".jc-social-field-group input.jc-social-input\");if(input){input.value=\"\";}return false;}btn.closest(\".jc-social-field-group\").remove();return false;})(this);">×</button>';
                             c.appendChild(div);
                             try { div.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
                         } catch (e) { alert('Fehler: ' + e); }
