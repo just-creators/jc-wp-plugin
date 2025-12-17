@@ -57,23 +57,23 @@ add_action( 'init', function() {
 function jc_verify_api_secret( $request ) {
     $auth_header = $request->get_header( 'authorization' );
     $expected = 'Bearer ' . jc_get_bot_api_secret();
-   
-    error_log( "JC API Auth: Header=" . substr($auth_header, 0, 20) . "..., Expected=" . substr($expected, 0, 20) . "..." );
-    error_log( "JC API Auth Match: " . ($auth_header === $expected ? 'YES' : 'NO') );
-   
-    return $auth_header === $expected;
-}
-add_action('rest_api_init', function() {
-    register_rest_route('jc/v1', '/status-sync', array(
-        'methods' => 'POST',
-        'callback' => 'jc_handle_status_sync',
-        'permission_callback' => 'jc_verify_api_secret'
-    ));
-    
-    register_rest_route('jc/v1', '/check-discord-join', array(
-        'methods' => 'POST',
-        'callback' => 'jc_handle_check_discord_join',
         'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
+    // 1. ZUERST in die Haupt-DB einfügen, um die ID zu bekommen
+    $inserted = $wpdb->insert( $main_table, array(
+        'discord_id' => $temp_application->discord_id,
+        'discord_name' => $temp_application->discord_name,
+        'applicant_name' => $temp_application->applicant_name,
+        'age' => $temp_application->age,
+        'social_channels' => $temp_application->social_channels,
+        'social_activity' => $temp_application->social_activity,
+        'motivation' => $temp_application->motivation,
+        'privacy_accepted_at' => $temp_application->privacy_accepted_at, // <-- NEU (v6.17)
+        'status' => 'pending'
+    ), array(
+        '%s','%s','%s','%s','%s','%s','%s',
+        '%s', // <-- NEU (v6.17) für privacy_accepted_at
+        '%s'
+    ) );
     ));
     
     register_rest_route('jc/v1', '/send-application', array(
@@ -1969,7 +1969,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                             '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + idx + '" />' +
                                             '<span class="jc-platform-icon" data-index="' + idx + '"></span>' +
                                             '</div>' +
-                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="this.closest(\".jc-social-field-group\").remove(); return false;">X</button>';
+                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="this.parentNode.parentNode.remove(); return false;">×</button>';
                             c.appendChild(div);
                             try { div.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
                         } catch (e) { alert('Fehler: ' + e); }
@@ -2072,7 +2072,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         jcLog('setup:nextIndex:init', nextIndex);
                         jcSendLog('setup:nextIndex:init', { nextIndex });
 
-                        const icons = { youtube:'YT', tiktok:'TT', twitch:'TW', twitter:'TW', instagram:'IG', handle:'@', unknown:'?' };
+                        const icons = { youtube:'🎥', tiktok:'🎵', twitch:'🎮', twitter:'🐦', instagram:'📸', handle:'@', unknown:'🔗' };
                         function detectPlatform(url) {
                             const u = (url || '').toLowerCase();
                             if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
@@ -2102,16 +2102,34 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             jcLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
                             jcSendLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
                         }
+                        function validateLink(input) {
+                            const val = (input.value || '').trim();
+                            if (!val) { input.classList.remove('error'); input.dataset.platform = ''; return { valid:false, platform:null }; }
+                            const p = detectPlatform(val);
+                            const valid = ['youtube','tiktok','twitch','instagram'].includes(p) && (val.includes('http://') || val.includes('https://') || val.includes('www.') || val.includes('.'));
+                            if (!valid) {
+                                input.classList.add('error');
+                            } else {
+                                input.classList.remove('error');
+                            }
+                            input.dataset.platform = valid ? p : '';
+                            return { valid, platform: p };
+                        }
                         function updateIconForInput(input) {
                             const idx = input.getAttribute('data-index') || '0';
                             const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
                             if (!el) return;
                             const val = (input.value || '').trim();
                             if (val.length > 3) {
-                                const p = detectPlatform(val);
-                                el.textContent = icons[p] || icons.unknown;
-                                el.classList.add('visible');
-                                jcLog('icon:update', { idx, val, platform: p });
+                                const { valid, platform } = validateLink(input);
+                                if (valid) {
+                                    el.textContent = icons[platform] || icons.unknown;
+                                    el.classList.add('visible');
+                                    jcLog('icon:update', { idx, val, platform });
+                                } else {
+                                    el.textContent = icons.unknown;
+                                    el.classList.add('visible');
+                                }
                             } else {
                                 el.classList.remove('visible');
                             }
@@ -2217,6 +2235,14 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 removeField(e.target);
                             }
                         });
+                        container.addEventListener('pointerdown', function(e) {
+                            if (e.pointerType === 'touch' && e.target && e.target.classList.contains('jc-remove-social-btn')) {
+                                e.preventDefault();
+                                jcLog('removeBtn:pointer');
+                                jcSendLog('removeBtn:pointer');
+                                removeField(e.target);
+                            }
+                        });
                         container.addEventListener('input', function(e) {
                             if (e.target && e.target.classList.contains('jc-social-input')) {
                                 updateIconForInput(e.target);
@@ -2246,8 +2272,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         function validateSocialLinks() {
                             const inputs = document.querySelectorAll('.jc-social-input');
                             return Array.from(inputs).some(function(input) {
-                                const v = (input.value || '').toLowerCase();
-                                return v.includes('youtube.com') || v.includes('youtu.be') || v.includes('twitch.tv') || v.includes('tiktok.com');
+                                const res = validateLink(input);
+                                return res.valid;
                             });
                         }
                         function validateActivity() {
