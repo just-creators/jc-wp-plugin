@@ -627,14 +627,6 @@ function jc_teilnehmer_render_shortcode( $atts ) {
 	global $wpdb;
 	$table = $wpdb->prefix . JC_TEILNEHMER_TABLE;
 
-	// Lade CSS nur einmal
-	static $styles_loaded = false;
-	if ( ! $styles_loaded ) {
-		wp_enqueue_style( 'jc-teilnehmer-styles', false );
-		wp_add_inline_style( 'jc-teilnehmer-styles', jc_teilnehmer_get_css() );
-		$styles_loaded = true;
-	}
-
 	$atts = shortcode_atts( array(
 		'limit' => 0,
 		'show_inactive' => false,
@@ -658,56 +650,17 @@ function jc_teilnehmer_render_shortcode( $atts ) {
 		return '<p style="text-align: center; color: #999;">Noch keine Teilnehmer vorhanden.</p>';
 	}
 
+	// CSS nur einmal ausgeben
+	static $styles_loaded = false;
+	$css_output = '';
+	if ( ! $styles_loaded ) {
+		$css_output = '<style>' . jc_teilnehmer_get_css() . '</style>';
+		$styles_loaded = true;
+	}
+
 	ob_start();
+	echo $css_output;
 	?>
-	<div class="jc-wrap">
-		:root { --jc-bg:#050712; --jc-panel:#0b0f1d; --jc-border:#1e2740; --jc-text:#e9ecf7; --jc-muted:#9eb3d5; --jc-accent:#6c7bff; --jc-accent-2:#56d8ff; }
-		.jc-wrap { max-width: 1220px; margin: 26px auto; padding: 0 18px 40px; color: var(--jc-text); font-family: "Space Grotesk", "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif; }
-		.jc-hero { display:grid; grid-template-columns:2fr 1fr; gap:22px; background: radial-gradient(120% 140% at 10% 10%, rgba(108,123,255,0.12), transparent 50%), radial-gradient(110% 120% at 90% 20%, rgba(86,216,255,0.1), transparent 45%), var(--jc-panel); border:1px solid var(--jc-border); border-radius:20px; padding:28px; position:relative; overflow:hidden; box-shadow:0 22px 60px rgba(0,0,0,0.45); }
-		.jc-hero:after { content:""; position:absolute; inset:0; background:linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0)); pointer-events:none; }
-		.jc-hero-left { position:relative; z-index:1; }
-		.jc-kicker { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); border-radius:999px; color:var(--jc-text); font-size:13px; letter-spacing:0.04em; text-transform:uppercase; }
-		.jc-hero-title { margin:10px 0 6px; font-size:32px; line-height:1.2; color:var(--jc-text); }
-		.jc-hero-sub { margin:0 0 14px; color:var(--jc-muted); line-height:1.6; max-width:680px; }
-		.jc-hero-right { position:relative; min-height:180px; display:flex; align-items:center; justify-content:flex-end; }
-		.jc-hero-badge { position:relative; z-index:1; padding:12px 18px; border-radius:14px; background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#040510; font-weight:800; letter-spacing:0.08em; box-shadow:0 18px 40px rgba(108,123,255,0.45); }
-		.jc-hero-glow { position:absolute; inset:20px; border-radius:18px; background:radial-gradient(circle at 50% 50%, rgba(108,123,255,0.25), transparent 55%); filter:blur(20px); opacity:0.9; }
-		.jc-toolbar { margin:18px 0 8px; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
-		.jc-search { flex:1; min-width:260px; position:relative; }
-		.jc-search input { width:100%; padding:12px 44px 12px 40px; background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:12px; color:var(--jc-text); box-shadow:0 12px 32px rgba(0,0,0,0.35); font-size:14px; }
-		.jc-search input::placeholder { color:var(--jc-muted); opacity:0.6; }
-		.jc-search input:focus { outline:none; border-color:var(--jc-accent); box-shadow:0 0 0 3px rgba(108,123,255,0.35); background:rgba(11,15,29,0.9); }
-		.jc-search-icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); opacity:0.7; }
-		.jc-teilnehmer-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; margin-top:20px; }
-		.jc-teilnehmer-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; padding:22px; position:relative; overflow:hidden; box-shadow:0 20px 54px rgba(0,0,0,0.4); transition:transform .2s, border-color .2s, box-shadow .2s; }
-		.jc-teilnehmer-card:hover { transform:translateY(-5px); border-color:rgba(108,123,255,0.5); box-shadow:0 24px 68px rgba(0,0,0,0.5); }
-		.jc-teilnehmer-header { display:flex; gap:16px; align-items:center; margin-bottom:18px; }
-		.jc-teilnehmer-avatar { width:80px; height:80px; border-radius:50%; object-fit:cover; border:3px solid var(--jc-border); box-shadow:0 8px 20px rgba(0,0,0,0.3); }
-		.jc-teilnehmer-info { flex:1; }
-		.jc-teilnehmer-name { margin:0; font-size:20px; font-weight:800; color:var(--jc-text); line-height:1.2; }
-		.jc-teilnehmer-title { margin:6px 0 0; font-size:14px; color:var(--jc-muted); }
-		.jc-teilnehmer-socials { display:flex; flex-wrap:wrap; gap:10px; }
-		.jc-social-btn { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:10px; background:rgba(108,123,255,0.12); border:1px solid rgba(108,123,255,0.3); color:var(--jc-text); text-decoration:none; font-weight:700; font-size:13px; transition:all .2s; }
-		.jc-social-btn:hover { background:rgba(108,123,255,0.2); border-color:rgba(108,123,255,0.5); transform:translateY(-2px); box-shadow:0 8px 16px rgba(108,123,255,0.25); }
-		.jc-social-youtube { background:rgba(255,0,0,0.12); border-color:rgba(255,0,0,0.3); color:#ff6b6b; }
-		.jc-social-youtube:hover { background:rgba(255,0,0,0.2); border-color:rgba(255,0,0,0.5); box-shadow:0 8px 16px rgba(255,0,0,0.3); }
-		.jc-social-twitch { background:rgba(145,70,255,0.12); border-color:rgba(145,70,255,0.3); color:#bf9dff; }
-		.jc-social-twitch:hover { background:rgba(145,70,255,0.2); border-color:rgba(145,70,255,0.5); box-shadow:0 8px 16px rgba(145,70,255,0.3); }
-		.jc-social-tiktok { background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.2); color:#e9ecf7; }
-		.jc-social-tiktok:hover { background:rgba(255,255,255,0.15); border-color:rgba(255,255,255,0.4); box-shadow:0 8px 16px rgba(255,255,255,0.2); }
-		.jc-social-instagram { background:rgba(228,64,95,0.12); border-color:rgba(228,64,95,0.3); color:#ff87a8; }
-		.jc-social-instagram:hover { background:rgba(228,64,95,0.2); border-color:rgba(228,64,95,0.5); box-shadow:0 8px 16px rgba(228,64,95,0.3); }
-		.jc-social-twitter { background:rgba(29,155,240,0.12); border-color:rgba(29,155,240,0.3); color:#6db6f7; }
-		.jc-social-twitter:hover { background:rgba(29,155,240,0.2); border-color:rgba(29,155,240,0.5); box-shadow:0 8px 16px rgba(29,155,240,0.3); }
-		@media (max-width: 900px) {
-			.jc-hero { grid-template-columns:1fr; }
-			.jc-hero-right { justify-content:flex-start; min-height:120px; }
-		}
-		@media (max-width: 640px) {
-			.jc-teilnehmer-grid { grid-template-columns:1fr; }
-			.jc-hero { padding:22px; }
-		}
-	</style>
 	<div class="jc-wrap">
 		<div class="jc-hero">
 			<div class="jc-hero-left">
