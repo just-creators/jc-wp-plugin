@@ -2087,22 +2087,44 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 jcSendLog('addField:blocked:max-reached', { count: getGroupCount() });
                                 return;
                             }
-                            const group = document.createElement('div');
-                            group.className = 'jc-social-field-group';
-                            group.innerHTML = (
-                                '<div class="jc-social-field-wrapper">' +
+                            const html = (
+                                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
+                                  '<div class="jc-social-field-wrapper">' +
                                     '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
                                     '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                                '</div>' +
-                                '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>'
+                                  '</div>' +
+                                  '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>' +
+                                '</div>'
                             );
-                            container.appendChild(group);
-                            jcLog('addField:appended', { newIndex: nextIndex });
-                            jcSendLog('addField:appended', { newIndex: nextIndex });
+                            const before = getGroupCount();
+                            try {
+                                container.insertAdjacentHTML('beforeend', html);
+                            } catch (e) {
+                                const group = document.createElement('div');
+                                group.className = 'jc-social-field-group';
+                                group.innerHTML = (
+                                    '<div class="jc-social-field-wrapper">' +
+                                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
+                                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
+                                    '</div>' +
+                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>'
+                                );
+                                container.appendChild(group);
+                            }
+                            const after = getGroupCount();
+                            jcLog('addField:appended', { newIndex: nextIndex, before, after });
+                            jcSendLog('addField:appended', { newIndex: nextIndex, before, after });
                             nextIndex += 1;
                             jcLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
                             jcSendLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
                             updateAddBtnVisibility();
+                            try {
+                                const last = container.querySelector('.jc-social-field-group[data-added="1"]:last-child') || container.querySelector('.jc-social-field-group:last-child');
+                                if (last) {
+                                    last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    setTimeout(function(){ if (last && last.style) last.style.outline = 'none'; }, 900);
+                                }
+                            } catch (e) { /* ignore */ }
                         }
                         function removeField(btn) {
                             const count = getGroupCount();
@@ -2123,9 +2145,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             jcSendLog('removeField:removed', { newCount: getGroupCount() });
                             updateAddBtnVisibility();
                         }
-                        // Event binding
-                        if (addBtn) {
+                        // Event binding (idempotent)
+                        if (addBtn && !addBtn.dataset.bound) {
                             addBtn.addEventListener('click', function(e) { e.preventDefault(); jcLog('addBtn:direct-click'); jcSendLog('addBtn:direct-click'); addField(); });
+                            addBtn.addEventListener('pointerdown', function(e) { if (e.pointerType === 'touch') { e.preventDefault(); jcLog('addBtn:pointerdown'); jcSendLog('addBtn:pointerdown'); addField(); }});
+                            addBtn.dataset.bound = '1';
                         }
                         // Fallback Delegation (falls Button neu gerendert wird)
                         document.addEventListener('click', function(e) {
@@ -2134,6 +2158,15 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                                 e.preventDefault();
                                 jcLog('addBtn:delegated-click');
                                 jcSendLog('addBtn:delegated-click');
+                                addField();
+                            }
+                        });
+                        document.addEventListener('pointerdown', function(e) {
+                            const t = e.target;
+                            if (e.pointerType === 'touch' && t && (t.id === 'jc-add-social-btn' || (t.closest && t.closest('#jc-add-social-btn')))) {
+                                e.preventDefault();
+                                jcLog('addBtn:delegated-pointerdown');
+                                jcSendLog('addBtn:delegated-pointerdown');
                                 addField();
                             }
                         });
@@ -2217,6 +2250,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     setup();
                     // Safety: run again on DOMContentLoaded in case of late rendering
                     document.addEventListener('DOMContentLoaded', function(){ jcLog('setup:rerun:DOMContentLoaded'); jcSendLog('setup:rerun:DOMContentLoaded'); setup(); });
+                    // Observe DOM changes to re-bind if page builder re-renders
+                    try {
+                        const mo = new MutationObserver(function() {
+                            const c = document.getElementById('jc-social-fields');
+                            const b = document.getElementById('jc-add-social-btn');
+                            if (c && b && !b.dataset.bound) {
+                                jcLog('mutation:reinit');
+                                jcSendLog('mutation:reinit');
+                                setup();
+                            }
+                        });
+                        mo.observe(document.body, { childList: true, subtree: true });
+                    } catch (e) { /* ignore */ }
                 })();
                 </script>
                 <?php
