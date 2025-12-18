@@ -1438,8 +1438,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 
                 <script>
                 (function() {
-                    const JC_DEBUG = true;
-                    const JC_REMOTE_DEBUG = true;
+                    const JC_DEBUG = false;
+                    const JC_REMOTE_DEBUG = false;
                     const JC_FE_ENDPOINT = '<?php echo esc_url( rest_url( 'jc/v1/frontend-log' ) ); ?>';
                     const JC_SID = '<?php echo esc_js( session_id() ); ?>';
                     window.JCLogHistory = window.JCLogHistory || [];
@@ -1474,6 +1474,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     }
                     // Fallback: falls console beschnitten ist, schreibe eine sichtbare Warnung ins DOM
                     function jcWarnDom(msg) {
+                        if (!JC_DEBUG) return;
                         try {
                             const el = document.getElementById('jc-log-warning') || (function(){
                                 const d = document.createElement('div');
