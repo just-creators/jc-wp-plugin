@@ -711,12 +711,18 @@ function jc_test_bot_connection() {
 // ========================================
 if ( ! function_exists( 'jc_get_bot_api_url' ) ) {
     function jc_get_bot_api_url() {
+        if ( defined( 'JC_BOT_API_URL' ) ) {
+            return JC_BOT_API_URL;
+        }
         return get_option( 'jc_bot_api_url', '' );
     }
 }
 
 if ( ! function_exists( 'jc_get_bot_api_secret' ) ) {
     function jc_get_bot_api_secret() {
+        if ( defined( 'JC_BOT_API_SECRET' ) ) {
+            return JC_BOT_API_SECRET;
+        }
         return get_option( 'jc_bot_api_secret', '' );
     }
 }
@@ -724,7 +730,7 @@ if ( ! function_exists( 'jc_get_bot_api_secret' ) ) {
 if ( ! function_exists( 'jc_get_discord_authorize_url' ) ) {
     function jc_get_discord_authorize_url() {
         // Build Discord OAuth URL
-        $client_id = get_option( 'jc_discord_client_id', '' );
+        $client_id = defined( 'JC_DISCORD_CLIENT_ID' ) ? JC_DISCORD_CLIENT_ID : get_option( 'jc_discord_client_id', '' );
         $redirect_uri = urlencode( rest_url( 'jc/v1/discord-callback' ) );
         $scope = urlencode( 'identify email' );
         if ( ! $client_id ) {
@@ -2119,6 +2125,89 @@ function jc_admin_bewerbungen_page() {
         }
     </style>';
 }
+// ========================================
+// ADMIN SETTINGS PAGE FOR DISCORD CONFIG
+// ========================================
+add_action( 'admin_menu', function() {
+    add_submenu_page(
+        'plugins.php',
+        'JC Bewerbungsportal Einstellungen',
+        'JC Discord Config',
+        'manage_options',
+        'jc-bewerbung-settings',
+        'jc_bewerbung_render_settings_page'
+    );
+} );
+
+function jc_bewerbung_render_settings_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'Unauthorized' );
+    }
+    
+    if ( isset( $_POST['submit'] ) ) {
+        check_admin_referer( 'jc_bewerbung_settings_nonce' );
+        update_option( 'jc_discord_client_id', sanitize_text_field( $_POST['jc_discord_client_id'] ?? '' ) );
+        update_option( 'jc_discord_client_secret', sanitize_text_field( $_POST['jc_discord_client_secret'] ?? '' ) );
+        update_option( 'jc_bot_api_url', sanitize_url( $_POST['jc_bot_api_url'] ?? '' ) );
+        update_option( 'jc_bot_api_secret', sanitize_text_field( $_POST['jc_bot_api_secret'] ?? '' ) );
+        echo '<div class="notice notice-success"><p>✅ Einstellungen gespeichert!</p></div>';
+    }
+    
+    $client_id = get_option( 'jc_discord_client_id', '' );
+    $client_secret = get_option( 'jc_discord_client_secret', '' );
+    $bot_api_url = get_option( 'jc_bot_api_url', '' );
+    $bot_api_secret = get_option( 'jc_bot_api_secret', '' );
+    $callback_url = rest_url( 'jc/v1/discord-callback' );
+    ?>
+    <div class="wrap">
+        <h1>🎮 JustCreators Bewerbungsportal - Discord Konfiguration</h1>
+        <form method="post" style="max-width: 600px; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
+            <?php wp_nonce_field( 'jc_bewerbung_settings_nonce' ); ?>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="jc_discord_client_id">Discord Client ID *</label></th>
+                    <td>
+                        <input type="text" id="jc_discord_client_id" name="jc_discord_client_id" value="<?php echo esc_attr( $client_id ); ?>" class="regular-text" required>
+                        <p class="description">Deine Discord App Client ID (von <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a>)</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="jc_discord_client_secret">Discord Client Secret *</label></th>
+                    <td>
+                        <input type="password" id="jc_discord_client_secret" name="jc_discord_client_secret" value="<?php echo esc_attr( $client_secret ); ?>" class="regular-text" required>
+                        <p class="description">Dein Discord App Client Secret</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label>Discord Redirect URI</label></th>
+                    <td>
+                        <code style="background: #fff; padding: 8px; border: 1px solid #ddd; display: inline-block;"><?php echo esc_html( $callback_url ); ?></code>
+                        <p class="description">← Diese URL in deiner Discord App unter "OAuth2 > Redirects" eintragen</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="jc_bot_api_url">Bot API URL</label></th>
+                    <td>
+                        <input type="url" id="jc_bot_api_url" name="jc_bot_api_url" value="<?php echo esc_attr( $bot_api_url ); ?>" class="regular-text" placeholder="https://api.example.com">
+                        <p class="description">URL zum Bot API (optional)</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="jc_bot_api_secret">Bot API Secret</label></th>
+                    <td>
+                        <input type="password" id="jc_bot_api_secret" name="jc_bot_api_secret" value="<?php echo esc_attr( $bot_api_secret ); ?>" class="regular-text">
+                        <p class="description">Secret für Bot API (optional)</p>
+                    </td>
+                </tr>
+            </table>
+            
+            <?php submit_button( '💾 Speichern' ); ?>
+        </form>
+    </div>
+    <?php
+}
+
 // ========================================
 // MEMBER DASHBOARD LADEN
 // ========================================
