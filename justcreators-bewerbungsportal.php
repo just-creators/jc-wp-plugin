@@ -505,19 +505,6 @@ add_action( 'wp_enqueue_scripts', function() {
     wp_add_inline_style( 'jc-bewerbung-inline', jc_bewerbung_get_css() );
 } );
 
-// BEWERBUNGSFORMULAR SHORTCODE
-// ========================================
-add_shortcode( 'discord_application_form', function( $atts ) {
-    ob_start();
-
-    ?>
-    <div class="jc-bewerbung-wrap">
-                </button>
-            </form>
-        </div>
-    </div>
-    <?php
-}
 // ========================================
 // SESSION & DATABASE
 // ========================================
