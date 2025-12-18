@@ -1367,45 +1367,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         Weiteren Kanäle hinzufügen
                     </button>
                     <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
-                    <script>
-                    // Notfall-Fallback: Fügt ein Feld hinzu, auch wenn das Hauptscript nicht läuft.
-                    window.jcInlineRemove = window.jcInlineRemove || function(btn) {
-                        try {
-                            const c = document.getElementById('jc-social-fields');
-                            if (!c) return false;
-                            const count = c.querySelectorAll('.jc-social-field-group').length;
-                            const group = btn.closest('.jc-social-field-group');
-                            if (count <= 1) {
-                                const input = group ? group.querySelector('input.jc-social-input') : c.querySelector('input.jc-social-input');
-                                if (input) { input.value = ''; }
-                                return false;
-                            }
-                            if (group) group.remove();
-                        } catch (e) { alert('Fehler: ' + e); }
-                        return false;
-                    };
-                    window.jcInlineAddSocial = window.jcInlineAddSocial || function() {
-                        try {
-                            const c = document.getElementById('jc-social-fields');
-                            if (!c) { alert('Kein Social-Container gefunden.'); return false; }
-                            const MAX = 5;
-                            const count = c.querySelectorAll('.jc-social-field-group').length;
-                            if (count >= MAX) { alert('Maximal ' + MAX + ' Social Media Kanäle erlaubt.'); return false; }
-                            const idx = count;
-                            const div = document.createElement('div');
-                            div.className = 'jc-social-field-group';
-                            div.innerHTML = '<div class="jc-social-field-wrapper">' +
-                                            '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + idx + '" />' +
-                                            '<span class="jc-platform-icon" data-index="' + idx + '"></span>' +
-                                            '</div>' +
-                                            '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>';
-                            c.appendChild(div);
-                            try { div.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
-                        } catch (e) { alert('Fehler: ' + e); }
-                        return false;
-                    };
-                    </script>
-                    <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
                     
                     <label class="jc-label">📊 Wie aktiv bist du? *</label>
                     <input class="jc-input" type="text" name="social_activity" id="jc-activity-input" placeholder="z. B. täglich" required />
@@ -1436,389 +1397,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     </button>
                 </form>
                 
-                <script>
-                (function() {
-                    const JC_DEBUG = false;
-                    const JC_REMOTE_DEBUG = false;
-                    const JC_FE_ENDPOINT = '<?php echo esc_url( rest_url( 'jc/v1/frontend-log' ) ); ?>';
-                    const JC_SID = '<?php echo esc_js( session_id() ); ?>';
-                    window.JCLogHistory = window.JCLogHistory || [];
-                    function jcSendLog(event, payload, level) {
-                        try {
-                            if (!JC_REMOTE_DEBUG) return;
-                            const body = JSON.stringify({
-                                event: event || 'unknown',
-                                level: level || 'info',
-                                ts: Date.now(),
-                                url: location.href,
-                                ua: navigator.userAgent,
-                                sid: JC_SID,
-                                payload: payload || {}
-                            });
-                            if (navigator.sendBeacon) {
-                                const blob = new Blob([body], { type: 'application/json' });
-                                navigator.sendBeacon(JC_FE_ENDPOINT, blob);
-                            } else {
-                                fetch(JC_FE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
-                            }
-                        } catch (e) { /* ignore */ }
-                    }
-                    function jcLog() {
-                        try {
-                            if (JC_DEBUG) {
-                                const args = Array.prototype.slice.call(arguments);
-                                console.log.apply(console, ['[JC Bewerbungsportal]'].concat(args));
-                                window.JCLogHistory.push({ t: Date.now(), args });
-                            }
-                        } catch (e) { /* ignore */ }
-                    }
-                    // Fallback: falls console beschnitten ist, schreibe eine sichtbare Warnung ins DOM
-                    function jcWarnDom(msg) {
-                        if (!JC_DEBUG) return;
-                        try {
-                            const el = document.getElementById('jc-log-warning') || (function(){
-                                const d = document.createElement('div');
-                                d.id = 'jc-log-warning';
-                                d.style.cssText = 'background:#ffedc2;color:#8a5500;padding:8px 12px;margin:10px 0;border:1px solid #e0b200;border-radius:6px;font-size:13px;';
-                                const form = document.getElementById('jc-application-form');
-                                if (form) form.prepend(d);
-                                return d;
-                            })();
-                            el.textContent = msg;
-                        } catch (e) { /* ignore */ }
-                    }
-
-                    function setup() {
-                        jcLog('setup:start', { readyState: document.readyState });
-                        jcWarnDom('JS geladen – versuche Button zu binden');
-                        jcSendLog('setup:start', { readyState: document.readyState });
-                        const MAX_FIELDS = 5;
-                        const container = document.getElementById('jc-social-fields');
-                        const addBtn = document.getElementById('jc-add-social-btn');
-                        jcLog('setup:elements', { container: !!container, addBtn: !!addBtn });
-                        jcSendLog('setup:elements', { container: !!container, addBtn: !!addBtn });
-                        if (!container) { jcLog('setup:abort:no-container'); jcSendLog('setup:abort:no-container'); return; } // Falls DOM noch nicht bereit
-                        let nextIndex = getInitialNextIndex();
-                        jcLog('setup:nextIndex:init', nextIndex);
-                        jcSendLog('setup:nextIndex:init', { nextIndex });
-
-                        const platformClasses = ['icon-youtube','icon-tiktok','icon-twitch','icon-instagram','icon-unknown'];
-                        function inlineRemove(btn) {
-                            try {
-                                const c = document.getElementById('jc-social-fields');
-                                if (!c) return false;
-                                const count = c.querySelectorAll('.jc-social-field-group').length;
-                                const group = btn.closest('.jc-social-field-group');
-                                if (count <= 1) {
-                                    const input = group ? group.querySelector('input.jc-social-input') : c.querySelector('input.jc-social-input');
-                                    if (input) { input.value = ''; updateIconForInput(input); }
-                                    return false;
-                                }
-                                if (group) group.remove();
-                                updateAddBtnVisibility();
-                            } catch (e) { /* ignore */ }
-                            return false;
-                        }
-                        function detectPlatform(url) {
-                            const u = (url || '').toLowerCase();
-                            if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
-                            if (u.includes('tiktok.com')) return 'tiktok';
-                            if (u.includes('twitch.tv')) return 'twitch';
-                            if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
-                            if (u.includes('instagram.com')) return 'instagram';
-                            if (u.startsWith('@')) return 'handle';
-                            return 'unknown';
-                        }
-                        function getGroupCount() { return container.querySelectorAll('.jc-social-field-group').length; }
-                        function getInitialNextIndex() {
-                            // Finde höchste vorhandene data-index und setze nextIndex = max+1
-                            let maxIdx = 0;
-                            container.querySelectorAll('input.jc-social-input').forEach(function(inp) {
-                                const idx = parseInt(inp.getAttribute('data-index') || '0', 10);
-                                if (!isNaN(idx)) maxIdx = Math.max(maxIdx, idx);
-                            });
-                            const initIdx = maxIdx + 1;
-                            jcLog('compute:initialNextIndex', { maxIdx, initIdx });
-                            jcSendLog('compute:initialNextIndex', { maxIdx, initIdx });
-                            return initIdx;
-                        }
-                        function updateAddBtnVisibility() {
-                            if (!addBtn) return;
-                            addBtn.style.display = getGroupCount() >= MAX_FIELDS ? 'none' : 'inline-block';
-                            jcLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
-                            jcSendLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
-                        }
-                        function validateLink(input) {
-                            const val = (input.value || '').trim();
-                            if (!val) return { valid: false, platform: null };
-                            const p = detectPlatform(val);
-                            return { valid: true, platform: p };
-                        }
-                        function bindInputListeners(input) {
-                            if (!input || input.dataset.listenerBound) return;
-                            jcLog('bindInputListeners', { idx: input.getAttribute('data-index') });
-                            input.addEventListener('input', function() {
-                                jcLog('input:event:fired', { val: this.value, idx: this.getAttribute('data-index') });
-                                jcSendLog('input:event:fired', { val: this.value, idx: this.getAttribute('data-index') });
-                                updateIconForInput(this);
-                            });
-                            input.addEventListener('keyup', function() {
-                                jcLog('keyup:event:fired', { val: this.value });
-                                updateIconForInput(this);
-                            });
-                            input.addEventListener('change', function() {
-                                jcLog('change:event:fired', { val: this.value });
-                                updateIconForInput(this);
-                            });
-                            input.dataset.listenerBound = '1';
-                        }
-                        function updateIconForInput(input) {
-                            const idx = input.getAttribute('data-index') || '0';
-                            const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
-                            const val = (input.value || '').trim();
-                            
-                            // Reset classes
-                            if (el) platformClasses.forEach(function(c){ el.classList.remove(c); });
-                            
-                            if (val.length > 3) {
-                                const p = detectPlatform(val);
-                                const cls = 'icon-' + p;
-                                if (el) el.classList.add(cls, 'visible');
-                                jcLog('icon:update', { idx, val, platform: p });
-                            } else {
-                                if (el) el.classList.remove('visible');
-                            }
-                        }
-                        function addField() {
-                            jcLog('addField:clicked', { count: getGroupCount(), nextIndex });
-                            jcSendLog('addField:clicked', { count: getGroupCount(), nextIndex });
-                            if (getGroupCount() >= MAX_FIELDS) {
-                                alert('Maximal ' + MAX_FIELDS + ' Social Media Kanäle erlaubt.');
-                                jcLog('addField:blocked:max-reached');
-                                jcSendLog('addField:blocked:max-reached', { count: getGroupCount() });
-                                return;
-                            }
-                                                        const html = (
-                                                                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
-                                                                    '<div class="jc-social-field-wrapper">' +
-                                                                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                                                                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                                                                    '</div>' +
-                                                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>' +
-                                                                '</div>'
-                                                        );
-                            const before = getGroupCount();
-                            try {
-                                container.insertAdjacentHTML('beforeend', html);
-                            } catch (e) {
-                                const group = document.createElement('div');
-                                group.className = 'jc-social-field-group';
-                                group.innerHTML = (
-                                    '<div class="jc-social-field-wrapper">' +
-                                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                                    '</div>' +
-                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>'
-                                );
-                                container.appendChild(group);
-                            }
-                            const after = getGroupCount();
-                            jcLog('addField:appended', { newIndex: nextIndex, before, after });
-                            jcSendLog('addField:appended', { newIndex: nextIndex, before, after });
-                            nextIndex += 1;
-                            jcLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
-                            jcSendLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
-                            updateAddBtnVisibility();
-                            // Binde Input-Listener auf das neue Feld
-                            try {
-                                const newInput = container.querySelector('input.jc-social-input[data-index="' + (nextIndex - 1) + '"]');
-                                if (newInput) {
-                                    bindInputListeners(newInput);
-                                    jcLog('addField:listener-bound', { idx: nextIndex - 1 });
-                                }
-                            } catch (e) { jcLog('addField:listener-bind-error', { error: e.message }); }
-                            try {
-                                const last = container.querySelector('.jc-social-field-group[data-added="1"]:last-child') || container.querySelector('.jc-social-field-group:last-child');
-                                if (last) {
-                                    last.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    setTimeout(function(){ if (last && last.style) last.style.outline = 'none'; }, 900);
-                                }
-                            } catch (e) { /* ignore */ }
-                        }
-                        function removeField(btn) {
-                            const count = getGroupCount();
-                            const group = btn.closest('.jc-social-field-group');
-                            if (!group) return;
-                            if (count <= 1) {
-                                jcLog('removeField:clearing-last');
-                                jcSendLog('removeField:clearing-last');
-                                const input = group.querySelector('input.jc-social-input');
-                                if (input) {
-                                    input.value = '';
-                                    updateIconForInput(input);
-                                }
-                                return;
-                            }
-                            group.remove();
-                            jcLog('removeField:removed', { newCount: getGroupCount() });
-                            jcSendLog('removeField:removed', { newCount: getGroupCount() });
-                            updateAddBtnVisibility();
-                        }
-                        // Event binding (idempotent)
-                        if (addBtn && !addBtn.dataset.bound) {
-                            addBtn.addEventListener('click', function(e) { e.preventDefault(); jcLog('addBtn:direct-click'); jcSendLog('addBtn:direct-click'); addField(); });
-                            addBtn.addEventListener('pointerdown', function(e) { if (e.pointerType === 'touch') { e.preventDefault(); jcLog('addBtn:pointerdown'); jcSendLog('addBtn:pointerdown'); addField(); }});
-                            addBtn.dataset.bound = '1';
-                            jcWarnDom('Button gebunden (click/pointerdown)');
-                        }
-                        // Fallback Delegation (falls Button neu gerendert wird)
-                        document.addEventListener('click', function(e) {
-                            const target = e.target;
-                            if (target && (target.id === 'jc-add-social-btn' || (target.closest && target.closest('#jc-add-social-btn')))) {
-                                e.preventDefault();
-                                jcLog('addBtn:delegated-click');
-                                jcSendLog('addBtn:delegated-click');
-                                addField();
-                            }
-                        });
-                        document.addEventListener('pointerdown', function(e) {
-                            const t = e.target;
-                            if (e.pointerType === 'touch' && t && (t.id === 'jc-add-social-btn' || (t.closest && t.closest('#jc-add-social-btn')))) {
-                                e.preventDefault();
-                                jcLog('addBtn:delegated-pointerdown');
-                                jcSendLog('addBtn:delegated-pointerdown');
-                                addField();
-                            }
-                        });
-                        // Delegate remove buttons (click + touch)
-                        container.addEventListener('click', function(e) {
-                            const target = e.target;
-                            if (target && target.classList.contains('jc-remove-social-btn')) {
-                                e.preventDefault();
-                                jcLog('removeBtn:click');
-                                jcSendLog('removeBtn:click');
-                                removeField(target);
-                            }
-                        });
-                        container.addEventListener('pointerdown', function(e) {
-                            const target = e.target;
-                            if (e.pointerType === 'touch' && target && target.classList.contains('jc-remove-social-btn')) {
-                                e.preventDefault();
-                                jcLog('removeBtn:pointer');
-                                jcSendLog('removeBtn:pointer');
-                                removeField(target);
-                            }
-                        });
-                        // Delegierte Input-Listener (Fallback)
-                        container.addEventListener('input', function(e) {
-                            if (e.target && e.target.classList.contains('jc-social-input')) {
-                                jcLog('container:input:delegated', { val: e.target.value });
-                                jcSendLog('container:input:delegated', { val: e.target.value });
-                                updateIconForInput(e.target);
-                            }
-                        }, true);
-                        container.addEventListener('keyup', function(e) {
-                            if (e.target && e.target.classList.contains('jc-social-input')) {
-                                jcLog('container:keyup:delegated', { val: e.target.value });
-                                updateIconForInput(e.target);
-                            }
-                        }, true);
-                        // Initial state
-                        // Binde direkte Input-Listener auf alle existierenden Inputs
-                        container.querySelectorAll('input.jc-social-input').forEach(function(input) {
-                            bindInputListeners(input);
-                        });
-                        jcLog('init:listeners-bound', { count: container.querySelectorAll('input.jc-social-input').length });
-                        jcSendLog('init:listeners-bound', { count: container.querySelectorAll('input.jc-social-input').length });
-                        const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
-                        if (firstInput) updateIconForInput(firstInput);
-                        jcLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
-                        jcSendLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
-                        updateAddBtnVisibility();
-
-                        // Validation
-                        function validateAge() {
-                            const ageInput = document.getElementById('jc-age-input');
-                            if (!ageInput) return true;
-                            const val = (ageInput.value || '').trim();
-                            if (val === '') return true;
-                            const n = parseInt(val, 10);
-                            return !isNaN(n) && n >= 11 && n <= 99;
-                        }
-                        function validateName() {
-                            const el = document.getElementById('jc-name-input');
-                            if (!el) return true;
-                            return (el.value || '').trim().length >= 2;
-                        }
-                        function validateSocialLinks() {
-                            const inputs = document.querySelectorAll('.jc-social-input');
-                            const hasValue = Array.from(inputs).some(function(input) {
-                                return (input.value || '').trim().length > 0;
-                            });
-                            const errorEl = document.getElementById('jc-social-error');
-                            if (!hasValue && errorEl) {
-                                errorEl.textContent = 'Bitte gib mindestens einen Social Media Kanal an.';
-                                errorEl.style.display = 'block';
-                            } else if (errorEl) {
-                                errorEl.style.display = 'none';
-                            }
-                            return hasValue;
-                        }
-                        function validateActivity() {
-                            const a = document.getElementById('jc-activity-input');
-                            if (!a) return true;
-                            return (a.value || '').trim().length >= 2;
-                        }
-                        function validateMotivation() {
-                            const m = document.getElementById('jc-motivation-input');
-                            if (!m) return true;
-                            return (m.value || '').replace(/\s/g, '').length >= 20;
-                        }
-                        function initValidation() {
-                            const form = document.getElementById('jc-application-form');
-                            if (!form) return;
-                            form.addEventListener('submit', function(e) {
-                                const checks = {
-                                    name: validateName(),
-                                    age: validateAge(),
-                                    social: validateSocialLinks(),
-                                    activity: validateActivity(),
-                                    motivation: validateMotivation()
-                                };
-                                const ok = checks.name && checks.age && checks.social && checks.activity && checks.motivation;
-                                jcLog('form:submit:validation', { ok, checks });
-                                if (!ok) jcSendLog('form:submit:validation:fail', { checks });
-                                if (!ok) { e.preventDefault(); e.stopPropagation(); }
-                            });
-                        }
-                        if (document.readyState === 'loading') {
-                            document.addEventListener('DOMContentLoaded', function(){ jcLog('validation:init:DOMContentLoaded'); jcSendLog('validation:init:DOMContentLoaded'); initValidation(); });
-                        } else {
-                            jcLog('validation:init:immediate');
-                            jcSendLog('validation:init:immediate');
-                            initValidation();
-                        }
-                    }
-                    // Initial attempt
-                    setup();
-                    // Safety: run again on DOMContentLoaded in case of late rendering
-                    document.addEventListener('DOMContentLoaded', function(){ jcLog('setup:rerun:DOMContentLoaded'); jcSendLog('setup:rerun:DOMContentLoaded'); setup(); });
-                    // Observe DOM changes to re-bind if page builder re-renders
-                    try {
-                        const mo = new MutationObserver(function() {
-                            const c = document.getElementById('jc-social-fields');
-                            const b = document.getElementById('jc-add-social-btn');
-                            if (c && b && !b.dataset.bound) {
-                                jcLog('mutation:reinit');
-                                jcSendLog('mutation:reinit');
-                                setup();
-                            }
-                        });
-                        mo.observe(document.body, { childList: true, subtree: true });
-                    } catch (e) { /* ignore */ }
-                })();
-                </script>
                 <?php
+                // Kennzeichne, dass wir das Inline-JS im Footer laden sollen
+                $GLOBALS['jc_application_form_scripts'] = true;
             }
             ?>
         </div>
@@ -1827,6 +1408,277 @@ add_shortcode( 'discord_application_form', function( $atts ) {
     <?php
     return ob_get_clean();
 } );
+
+// Drucke das Formular-JavaScript im Footer, damit es nicht von Content-Filtern entfernt wird
+add_action( 'wp_footer', 'jc_print_application_form_scripts' );
+function jc_print_application_form_scripts() {
+    static $printed = false;
+    if ( $printed ) return;
+    if ( empty( $GLOBALS['jc_application_form_scripts'] ) ) return;
+    $printed = true;
+    $fe_endpoint = esc_url( rest_url( 'jc/v1/frontend-log' ) );
+    $session_id = esc_js( session_id() );
+    ?>
+    <script>
+    (function() {
+        const JC_DEBUG = false;
+        const JC_REMOTE_DEBUG = false;
+        const JC_FE_ENDPOINT = '<?php echo $fe_endpoint; ?>';
+        const JC_SID = '<?php echo $session_id; ?>';
+        const MAX_FIELDS = 5;
+        const platformClasses = ['icon-youtube','icon-tiktok','icon-twitch','icon-instagram','icon-unknown'];
+        let container = null;
+        let addBtn = null;
+        let nextIndex = 1;
+
+        function detectPlatform(url) {
+            const u = (url || '').toLowerCase();
+            if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+            if (u.includes('tiktok.com')) return 'tiktok';
+            if (u.includes('twitch.tv')) return 'twitch';
+            if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
+            if (u.includes('instagram.com')) return 'instagram';
+            if (u.startsWith('@')) return 'handle';
+            return 'unknown';
+        }
+
+        function getGroupCount() {
+            return container ? container.querySelectorAll('.jc-social-field-group').length : 0;
+        }
+
+        function getInitialNextIndex() {
+            let maxIdx = 0;
+            if (!container) return 1;
+            container.querySelectorAll('input.jc-social-input').forEach(function(inp) {
+                const idx = parseInt(inp.getAttribute('data-index') || '0', 10);
+                if (!isNaN(idx)) maxIdx = Math.max(maxIdx, idx);
+            });
+            return maxIdx + 1;
+        }
+
+        function updateAddBtnVisibility() {
+            if (addBtn) {
+                addBtn.style.display = getGroupCount() >= MAX_FIELDS ? 'none' : 'inline-block';
+            }
+        }
+
+        function updateIconForInput(input) {
+            if (!container || !input) return;
+            const idx = input.getAttribute('data-index') || '0';
+            const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
+            const val = (input.value || '').trim();
+            if (el) platformClasses.forEach(function(c){ el.classList.remove(c); });
+            if (val.length > 3) {
+                const p = detectPlatform(val);
+                if (el) el.classList.add('icon-' + p, 'visible');
+            } else if (el) {
+                el.classList.remove('visible');
+            }
+        }
+
+        function bindInputListeners(input) {
+            if (!input || input.dataset.listenerBound) return;
+            input.addEventListener('input', function() { updateIconForInput(this); });
+            input.addEventListener('keyup', function() { updateIconForInput(this); });
+            input.addEventListener('change', function() { updateIconForInput(this); });
+            input.dataset.listenerBound = '1';
+        }
+
+        function addField() {
+            if (!container) return false;
+            if (getGroupCount() >= MAX_FIELDS) {
+                alert('Maximal ' + MAX_FIELDS + ' Social Media Kanäle erlaubt.');
+                return false;
+            }
+            const html = (
+                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
+                    '<div class="jc-social-field-wrapper">' +
+                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
+                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
+                    '</div>' +
+                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>' +
+                '</div>'
+            );
+            try {
+                container.insertAdjacentHTML('beforeend', html);
+            } catch (e) {
+                const group = document.createElement('div');
+                group.className = 'jc-social-field-group';
+                group.innerHTML = (
+                    '<div class="jc-social-field-wrapper">' +
+                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
+                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
+                    '</div>' +
+                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>'
+                );
+                container.appendChild(group);
+            }
+            const newInput = container.querySelector('input.jc-social-input[data-index="' + nextIndex + '"]');
+            if (newInput) bindInputListeners(newInput);
+            nextIndex += 1;
+            updateAddBtnVisibility();
+            return false;
+        }
+
+        function removeField(btn) {
+            if (!container) return false;
+            const count = getGroupCount();
+            const group = btn.closest('.jc-social-field-group');
+            if (!group) return false;
+            if (count <= 1) {
+                const input = group.querySelector('input.jc-social-input');
+                if (input) {
+                    input.value = '';
+                    updateIconForInput(input);
+                }
+                return false;
+            }
+            group.remove();
+            updateAddBtnVisibility();
+            return false;
+        }
+
+        function initValidation() {
+            const form = document.getElementById('jc-application-form');
+            if (!form) return;
+            function validateAge() {
+                const ageInput = document.getElementById('jc-age-input');
+                if (!ageInput) return true;
+                const val = (ageInput.value || '').trim();
+                if (val === '') return true;
+                const n = parseInt(val, 10);
+                return !isNaN(n) && n >= 11 && n <= 99;
+            }
+            function validateName() {
+                const el = document.getElementById('jc-name-input');
+                if (!el) return true;
+                return (el.value || '').trim().length >= 2;
+            }
+            function validateSocialLinks() {
+                const inputs = document.querySelectorAll('.jc-social-input');
+                const hasValue = Array.from(inputs).some(function(input) { return (input.value || '').trim().length > 0; });
+                const errorEl = document.getElementById('jc-social-error');
+                if (!hasValue && errorEl) {
+                    errorEl.textContent = 'Bitte gib mindestens einen Social Media Kanal an.';
+                    errorEl.style.display = 'block';
+                } else if (errorEl) {
+                    errorEl.style.display = 'none';
+                }
+                return hasValue;
+            }
+            function validateActivity() {
+                const a = document.getElementById('jc-activity-input');
+                if (!a) return true;
+                return (a.value || '').trim().length >= 2;
+            }
+            function validateMotivation() {
+                const m = document.getElementById('jc-motivation-input');
+                if (!m) return true;
+                return (m.value || '').replace(/\s/g, '').length >= 20;
+            }
+            form.addEventListener('submit', function(e) {
+                const checks = {
+                    name: validateName(),
+                    age: validateAge(),
+                    social: validateSocialLinks(),
+                    activity: validateActivity(),
+                    motivation: validateMotivation()
+                };
+                const ok = checks.name && checks.age && checks.social && checks.activity && checks.motivation;
+                if (!ok) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            });
+        }
+
+        function bindEvents() {
+            if (addBtn && !addBtn.dataset.bound) {
+                addBtn.addEventListener('click', function(e) { e.preventDefault(); addField(); });
+                addBtn.addEventListener('pointerdown', function(e) { if (e.pointerType === 'touch') { e.preventDefault(); addField(); }});
+                addBtn.dataset.bound = '1';
+            }
+            document.addEventListener('click', function(e) {
+                const target = e.target;
+                if (target && (target.id === 'jc-add-social-btn' || (target.closest && target.closest('#jc-add-social-btn')))) {
+                    e.preventDefault();
+                    addField();
+                }
+            });
+            document.addEventListener('pointerdown', function(e) {
+                const t = e.target;
+                if (e.pointerType === 'touch' && t && (t.id === 'jc-add-social-btn' || (t.closest && t.closest('#jc-add-social-btn')))) {
+                    e.preventDefault();
+                    addField();
+                }
+            });
+            if (container) {
+                container.addEventListener('click', function(e) {
+                    const target = e.target;
+                    if (target && target.classList.contains('jc-remove-social-btn')) {
+                        e.preventDefault();
+                        removeField(target);
+                    }
+                });
+                container.addEventListener('pointerdown', function(e) {
+                    const target = e.target;
+                    if (e.pointerType === 'touch' && target && target.classList.contains('jc-remove-social-btn')) {
+                        e.preventDefault();
+                        removeField(target);
+                    }
+                });
+                container.addEventListener('input', function(e) {
+                    if (e.target && e.target.classList.contains('jc-social-input')) {
+                        updateIconForInput(e.target);
+                    }
+                }, true);
+                container.addEventListener('keyup', function(e) {
+                    if (e.target && e.target.classList.contains('jc-social-input')) {
+                        updateIconForInput(e.target);
+                    }
+                }, true);
+            }
+        }
+
+        function bindInitialInputs() {
+            if (!container) return;
+            container.querySelectorAll('input.jc-social-input').forEach(function(input) {
+                bindInputListeners(input);
+            });
+            const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
+            if (firstInput) updateIconForInput(firstInput);
+        }
+
+        function setup() {
+            container = document.getElementById('jc-social-fields');
+            addBtn = document.getElementById('jc-add-social-btn');
+            if (!container) return;
+            nextIndex = getInitialNextIndex();
+            window.jcInlineAddSocial = addField;
+            window.jcInlineRemove = removeField;
+            bindInitialInputs();
+            updateAddBtnVisibility();
+            bindEvents();
+            initValidation();
+        }
+
+        // Erste Initialisierung + Fallbacks für späte DOM-Änderungen
+        setup();
+        document.addEventListener('DOMContentLoaded', setup);
+        try {
+            const mo = new MutationObserver(function() {
+                const c = document.getElementById('jc-social-fields');
+                const b = document.getElementById('jc-add-social-btn');
+                if (c && b && (!b.dataset.bound || !window.jcInlineAddSocial)) {
+                    setup();
+                }
+            });
+            mo.observe(document.body, { childList: true, subtree: true });
+        } catch (e) { /* ignore */ }
+    })();
+    </script>
+    <?php
+}
 // ========================================
 // ADMIN BEWERBUNGEN ÜBERSICHT
 // ========================================
