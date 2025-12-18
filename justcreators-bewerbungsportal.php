@@ -727,11 +727,38 @@ if ( ! function_exists( 'jc_get_bot_api_secret' ) ) {
     }
 }
 
+if ( ! function_exists( 'jc_get_discord_client_id' ) ) {
+    function jc_get_discord_client_id() {
+        if ( defined( 'JC_DISCORD_CLIENT_ID' ) ) {
+            return JC_DISCORD_CLIENT_ID;
+        }
+        return get_option( 'jc_discord_client_id', '' );
+    }
+}
+
+if ( ! function_exists( 'jc_get_discord_client_secret' ) ) {
+    function jc_get_discord_client_secret() {
+        if ( defined( 'JC_DISCORD_CLIENT_SECRET' ) ) {
+            return JC_DISCORD_CLIENT_SECRET;
+        }
+        return get_option( 'jc_discord_client_secret', '' );
+    }
+}
+
+if ( ! function_exists( 'jc_get_redirect_uri' ) ) {
+    function jc_get_redirect_uri() {
+        if ( defined( 'JC_REDIRECT_URI' ) ) {
+            return JC_REDIRECT_URI;
+        }
+        return get_option( 'jc_redirect_uri', rest_url( 'jc/v1/discord-callback' ) );
+    }
+}
+
 if ( ! function_exists( 'jc_get_discord_authorize_url' ) ) {
     function jc_get_discord_authorize_url() {
         // Build Discord OAuth URL
-        $client_id = defined( 'JC_DISCORD_CLIENT_ID' ) ? JC_DISCORD_CLIENT_ID : get_option( 'jc_discord_client_id', '' );
-        $redirect_uri = urlencode( rest_url( 'jc/v1/discord-callback' ) );
+        $client_id = jc_get_discord_client_id();
+        $redirect_uri = urlencode( jc_get_redirect_uri() );
         $scope = urlencode( 'identify email' );
         if ( ! $client_id ) {
             error_log( 'JC: Discord Client ID not configured' );
@@ -780,6 +807,98 @@ function jc_check_user_on_temp_server( $discord_id ) {
     
     return array( 'success' => false, 'is_on_temp_server' => false );
 }
+
+// ========================================
+// DISCORD OAUTH CALLBACK HANDLER
+// ========================================
+add_action( 'init', function() {
+    if ( isset( $_GET['discord_oauth'] ) && $_GET['discord_oauth'] === '1' ) {
+        if ( ! isset( $_GET['code'] ) ) {
+            wp_die( 'Fehler: Discord hat keinen Code zurückgegeben. Bitte versuche es erneut.' );
+        }
+        
+        $code = sanitize_text_field( $_GET['code'] );
+        $client_id = jc_get_discord_client_id();
+        $client_secret = jc_get_discord_client_secret();
+        $redirect_uri = jc_get_redirect_uri();
+        
+        if ( ! $client_id || ! $client_secret ) {
+            wp_die( 'Fehler: Discord Credentials sind nicht konfiguriert.' );
+        }
+        
+        // Exchange code for access token
+        $response = wp_remote_post( 'https://discord.com/api/oauth2/token', array(
+            'body' => array(
+                'client_id' => $client_id,
+                'client_secret' => $client_secret,
+                'grant_type' => 'authorization_code',
+                'code' => $code,
+                'redirect_uri' => $redirect_uri,
+            ),
+            'timeout' => 10
+        ) );
+        
+        if ( is_wp_error( $response ) ) {
+            wp_die( 'Fehler beim Austausch mit Discord: ' . $response->get_error_message() );
+        }
+        
+        $response_code = wp_remote_retrieve_response_code( $response );
+        $response_body = json_decode( wp_remote_retrieve_body( $response ), true );
+        
+        if ( 200 !== $response_code ) {
+            $error_msg = isset( $response_body['error_description'] ) ? $response_body['error_description'] : 'Unbekannter Fehler';
+            wp_die( 'Discord Fehler: ' . esc_html( $error_msg ) );
+        }
+        
+        if ( ! isset( $response_body['access_token'] ) ) {
+            wp_die( 'Fehler: Kein Access Token von Discord erhalten.' );
+        }
+        
+        $access_token = $response_body['access_token'];
+        
+        // Fetch user profile from Discord
+        $user_response = wp_remote_get( 'https://discord.com/api/users/@me', array(
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $access_token,
+            ),
+            'timeout' => 10
+        ) );
+        
+        if ( is_wp_error( $user_response ) ) {
+            wp_die( 'Fehler beim Abrufen des Discord Profils: ' . $user_response->get_error_message() );
+        }
+        
+        $user_data = json_decode( wp_remote_retrieve_body( $user_response ), true );
+        
+        if ( ! isset( $user_data['id'] ) ) {
+            wp_die( 'Fehler: Discord Benutzerdaten ungültig.' );
+        }
+        
+        // Store Discord user in session
+        if ( ! isset( $_SESSION ) ) {
+            session_start();
+        }
+        
+        $_SESSION['jc_discord_user'] = array(
+            'id' => $user_data['id'],
+            'username' => $user_data['username'] ?? 'Unknown',
+            'avatar' => $user_data['avatar'] ?? '',
+            'email' => $user_data['email'] ?? '',
+            'verified' => $user_data['verified'] ?? false,
+        );
+        
+        error_log( 'JC Discord OAuth: User logged in: ' . $user_data['id'] );
+        
+        // Redirect to bewerbung page
+        wp_safe_remote_post( home_url( '/bewerbung/' ), array(
+            'blocking' => false,
+        ) );
+        
+        wp_redirect( home_url( '/bewerbung/' ) );
+        exit;
+    }
+} );
+
 // ========================================
 // BEWERBUNGSFORMULAR SHORTCODE
 // ========================================
@@ -2148,16 +2267,23 @@ function jc_bewerbung_render_settings_page() {
         check_admin_referer( 'jc_bewerbung_settings_nonce' );
         update_option( 'jc_discord_client_id', sanitize_text_field( $_POST['jc_discord_client_id'] ?? '' ) );
         update_option( 'jc_discord_client_secret', sanitize_text_field( $_POST['jc_discord_client_secret'] ?? '' ) );
+        update_option( 'jc_redirect_uri', sanitize_url( $_POST['jc_redirect_uri'] ?? '' ) );
         update_option( 'jc_bot_api_url', sanitize_url( $_POST['jc_bot_api_url'] ?? '' ) );
         update_option( 'jc_bot_api_secret', sanitize_text_field( $_POST['jc_bot_api_secret'] ?? '' ) );
         echo '<div class="notice notice-success"><p>✅ Einstellungen gespeichert!</p></div>';
     }
     
-    $client_id = get_option( 'jc_discord_client_id', '' );
-    $client_secret = get_option( 'jc_discord_client_secret', '' );
-    $bot_api_url = get_option( 'jc_bot_api_url', '' );
-    $bot_api_secret = get_option( 'jc_bot_api_secret', '' );
-    $callback_url = rest_url( 'jc/v1/discord-callback' );
+    $client_id = jc_get_discord_client_id();
+    $client_secret = jc_get_discord_client_secret();
+    $redirect_uri = jc_get_redirect_uri();
+    $bot_api_url = jc_get_bot_api_url();
+    $bot_api_secret = jc_get_bot_api_secret();
+    
+    $is_client_id_const = defined( 'JC_DISCORD_CLIENT_ID' );
+    $is_client_secret_const = defined( 'JC_DISCORD_CLIENT_SECRET' );
+    $is_redirect_uri_const = defined( 'JC_REDIRECT_URI' );
+    $is_bot_api_url_const = defined( 'JC_BOT_API_URL' );
+    $is_bot_api_secret_const = defined( 'JC_BOT_API_SECRET' );
     ?>
     <div class="wrap">
         <h1>🎮 JustCreators Bewerbungsportal - Discord Konfiguration</h1>
@@ -2166,38 +2292,38 @@ function jc_bewerbung_render_settings_page() {
             
             <table class="form-table">
                 <tr>
-                    <th scope="row"><label for="jc_discord_client_id">Discord Client ID *</label></th>
+                    <th scope="row"><label for="jc_discord_client_id">Discord Client ID <?php echo $is_client_id_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
                     <td>
-                        <input type="text" id="jc_discord_client_id" name="jc_discord_client_id" value="<?php echo esc_attr( $client_id ); ?>" class="regular-text" required>
-                        <p class="description">Deine Discord App Client ID (von <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a>)</p>
+                        <input type="text" id="jc_discord_client_id" name="jc_discord_client_id" value="<?php echo esc_attr( $client_id ); ?>" class="regular-text" <?php echo $is_client_id_const ? 'disabled' : 'required'; ?>>
+                        <p class="description">Deine Discord App Client ID (von <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a>)<?php echo $is_client_id_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="jc_discord_client_secret">Discord Client Secret *</label></th>
+                    <th scope="row"><label for="jc_discord_client_secret">Discord Client Secret <?php echo $is_client_secret_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
                     <td>
-                        <input type="password" id="jc_discord_client_secret" name="jc_discord_client_secret" value="<?php echo esc_attr( $client_secret ); ?>" class="regular-text" required>
-                        <p class="description">Dein Discord App Client Secret</p>
+                        <input type="password" id="jc_discord_client_secret" name="jc_discord_client_secret" value="<?php echo esc_attr( $client_secret ); ?>" class="regular-text" <?php echo $is_client_secret_const ? 'disabled' : 'required'; ?>>
+                        <p class="description">Dein Discord App Client Secret<?php echo $is_client_secret_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label>Discord Redirect URI</label></th>
+                    <th scope="row"><label for="jc_redirect_uri">Discord Redirect URI <?php echo $is_redirect_uri_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
                     <td>
-                        <code style="background: #fff; padding: 8px; border: 1px solid #ddd; display: inline-block;"><?php echo esc_html( $callback_url ); ?></code>
-                        <p class="description">← Diese URL in deiner Discord App unter "OAuth2 > Redirects" eintragen</p>
+                        <input type="url" id="jc_redirect_uri" name="jc_redirect_uri" value="<?php echo esc_attr( $redirect_uri ); ?>" class="regular-text" <?php echo $is_redirect_uri_const ? 'disabled' : ''; ?> placeholder="https://example.com/bewerbung?discord_oauth=1">
+                        <p class="description">Die Redirect URI muss exakt so in deiner Discord App unter "OAuth2 > Redirects" eingetragen sein<?php echo $is_redirect_uri_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="jc_bot_api_url">Bot API URL</label></th>
+                    <th scope="row"><label for="jc_bot_api_url">Bot API URL <?php echo $is_bot_api_url_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
                     <td>
-                        <input type="url" id="jc_bot_api_url" name="jc_bot_api_url" value="<?php echo esc_attr( $bot_api_url ); ?>" class="regular-text" placeholder="https://api.example.com">
-                        <p class="description">URL zum Bot API (optional)</p>
+                        <input type="url" id="jc_bot_api_url" name="jc_bot_api_url" value="<?php echo esc_attr( $bot_api_url ); ?>" class="regular-text" <?php echo $is_bot_api_url_const ? 'disabled' : ''; ?> placeholder="https://api.example.com">
+                        <p class="description">URL zum Bot API (optional)<?php echo $is_bot_api_url_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
                     </td>
                 </tr>
                 <tr>
-                    <th scope="row"><label for="jc_bot_api_secret">Bot API Secret</label></th>
+                    <th scope="row"><label for="jc_bot_api_secret">Bot API Secret <?php echo $is_bot_api_secret_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
                     <td>
-                        <input type="password" id="jc_bot_api_secret" name="jc_bot_api_secret" value="<?php echo esc_attr( $bot_api_secret ); ?>" class="regular-text">
-                        <p class="description">Secret für Bot API (optional)</p>
+                        <input type="password" id="jc_bot_api_secret" name="jc_bot_api_secret" value="<?php echo esc_attr( $bot_api_secret ); ?>" class="regular-text" <?php echo $is_bot_api_secret_const ? 'disabled' : ''; ?>>
+                        <p class="description">Secret für Bot API (optional)<?php echo $is_bot_api_secret_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
                     </td>
                 </tr>
             </table>
