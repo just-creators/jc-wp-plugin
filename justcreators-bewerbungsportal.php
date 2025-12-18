@@ -1072,6 +1072,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     $age = sanitize_text_field( wp_unslash( $_POST['age'] ) );
                     $social_activity = sanitize_text_field( wp_unslash( $_POST['social_activity'] ) );
                     $motivation = sanitize_textarea_field( wp_unslash( $_POST['motivation'] ) );
+                    $motivation_length = mb_strlen( $motivation );
                     
                     $social_channels = array();
                     if ( isset( $_POST['social_channels'] ) && is_array( $_POST['social_channels'] ) ) {
@@ -1086,10 +1087,19 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             }
                         }
                     }
+                    if ( count( $social_channels ) > 5 ) {
+                        $social_channels = array_slice( $social_channels, 0, 5 );
+                        $field_errors['social'][] = 'Es sind maximal 5 Kanäle erlaubt.';
+                        $validation_errors[] = 'Bitte gib höchstens 5 Social Media Kanäle an.';
+                    }
                     
                     if ( empty( $social_channels ) ) {
                         $field_errors['social'][] = 'Bitte gib mindestens einen Social Media Kanal an.';
                         $validation_errors[] = 'Bitte gib mindestens einen Social Media Kanal an.';
+                    }
+                    if ( $motivation_length < 100 || $motivation_length > 1000 ) {
+                        $field_errors['motivation'][] = 'Deine Begründung muss zwischen 100 und 1000 Zeichen lang sein.';
+                        $validation_errors[] = 'Bitte gib eine Begründung mit 100 bis 1000 Zeichen an.';
                     }
                     
                     if ( empty( $validation_errors ) ) {
@@ -1353,7 +1363,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     
                     <label class="jc-label">🌐 Social Media Kanäle *</label>
                     <div class="jc-note" style="margin-top: 8px;">
-                        Gib deine Social Media Kanäle an. <strong>Nur YouTube, Twitch und TikTok sind erlaubt.</strong> Die Links werden automatisch validiert.
+                        Gib mindestens einen Social Media Kanal an. <strong>Nur YouTube, Twitch und TikTok sind erlaubt.</strong> Du kannst bis zu <strong>5 Kanäle</strong> angeben (1 Pflichtfeld + 4 optional).
                     </div>
                     <div class="jc-social-fields" id="jc-social-fields">
                         <div class="jc-social-field-group">
@@ -1372,7 +1382,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <input class="jc-input" type="text" name="social_activity" id="jc-activity-input" placeholder="z. B. täglich" required />
                     <span class="jc-field-error" id="jc-activity-error" style="display: none;"></span>
                     <label class="jc-label">💭 Warum JustCreators? *</label>
-                    <textarea class="jc-textarea" name="motivation" id="jc-motivation-input" rows="6" required placeholder="Erzähle uns..."></textarea>
+                    <textarea class="jc-textarea" name="motivation" id="jc-motivation-input" rows="8" minlength="100" maxlength="1000" required placeholder="Erzähle uns, warum du zu JustCreators willst. Mindestens 100 und maximal 1000 Zeichen."></textarea>
                     <span class="jc-field-error" id="jc-motivation-error" style="display: none;"></span>
 
                     
@@ -1574,7 +1584,15 @@ function jc_print_application_form_scripts() {
             function validateMotivation() {
                 const m = document.getElementById('jc-motivation-input');
                 if (!m) return true;
-                return (m.value || '').replace(/\s/g, '').length >= 20;
+                const val = (m.value || '');
+                const len = val.length;
+                const err = document.getElementById('jc-motivation-error');
+                const ok = len >= 100 && len <= 1000;
+                if (err) {
+                    err.textContent = ok ? '' : 'Bitte gib zwischen 100 und 1000 Zeichen ein.';
+                    err.style.display = ok ? 'none' : 'block';
+                }
+                return ok;
             }
             form.addEventListener('submit', function(e) {
                 const checks = {
