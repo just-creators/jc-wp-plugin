@@ -2245,18 +2245,93 @@ function jc_admin_bewerbungen_page() {
     </style>';
 }
 // ========================================
-// ADMIN SETTINGS PAGE FOR DISCORD CONFIG
+// ADMIN MENU REGISTRATION
 // ========================================
 add_action( 'admin_menu', function() {
+    // Main menu for applications
+    add_menu_page(
+        'JustCreators Bewerbungen',
+        '🎮 Bewerbungen',
+        'manage_options',
+        'jc-applications',
+        'jc_render_applications_page',
+        'dashicons-forms',
+        59
+    );
+    
+    // Submenu: Discord Configuration
     add_submenu_page(
-        'plugins.php',
-        'JC Bewerbungsportal Einstellungen',
-        'JC Discord Config',
+        'jc-applications',
+        'Discord Bot Setup',
+        '🤖 Bot Setup',
         'manage_options',
         'jc-bewerbung-settings',
         'jc_bewerbung_render_settings_page'
     );
 } );
+
+// ========================================
+// APPLICATIONS LISTING PAGE
+// ========================================
+function jc_render_applications_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'Unauthorized' );
+    }
+    
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+    
+    // Check if table exists
+    if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
+        echo '<div class="wrap"><h1>🎮 JustCreators Bewerbungen</h1>';
+        echo '<div class="notice notice-warning"><p>⚠️ Bewerbungstabelle existiert noch nicht. Sie wird beim ersten Submit erstellt.</p></div>';
+        echo '</div>';
+        return;
+    }
+    
+    $applications = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" );
+    
+    ?>
+    <div class="wrap">
+        <h1>🎮 JustCreators Bewerbungen</h1>
+        <p style="color: #666;">Gesamt: <strong><?php echo count( $applications ); ?></strong> Bewerbung(en)</p>
+        
+        <?php if ( empty( $applications ) ) : ?>
+            <div class="notice notice-info"><p>📭 Noch keine Bewerbungen eingegangen.</p></div>
+        <?php else : ?>
+            <table class="wp-list-table widefat striped">
+                <thead>
+                    <tr>
+                        <th>Discord ID</th>
+                        <th>Discord Name</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Eingereicht am</th>
+                        <th>Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ( $applications as $app ) : ?>
+                        <tr>
+                            <td><code><?php echo esc_html( $app->discord_id ); ?></code></td>
+                            <td><?php echo esc_html( $app->discord_username ); ?></td>
+                            <td><?php echo esc_html( $app->email ); ?></td>
+                            <td>
+                                <span class="dashicons dashicons-<?php echo $app->status === 'approved' ? 'yes-alt' : 'dismiss'; ?>" style="color: <?php echo $app->status === 'approved' ? 'green' : 'gray'; ?>;"></span>
+                                <?php echo esc_html( ucfirst( $app->status ) ); ?>
+                            </td>
+                            <td><?php echo esc_html( $app->created_at ); ?></td>
+                            <td>
+                                <a href="?page=jc-applications&view=<?php echo esc_attr( $app->id ); ?>" class="button">👁️ Details</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php endif; ?>
+    </div>
+    <?php
+}
 
 function jc_bewerbung_render_settings_page() {
     if ( ! current_user_can( 'manage_options' ) ) {
