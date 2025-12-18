@@ -95,26 +95,7 @@ add_action('rest_api_init', function() {
         'callback' => 'jc_api_update_status',
         'permission_callback' => 'jc_verify_api_secret' // Dieselbe Sicherheit
     ));
-
-    // Frontend logging endpoint (public; logs only)
-    register_rest_route('jc/v1', '/frontend-log', array(
-        'methods' => 'POST',
-        'callback' => 'jc_handle_frontend_log',
-        'permission_callback' => '__return_true'
-    ));
 });
-function jc_handle_frontend_log( $request ) {
-    $params = $request->get_json_params();
-    $event = isset($params['event']) ? sanitize_text_field($params['event']) : 'unknown';
-    $level = isset($params['level']) ? sanitize_text_field($params['level']) : 'info';
-    $sid = isset($params['sid']) ? sanitize_text_field($params['sid']) : ( function_exists('session_id') ? session_id() : '' );
-    $url = isset($params['url']) ? esc_url_raw($params['url']) : '';
-    $ua = isset($params['ua']) ? substr( sanitize_text_field($params['ua']), 0, 200 ) : '';
-    $payload = isset($params['payload']) ? wp_json_encode($params['payload']) : '';
-    $ts = isset($params['ts']) ? intval($params['ts']) : 0;
-    error_log( sprintf('JC FE [%s] sid=%s event=%s ts=%s url=%s ua=%s payload=%s', $level, $sid, $event, $ts ?: '0', $url, $ua, $payload) );
-    return array( 'ok' => true );
-}
 function jc_handle_status_sync( $request ) {
     $params = $request->get_json_params();
    
@@ -956,11 +937,11 @@ add_shortcode( 'discord_application_form', function( $atts ) {
         }
         
         @keyframes jc-dot-bounce {
-            0%, 80%, 100% {
+            0%, 80%, 100% { 
                 transform: scale(0);
                 opacity: 0.5;
             }
-            40% {
+            40% { 
                 transform: scale(1);
                 opacity: 1;
             }
@@ -1496,12 +1477,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             
             <?php
             $discord_user = isset( $_SESSION['jc_discord_user'] ) ? $_SESSION['jc_discord_user'] : false;
-            // Debug: Render-Start des Shortcodes und Session-Status
-            if ( $discord_user ) {
-                error_log( 'JC Bewerbungs-Shortcode: render start; user=YES id=' . $discord_user['id'] );
-            } else {
-                error_log( 'JC Bewerbungs-Shortcode: render start; user=NO' );
-            }
             
             // NICHT ANGEMELDET
             if ( ! $discord_user ) {
@@ -1536,7 +1511,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             
             // STATUS PRÜFEN
             $application = jc_get_application_status( $discord_id );
-            error_log( 'JC Bewerbungs-Shortcode: app status check; hasApp=' . ( $application ? 'YES' : 'NO' ) );
             
             // BEWERBUNG EXISTIERT - STATUS ANZEIGEN
             if ( $application ) {
@@ -1569,7 +1543,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <h2 class="jc-status-title"><?php echo $current['title']; ?></h2>
                     <p class="jc-status-desc"><?php echo $current['desc']; ?></p>
                     
-                    <div class="jc-status-info-wrapper" style="margin-top: 30px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.15); text-align: left;">
+                    <div class="jc-status-info-wrapper" style="margin-top: 30px; border-radius: 10px; overflow: hidden; background: rgba(0,0,0,0.15); text-align: left;"> 
                         <div class="jc-status-meta">
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                 <div style="background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
@@ -1812,7 +1786,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         })
                         .then(response => response.json())
                         .then(data => {
-                            console.log('[JC Bewerbungsportal][waiting] check-discord-join result', data);
                             if (data.success && data.is_on_temp_server) {
                                 // User ist auf Temp-Server! Bewerbung an Bot senden
                                 sendApplicationToBot();
@@ -1822,7 +1795,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             }
                         })
                         .catch(error => {
-                            console.error('[JC Bewerbungsportal][waiting] Error checking Discord join:', error);
+                            console.error('Error checking Discord join:', error);
                             setTimeout(checkDiscordJoin, 3000); // Bei Fehler alle 3 Sekunden
                         });
                     }
@@ -1851,7 +1824,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                         })
                         .then(response => response.json())
                         .then(data => {
-                            console.log('[JC Bewerbungsportal][waiting] send-application result', data);
                             if (data.success) {
                                 // Erfolg! Zeige Erfolgsmeldung
                                 showSuccessMessage();
@@ -1868,7 +1840,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             }
                         })
                         .catch(error => {
-                            console.error('[JC Bewerbungsportal][waiting] Error sending application:', error);
+                            console.error('Error sending application:', error);
                             document.querySelector('.jc-waiting-content').innerHTML = `
                                 <div class="jc-error" style="margin: 20px 0;">
                                     ❌ Fehler beim Senden der Bewerbung. Bitte versuche es erneut.
@@ -1950,8 +1922,8 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="jc-add-social-btn" id="jc-add-social-btn">
-                        Weiteren Kanäle hinzufügen
+                    <button type="button" class="jc-add-social-btn" onclick="jcAddSocialField()">
+                        Weiteren Kanal hinzufügen
                     </button>
                     <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
                     
@@ -1985,301 +1957,158 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                 </form>
                 
                 <script>
-                (function() {
-                    const JC_DEBUG = true;
-                    const JC_REMOTE_DEBUG = true;
-                    const JC_FE_ENDPOINT = '<?php echo esc_url( rest_url( 'jc/v1/frontend-log' ) ); ?>';
-                    const JC_SID = '<?php echo esc_js( session_id() ); ?>';
-                    window.JCLogHistory = window.JCLogHistory || [];
-                    function jcSendLog(event, payload, level) {
-                        try {
-                            if (!JC_REMOTE_DEBUG) return;
-                            const body = JSON.stringify({
-                                event: event || 'unknown',
-                                level: level || 'info',
-                                ts: Date.now(),
-                                url: location.href,
-                                ua: navigator.userAgent,
-                                sid: JC_SID,
-                                payload: payload || {}
-                            });
-                            if (navigator.sendBeacon) {
-                                const blob = new Blob([body], { type: 'application/json' });
-                                navigator.sendBeacon(JC_FE_ENDPOINT, blob);
-                            } else {
-                                fetch(JC_FE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
-                            }
-                        } catch (e) { /* ignore */ }
+                console.log("JC Script loaded!");
+                
+                // basic counters
+                window.socialFieldCount = 1;
+                window.maxSocialFields = 5;
+                
+                console.log("socialFieldCount set to:", window.socialFieldCount);
+
+                // very small platform detection (ascii only)
+                var jcPlatformIcons = {
+                    youtube: "YT",
+                    tiktok: "TT",
+                    twitch: "TW",
+                    twitter: "TW",
+                    instagram: "IG",
+                    handle: "@",
+                    unknown: "?"
+                };
+
+                function detectPlatform(url) {
+                    var u = (url || "").toLowerCase();
+                    if (u.indexOf("youtube.com") !== -1 || u.indexOf("youtu.be") !== -1) return "youtube";
+                    if (u.indexOf("tiktok.com") !== -1) return "tiktok";
+                    if (u.indexOf("twitch.tv") !== -1) return "twitch";
+                    if (u.indexOf("twitter.com") !== -1 || u.indexOf("x.com") !== -1) return "twitter";
+                    if (u.indexOf("instagram.com") !== -1) return "instagram";
+                    if (u.charAt(0) === "@") return "handle";
+                    return "unknown";
+                }
+
+                function updatePlatformIcon(input, index) {
+                    var url = (input.value || "").trim();
+                    var iconElement = document.querySelector('.jc-platform-icon[data-index="' + index + '"]');
+                    if (!iconElement) return;
+                    if (url.length > 3) {
+                        var p = detectPlatform(url);
+                        iconElement.textContent = jcPlatformIcons[p] || jcPlatformIcons.unknown;
+                        iconElement.classList.add("visible");
+                    } else {
+                        iconElement.classList.remove("visible");
                     }
-                    function jcLog() {
-                        try {
-                            if (JC_DEBUG) {
-                                const args = Array.prototype.slice.call(arguments);
-                                console.log.apply(console, ['[JC Bewerbungsportal]'].concat(args));
-                                window.JCLogHistory.push({ t: Date.now(), args });
-                            }
-                        } catch (e) { /* ignore */ }
+                }
+
+                document.addEventListener("input", function(e) {
+                    if (e.target.classList.contains("jc-social-input")) {
+                        var idx = e.target.getAttribute("data-index") || "0";
+                        updatePlatformIcon(e.target, idx);
                     }
-                    // Fallback: falls console beschnitten ist, schreibe eine sichtbare Warnung ins DOM
-                    function jcWarnDom(msg) {
-                        try {
-                            const el = document.getElementById('jc-log-warning') || (function(){
-                                const d = document.createElement('div');
-                                d.id = 'jc-log-warning';
-                                d.style.cssText = 'background:#ffedc2;color:#8a5500;padding:8px 12px;margin:10px 0;border:1px solid #e0b200;border-radius:6px;font-size:13px;';
-                                const form = document.getElementById('jc-application-form');
-                                if (form) form.prepend(d);
-                                return d;
-                            })();
-                            el.textContent = msg;
-                        } catch (e) { /* ignore */ }
+                });
+
+                function jcAddSocialField() {
+                    console.log("jcAddSocialField called!");
+                    if (window.socialFieldCount >= window.maxSocialFields) {
+                        alert("Maximal 5 Social Media Kanaele erlaubt.");
+                        return;
+                    }
+                    var container = document.getElementById("jc-social-fields");
+                    if (!container) {
+                        console.error("Container not found!");
+                        return;
                     }
 
-                    function setup() {
-                        jcLog('setup:start', { readyState: document.readyState });
-                        jcWarnDom('JS geladen – versuche Button zu binden');
-                        jcSendLog('setup:start', { readyState: document.readyState });
-                        const MAX_FIELDS = 5;
-                        const container = document.getElementById('jc-social-fields');
-                        const addBtn = document.getElementById('jc-add-social-btn');
-                        jcLog('setup:elements', { container: !!container, addBtn: !!addBtn });
-                        jcSendLog('setup:elements', { container: !!container, addBtn: !!addBtn });
-                        if (!container) { jcLog('setup:abort:no-container'); jcSendLog('setup:abort:no-container'); return; } // Falls DOM noch nicht bereit
-                        let nextIndex = getInitialNextIndex();
-                        jcLog('setup:nextIndex:init', nextIndex);
-                        jcSendLog('setup:nextIndex:init', { nextIndex });
+                    var fieldGroup = document.createElement("div");
+                    fieldGroup.className = "jc-social-field-group";
+                    fieldGroup.innerHTML = '<div class="jc-social-field-wrapper">' +
+                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" ' +
+                        'placeholder="z. B. youtube.com/@username" data-index="' + window.socialFieldCount + '" />' +
+                        '<span class="jc-platform-icon" data-index="' + window.socialFieldCount + '"></span>' +
+                        '</div>' +
+                        '<button type="button" class="jc-remove-social-btn" onclick="jcRemoveSocialField(this)">X</button>';
 
-                        const icons = { youtube:'YT', tiktok:'TT', twitch:'TW', twitter:'TW', instagram:'IG', handle:'@', unknown:'?' };
-                        function detectPlatform(url) {
-                            const u = (url || '').toLowerCase();
-                            if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
-                            if (u.includes('tiktok.com')) return 'tiktok';
-                            if (u.includes('twitch.tv')) return 'twitch';
-                            if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
-                            if (u.includes('instagram.com')) return 'instagram';
-                            if (u.startsWith('@')) return 'handle';
-                            return 'unknown';
-                        }
-                        function getGroupCount() { return container.querySelectorAll('.jc-social-field-group').length; }
-                        function getInitialNextIndex() {
-                            // Finde höchste vorhandene data-index und setze nextIndex = max+1
-                            let maxIdx = 0;
-                            container.querySelectorAll('input.jc-social-input').forEach(function(inp) {
-                                const idx = parseInt(inp.getAttribute('data-index') || '0', 10);
-                                if (!isNaN(idx)) maxIdx = Math.max(maxIdx, idx);
-                            });
-                            const initIdx = maxIdx + 1;
-                            jcLog('compute:initialNextIndex', { maxIdx, initIdx });
-                            jcSendLog('compute:initialNextIndex', { maxIdx, initIdx });
-                            return initIdx;
-                        }
-                        function updateAddBtnVisibility() {
-                            if (!addBtn) return;
-                            addBtn.style.display = getGroupCount() >= MAX_FIELDS ? 'none' : 'inline-block';
-                            jcLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
-                            jcSendLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
-                        }
-                        function updateIconForInput(input) {
-                            const idx = input.getAttribute('data-index') || '0';
-                            const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
-                            if (!el) return;
-                            const val = (input.value || '').trim();
-                            if (val.length > 3) {
-                                const p = detectPlatform(val);
-                                el.textContent = icons[p] || icons.unknown;
-                                el.classList.add('visible');
-                                jcLog('icon:update', { idx, val, platform: p });
-                            } else {
-                                el.classList.remove('visible');
-                            }
-                        }
-                        function addField() {
-                            jcLog('addField:clicked', { count: getGroupCount(), nextIndex });
-                            jcSendLog('addField:clicked', { count: getGroupCount(), nextIndex });
-                            if (getGroupCount() >= MAX_FIELDS) {
-                                alert('Maximal ' + MAX_FIELDS + ' Social Media Kanäle erlaubt.');
-                                jcLog('addField:blocked:max-reached');
-                                jcSendLog('addField:blocked:max-reached', { count: getGroupCount() });
-                                return;
-                            }
-                            const html = (
-                                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
-                                  '<div class="jc-social-field-wrapper">' +
-                                    '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                                    '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                                  '</div>' +
-                                  '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>' +
-                                '</div>'
-                            );
-                            const before = getGroupCount();
-                            try {
-                                container.insertAdjacentHTML('beforeend', html);
-                            } catch (e) {
-                                const group = document.createElement('div');
-                                group.className = 'jc-social-field-group';
-                                group.innerHTML = (
-                                    '<div class="jc-social-field-wrapper">' +
-                                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                                    '</div>' +
-                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>'
-                                );
-                                container.appendChild(group);
-                            }
-                            const after = getGroupCount();
-                            jcLog('addField:appended', { newIndex: nextIndex, before, after });
-                            jcSendLog('addField:appended', { newIndex: nextIndex, before, after });
-                            nextIndex += 1;
-                            jcLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
-                            jcSendLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
-                            updateAddBtnVisibility();
-                            try {
-                                const last = container.querySelector('.jc-social-field-group[data-added="1"]:last-child') || container.querySelector('.jc-social-field-group:last-child');
-                                if (last) {
-                                    last.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    setTimeout(function(){ if (last && last.style) last.style.outline = 'none'; }, 900);
-                                }
-                            } catch (e) { /* ignore */ }
-                        }
-                        function removeField(btn) {
-                            const count = getGroupCount();
-                            const group = btn.closest('.jc-social-field-group');
-                            if (!group) return;
-                            if (count <= 1) {
-                                jcLog('removeField:clearing-last');
-                                jcSendLog('removeField:clearing-last');
-                                const input = group.querySelector('input.jc-social-input');
-                                if (input) {
-                                    input.value = '';
-                                    updateIconForInput(input);
-                                }
-                                return;
-                            }
-                            group.remove();
-                            jcLog('removeField:removed', { newCount: getGroupCount() });
-                            jcSendLog('removeField:removed', { newCount: getGroupCount() });
-                            updateAddBtnVisibility();
-                        }
-                        // Event binding (idempotent)
-                        if (addBtn && !addBtn.dataset.bound) {
-                            addBtn.addEventListener('click', function(e) { e.preventDefault(); jcLog('addBtn:direct-click'); jcSendLog('addBtn:direct-click'); addField(); });
-                            addBtn.addEventListener('pointerdown', function(e) { if (e.pointerType === 'touch') { e.preventDefault(); jcLog('addBtn:pointerdown'); jcSendLog('addBtn:pointerdown'); addField(); }});
-                            addBtn.dataset.bound = '1';
-                            jcWarnDom('Button gebunden (click/pointerdown)');
-                        }
-                        // Fallback Delegation (falls Button neu gerendert wird)
-                        document.addEventListener('click', function(e) {
-                            const target = e.target;
-                            if (target && (target.id === 'jc-add-social-btn' || (target.closest && target.closest('#jc-add-social-btn')))) {
-                                e.preventDefault();
-                                jcLog('addBtn:delegated-click');
-                                jcSendLog('addBtn:delegated-click');
-                                addField();
-                            }
-                        });
-                        document.addEventListener('pointerdown', function(e) {
-                            const t = e.target;
-                            if (e.pointerType === 'touch' && t && (t.id === 'jc-add-social-btn' || (t.closest && t.closest('#jc-add-social-btn')))) {
-                                e.preventDefault();
-                                jcLog('addBtn:delegated-pointerdown');
-                                jcSendLog('addBtn:delegated-pointerdown');
-                                addField();
-                            }
-                        });
-                        container.addEventListener('click', function(e) {
-                            if (e.target && e.target.classList.contains('jc-remove-social-btn')) {
-                                e.preventDefault();
-                                jcLog('removeBtn:click');
-                                jcSendLog('removeBtn:click');
-                                removeField(e.target);
-                            }
-                        });
-                        container.addEventListener('input', function(e) {
-                            if (e.target && e.target.classList.contains('jc-social-input')) {
-                                updateIconForInput(e.target);
-                            }
-                        }, true);
-                        // Initial state
-                        const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
-                        if (firstInput) updateIconForInput(firstInput);
-                        jcLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
-                        jcSendLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
-                        updateAddBtnVisibility();
+                    container.appendChild(fieldGroup);
+                    window.socialFieldCount += 1;
+                    console.log("Field added, new count:", window.socialFieldCount);
 
-                        // Validation
-                        function validateAge() {
-                            const ageInput = document.getElementById('jc-age-input');
-                            if (!ageInput) return true;
-                            const val = (ageInput.value || '').trim();
-                            if (val === '') return true;
-                            const n = parseInt(val, 10);
-                            return !isNaN(n) && n >= 11 && n <= 99;
-                        }
-                        function validateName() {
-                            const el = document.getElementById('jc-name-input');
-                            if (!el) return true;
-                            return (el.value || '').trim().length >= 2;
-                        }
-                        function validateSocialLinks() {
-                            const inputs = document.querySelectorAll('.jc-social-input');
-                            return Array.from(inputs).some(function(input) {
-                                const v = (input.value || '').toLowerCase();
-                                return v.includes('youtube.com') || v.includes('youtu.be') || v.includes('twitch.tv') || v.includes('tiktok.com');
-                            });
-                        }
-                        function validateActivity() {
-                            const a = document.getElementById('jc-activity-input');
-                            if (!a) return true;
-                            return (a.value || '').trim().length >= 2;
-                        }
-                        function validateMotivation() {
-                            const m = document.getElementById('jc-motivation-input');
-                            if (!m) return true;
-                            return (m.value || '').replace(/\s/g, '').length >= 20;
-                        }
-                        function initValidation() {
-                            const form = document.getElementById('jc-application-form');
-                            if (!form) return;
-                            form.addEventListener('submit', function(e) {
-                                const checks = {
-                                    name: validateName(),
-                                    age: validateAge(),
-                                    social: validateSocialLinks(),
-                                    activity: validateActivity(),
-                                    motivation: validateMotivation()
-                                };
-                                const ok = checks.name && checks.age && checks.social && checks.activity && checks.motivation;
-                                jcLog('form:submit:validation', { ok, checks });
-                                if (!ok) jcSendLog('form:submit:validation:fail', { checks });
-                                if (!ok) { e.preventDefault(); e.stopPropagation(); }
-                            });
-                        }
-                        if (document.readyState === 'loading') {
-                            document.addEventListener('DOMContentLoaded', function(){ jcLog('validation:init:DOMContentLoaded'); jcSendLog('validation:init:DOMContentLoaded'); initValidation(); });
-                        } else {
-                            jcLog('validation:init:immediate');
-                            jcSendLog('validation:init:immediate');
-                            initValidation();
-                        }
+                    var addBtn = document.querySelector(".jc-add-social-btn");
+                    if (addBtn && window.socialFieldCount >= window.maxSocialFields) {
+                        addBtn.style.display = "none";
                     }
-                    // Initial attempt
-                    setup();
-                    // Safety: run again on DOMContentLoaded in case of late rendering
-                    document.addEventListener('DOMContentLoaded', function(){ jcLog('setup:rerun:DOMContentLoaded'); jcSendLog('setup:rerun:DOMContentLoaded'); setup(); });
-                    // Observe DOM changes to re-bind if page builder re-renders
-                    try {
-                        const mo = new MutationObserver(function() {
-                            const c = document.getElementById('jc-social-fields');
-                            const b = document.getElementById('jc-add-social-btn');
-                            if (c && b && !b.dataset.bound) {
-                                jcLog('mutation:reinit');
-                                jcSendLog('mutation:reinit');
-                                setup();
-                            }
-                        });
-                        mo.observe(document.body, { childList: true, subtree: true });
-                    } catch (e) { /* ignore */ }
-                })();
+                }
+                
+                console.log("Defining window.jcAddSocialField...");
+                window.jcAddSocialField = jcAddSocialField;
+                console.log("window.jcAddSocialField is now:", typeof window.jcAddSocialField);
+
+                function jcRemoveSocialField(button) {
+                    console.log("jcRemoveSocialField called!");
+                    var group = button.closest(".jc-social-field-group");
+                    if (!group) return;
+                    group.remove();
+                    window.socialFieldCount = Math.max(1, window.socialFieldCount - 1);
+                    var addBtn = document.querySelector(".jc-add-social-btn");
+                    if (addBtn && window.socialFieldCount < window.maxSocialFields) {
+                        addBtn.style.display = "inline-block";
+                    }
+                }
+                window.jcRemoveSocialField = jcRemoveSocialField;
+
+                // minimal validation (kept simple to avoid charset issues)
+                function validateAge() {
+                    var ageInput = document.getElementById("jc-age-input");
+                    if (!ageInput) return true;
+                    var val = (ageInput.value || "").trim();
+                    if (val === "") return true;
+                    var n = parseInt(val, 10);
+                    return !isNaN(n) && n >= 11 && n <= 99;
+                }
+
+                function validateName() {
+                    var nameInput = document.getElementById("jc-name-input");
+                    if (!nameInput) return true;
+                    return (nameInput.value || "").trim().length >= 2;
+                }
+
+                function validateSocialLinks() {
+                    var inputs = document.querySelectorAll(".jc-social-input");
+                    return Array.from(inputs).some(function(input) {
+                        var v = (input.value || "").toLowerCase();
+                        return v.indexOf("youtube.com") !== -1 || v.indexOf("youtu.be") !== -1 || v.indexOf("twitch.tv") !== -1 || v.indexOf("tiktok.com") !== -1;
+                    });
+                }
+
+                function validateActivity() {
+                    var a = document.getElementById("jc-activity-input");
+                    if (!a) return true;
+                    return (a.value || "").trim().length >= 2;
+                }
+
+                function validateMotivation() {
+                    var m = document.getElementById("jc-motivation-input");
+                    if (!m) return true;
+                    return (m.value || "").replace(/\s/g, "").length >= 20;
+                }
+
+                function initValidation() {
+                    var form = document.getElementById("jc-application-form");
+                    if (!form) return;
+                    form.addEventListener("submit", function(e) {
+                        var ok = validateName() && validateAge() && validateSocialLinks() && validateActivity() && validateMotivation();
+                        if (!ok) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                        }
+                    });
+                }
+
+                if (document.readyState === "loading") {
+                    document.addEventListener("DOMContentLoaded", initValidation);
+                } else {
+                    initValidation();
+                }
+                
                 </script>
                 <?php
             }
@@ -2519,7 +2348,7 @@ function jc_admin_bewerbungen_page() {
         
         .jc-stat-card {
             background: #2a2c36;
-            padding: 15px 25px 20px 25px;
+            padding: 15px 25px 20px 25px; /* Top-Padding weiter reduziert */
             border-radius: 14px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2532,16 +2361,31 @@ function jc_admin_bewerbungen_page() {
             box-shadow: 0 8px 30px rgba(0,0,0,0.5);
         }
         
-        .jc-stat-total { border-left-color: #5865F2; background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, #2a2c36 100%); }
-        .jc-stat-pending { border-left-color: #ffc107; background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, #2a2c36 100%); }
-        .jc-stat-accepted { border-left-color: #4ade80; background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, #2a2c36 100%); }
-        .jc-stat-rejected { border-left-color: #f44336; background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, #2a2c36 100%); }
+        .jc-stat-total {
+            border-left-color: #5865F2;
+            background: linear-gradient(135deg, rgba(88, 101, 242, 0.1) 0%, #2a2c36 100%);
+        }
+        
+        .jc-stat-pending {
+            border-left-color: #ffc107;
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, #2a2c36 100%);
+        }
+        
+        .jc-stat-accepted {
+            border-left-color: #4ade80;
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.1) 0%, #2a2c36 100%);
+        }
+        
+        .jc-stat-rejected {
+            border-left-color: #f44336;
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.1) 0%, #2a2c36 100%);
+        }
         
         .jc-stat-number {
             font-size: 42px;
             font-weight: 700;
             color: #f0f0f0;
-            margin-bottom: 2px;
+            margin-bottom: 2px; /* Von 4px auf 2px reduziert */
         }
         
         .jc-stat-label {
@@ -2562,6 +2406,7 @@ function jc_admin_bewerbungen_page() {
         .jc-empty-icon {
             font-size: 64px;
             margin-bottom: 20px;
+            animation: jc-fadeIn 0.8s ease-out;
         }
         
         .jc-empty-title {
@@ -2613,9 +2458,17 @@ function jc_admin_bewerbungen_page() {
             transform: scale(1.01);
         }
         
-        .jc-table-row.jc-status-pending { border-left: 3px solid #ffc107; }
-        .jc-table-row.jc-status-accepted { border-left: 3px solid #4ade80; }
-        .jc-table-row.jc-status-rejected { border-left: 3px solid #f44336; }
+        .jc-table-row.jc-status-pending {
+            border-left: 3px solid #ffc107;
+        }
+        
+        .jc-table-row.jc-status-accepted {
+            border-left: 3px solid #4ade80;
+        }
+        
+        .jc-table-row.jc-status-rejected {
+            border-left: 3px solid #f44336;
+        }
         
         .jc-applications-table td {
             padding: 18px 15px;
@@ -2624,17 +2477,62 @@ function jc_admin_bewerbungen_page() {
             font-size: 14px;
         }
         
-        .jc-cell-discord { min-width: 200px; }
-        .jc-discord-name { color: #f0f0f0; font-size: 15px; display: block; margin-bottom: 5px; }
-        .jc-discord-id { color: #8a8f9b; font-family: monospace; font-size: 12px; }
-        .jc-cell-name strong { color: #f0f0f0; font-size: 15px; }
-        .jc-cell-age { color: #dcddde; }
-        .jc-cell-social small { color: #a0a8b8; line-height: 1.8; display: block; }
-        .jc-motivation-preview { color: #a0a8b8; font-size: 13px; font-style: italic; }
-        .jc-cell-date small { color: #8a8f9b; font-size: 12px; }
-        .jc-status-col { min-width: 180px; }
+        .jc-cell-discord {
+            min-width: 200px;
+        }
         
-        .jc-status-form { display: flex; flex-direction: column; gap: 8px; }
+        .jc-discord-name {
+            color: #f0f0f0;
+            font-size: 15px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .jc-discord-id {
+            color: #8a8f9b;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .jc-cell-name strong {
+            color: #f0f0f0;
+            font-size: 15px;
+        }
+        
+        .jc-cell-age {
+            color: #dcddde;
+        }
+        
+        .jc-cell-social small {
+            color: #a0a8b8;
+            line-height: 1.8;
+            display: block;
+        }
+        
+        .jc-cell-activity {
+            color: #dcddde;
+        }
+        
+        .jc-motivation-preview {
+            color: #a0a8b8;
+            font-size: 13px;
+            font-style: italic;
+        }
+        
+        .jc-cell-date small {
+            color: #8a8f9b;
+            font-size: 12px;
+        }
+        
+        .jc-status-col {
+            min-width: 180px;
+        }
+        
+        .jc-status-form {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
         
         .jc-status-select {
             padding: 10px 12px;
@@ -2649,7 +2547,7 @@ function jc_admin_bewerbungen_page() {
             transition: all 0.3s ease;
             -webkit-appearance: none;
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%<path fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             padding-right: 35px;
@@ -2703,8 +2601,14 @@ function jc_admin_bewerbungen_page() {
         }
         
         @media (max-width: 1200px) {
-            .jc-applications-table { font-size: 12px; }
-            .jc-applications-table th, .jc-applications-table td { padding: 12px 10px; }
+            .jc-applications-table {
+                font-size: 12px;
+            }
+            
+            .jc-applications-table th,
+            .jc-applications-table td {
+                padding: 12px 10px;
+            }
         }
     </style>';
 }
@@ -2769,6 +2673,7 @@ function jc_application_countdown_shortcode() {
             color: #f0f0f0;
             line-height: 1.1;
             display: block;
+            /* Dieser Textschatten gibt den Look eures Designs */
             text-shadow: 0 0 15px rgba(88, 101, 242, 0.5);
         }
         
@@ -2781,15 +2686,29 @@ function jc_application_countdown_shortcode() {
             letter-spacing: 1px;
         }
         
-        #jc-countdown-expired { text-align: center; }
+        #jc-countdown-expired {
+            text-align: center;
+        }
         
-        /* Responsive */
+        /* Responsive Anpassungen */
         @media (max-width: 768px) {
-            .jc-countdown-wrap { padding: 30px 20px; }
-            #jc-countdown-timer { gap: 15px; }
-            .jc-countdown-box { padding: 20px; min-width: 100px; }
-            .jc-countdown-number { font-size: 48px; }
-            .jc-countdown-label { font-size: 14px; margin-top: 5px; }
+            .jc-countdown-wrap {
+                padding: 30px 20px;
+            }
+            #jc-countdown-timer {
+                gap: 15px;
+            }
+            .jc-countdown-box {
+                padding: 20px;
+                min-width: 100px;
+            }
+            .jc-countdown-number {
+                font-size: 48px;
+            }
+            .jc-countdown-label {
+                font-size: 14px;
+                margin-top: 5px;
+            }
         }
         
         @media (max-width: 480px) {
@@ -2798,9 +2717,15 @@ function jc_application_countdown_shortcode() {
                 grid-template-columns: 1fr 1fr;
                 gap: 15px;
             }
-            .jc-countdown-box { min-width: auto; padding: 20px 10px; }
-            .jc-countdown-number { font-size: 40px; }
+            .jc-countdown-box {
+                min-width: auto;
+                padding: 20px 10px;
+            }
+            .jc-countdown-number {
+                font-size: 40px;
+            }
         }
+
     </style>
     
     <div class="jc-countdown-wrap">
@@ -2838,26 +2763,37 @@ function jc_application_countdown_shortcode() {
     
     <script>
     (function() {
+        // Zieldatum (aus PHP übernommen)
         const countDownDate = new Date("<?php echo $target_date_string; ?>").getTime();
-        function formatTime(time) { return time < 10 ? "0" + time : time; }
 
+        // Helfer-Funktion: Fügt eine führende Null hinzu (z.B. 9 -> 09)
+        function formatTime(time) {
+            return time < 10 ? "0" + time : time;
+        }
+
+        // Update den Countdown jede Sekunde
         const x = setInterval(function() {
             const now = new Date().getTime();
             const distance = countDownDate - now;
 
+            // Zeitberechnungen
             const days = Math.floor(distance / (1000 * 60 * 60 * 24));
             const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 
+            // HTML-Elemente aktualisieren
             document.getElementById("jc-days").innerHTML = formatTime(days);
             document.getElementById("jc-hours").innerHTML = formatTime(hours);
             document.getElementById("jc-minutes").innerHTML = formatTime(minutes);
             document.getElementById("jc-seconds").innerHTML = formatTime(seconds);
 
+            // Wenn der Countdown abgelaufen ist
             if (distance < 0) {
                 clearInterval(x);
+                // Verstecke den Timer
                 document.getElementById("jc-countdown-timer-wrap").style.display = "none";
+                // Zeige die "Bewerbung geöffnet"-Nachricht an
                 document.getElementById("jc-countdown-expired").style.display = "block";
             }
         }, 1000);
