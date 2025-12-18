@@ -6,11 +6,115 @@
  * Author: JustCreators Team
  * License: GPL2
  */
-
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+if ( ! defined( 'ABSPATH' ) ) exit;
+// ========================================
+// KONFIGURATION
+// ========================================
+if ( ! defined( 'JC_DISCORD_CLIENT_ID' ) ) {
+    define( 'JC_DISCORD_CLIENT_ID', 'YOUR_CLIENT_ID_HERE' );
 }
+if ( ! defined( 'JC_DISCORD_CLIENT_SECRET' ) ) {
+    define( 'JC_DISCORD_CLIENT_SECRET', 'YOUR_CLIENT_SECRET_HERE' );
+}
+if ( ! defined( 'JC_REDIRECT_URI' ) ) {
+    define( 'JC_REDIRECT_URI', site_url('/bewerbung?discord_oauth=1') );
+}
+if ( ! defined( 'JC_TEMP_DISCORD_INVITE' ) ) {
+    define( 'JC_TEMP_DISCORD_INVITE', 'https://discord.gg/TEjEc6F3GW' ); // Füge deinen Temp-Server Invite-Link hier ein
+}
+function jc_get_bot_api_url() {
+    return get_option( 'jc_bot_api_url', 'http://localhost:3000' );
+}
+function jc_get_bot_api_secret() {
+    return get_option( 'jc_bot_api_secret', '' );
+}
+// ========================================
+// REST API für Status-Sync (Discord → WordPress)
+// ========================================
+// Session GLOBAL starten - für ALLE Seiten
+add_action( 'init', function() {
+    if ( session_status() === PHP_SESSION_NONE && ! headers_sent() ) {
+        // Session mit Cookie-Optionen starten
+        session_set_cookie_params([
+            'lifetime' => 0, // Browser-Session
+            'path' => '/',
+            'domain' => '.just-creators.de',
+            'secure' => true,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+        session_start();
+        error_log( 'JC: Session gestartet - ID: ' . session_id() . ', Cookie Domain: .just-creators.de' );
+    }
+   
+    // DEBUG: Session Status auf jeder Seite
+    if ( is_page( 'regeln' ) || is_page( 'bewerbung' ) ) {
+        $has_user = isset( $_SESSION['jc_discord_user'] ) ? 'JA' : 'NEIN';
+        $username = isset( $_SESSION['jc_discord_user']['username'] ) ? $_SESSION['jc_discord_user']['username'] : 'N/A';
+        error_log( "JC Session Check - Page: " . get_the_title() . ", Session ID: " . session_id() . ", User: {$has_user} ({$username})" );
+    }
+}, 1 );
+function jc_verify_api_secret( $request ) {
+    $auth_header = $request->get_header( 'authorization' );
+    $expected = 'Bearer ' . jc_get_bot_api_secret();
+   
+    error_log( "JC API Auth: Header=" . substr($auth_header, 0, 20) . "..., Expected=" . substr($expected, 0, 20) . "..." );
+    error_log( "JC API Auth Match: " . ($auth_header === $expected ? 'YES' : 'NO') );
+   
+    return $auth_header === $expected;
+}
+add_action('rest_api_init', function() {
+    register_rest_route('jc/v1', '/status-sync', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_status_sync',
+        'permission_callback' => 'jc_verify_api_secret'
+    ));
+    
+    register_rest_route('jc/v1', '/check-discord-join', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_check_discord_join',
+        'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
+    ));
+    
+    register_rest_route('jc/v1', '/send-application', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_send_application',
+        'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
+    ));
+    
+    // NEUER Endpunkt für ioBroker (LESEN)
+    register_rest_route('jc/v1', '/applications', array(
+        'methods' => 'GET',
+        'callback' => 'jc_api_get_all_applications',
+        'permission_callback' => 'jc_verify_api_secret' // Wir nutzen dieselbe Sicheit wie der Bot
+    ));
+    
+    // NEUER Endpunkt für ioBroker (SCHREIBEN)
+    register_rest_route('jc/v1', '/update-status', array(
+        'methods' => 'POST', // Wichtig: POST, nicht GET
+        'callback' => 'jc_api_update_status',
+        'permission_callback' => 'jc_verify_api_secret' // Dieselbe Sicherheit
+    ));
 
+    // Frontend logging endpoint (public; logs only)
+    register_rest_route('jc/v1', '/frontend-log', array(
+        'methods' => 'POST',
+        'callback' => 'jc_handle_frontend_log',
+        'permission_callback' => '__return_true'
+    ));
+});
+function jc_handle_frontend_log( $request ) {
+    $params = $request->get_json_params();
+    $event = isset($params['event']) ? sanitize_text_field($params['event']) : 'unknown';
+    $level = isset($params['level']) ? sanitize_text_field($params['level']) : 'info';
+    $sid = isset($params['sid']) ? sanitize_text_field($params['sid']) : ( function_exists('session_id') ? session_id() : '' );
+    $url = isset($params['url']) ? esc_url_raw($params['url']) : '';
+    $ua = isset($params['ua']) ? substr( sanitize_text_field($params['ua']), 0, 200 ) : '';
+    $payload = isset($params['payload']) ? wp_json_encode($params['payload']) : '';
+    $ts = isset($params['ts']) ? intval($params['ts']) : 0;
+    error_log( sprintf('JC FE [%s] sid=%s event=%s ts=%s url=%s ua=%s payload=%s', $level, $sid, $event, $ts ?: '0', $url, $ua, $payload) );
+    return array( 'ok' => true );
+}
 function jc_handle_status_sync( $request ) {
     $params = $request->get_json_params();
    
@@ -403,618 +507,264 @@ function jc_api_update_status( $request ) {
 
 
 // ========================================
-// KONFIGURATION & STYLES
+// ADMIN EINSTELLUNGEN
 // ========================================
-function jc_bewerbung_get_css() {
-    return <<<'CSS'
-@keyframes jc-fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes jc-slideIn {
-    from { opacity: 0; transform: translateX(-20px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes jc-success-pop {
-    0% { transform: scale(0.8); opacity: 0; }
-    50% { transform: scale(1.1); }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes jc-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-
-@keyframes jc-dot-bounce {
-    0%, 80%, 100% {
-        transform: scale(0);
-        opacity: 0.5;
+add_action( 'admin_menu', function() {
+    add_options_page(
+        'JustCreators Bot Setup',
+        'JC Bot Setup',
+        'manage_options',
+        'jc-bot-setup',
+        'jc_bot_setup_page'
+    );
+   
+    add_menu_page(
+        'Bewerbungen',
+        'Bewerbungen',
+        'manage_options',
+        'jc-bewerbungen',
+        'jc_admin_bewerbungen_page',
+        'dashicons-list-view',
+        26
+    );
+});
+add_action( 'admin_init', function() {
+    register_setting( 'jc_bot_settings', 'jc_bot_api_url' );
+    register_setting( 'jc_bot_settings', 'jc_bot_api_secret' );
+});
+function jc_bot_setup_page() {
+    if ( ! current_user_can( 'manage_options' ) ) return;
+   
+    if ( isset( $_POST['jc_test_bot'] ) && check_admin_referer( 'jc_test_bot' ) ) {
+        $test_result = jc_test_bot_connection();
+        echo '<div class="notice notice-' . ($test_result['success'] ? 'success' : 'error') . ' is-dismissible">';
+        echo '<p>' . esc_html( $test_result['message'] ) . '</p>';
+        echo '</div>';
     }
-    40% {
-        transform: scale(1);
-        opacity: 1;
+   
+    ?>
+    <div class="wrap">
+        <h1>🤖 JustCreators Bot Setup</h1>
+       
+        <div style="background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h2>📋 Features</h2>
+            <ul style="font-size: 15px; line-height: 2;">
+                <li>✅ Automatische Social Media Link-Validierung mit Icons</li>
+                <li>✅ Auto-Sync bei Löschung (WP → Discord)</li>
+                <li>✅ Forum Tags für Bewerbungsstatus</li>
+                <li>✅ Slash Commands: <code>/accept</code>, <code>/reject</code></li>
+                <li>✅ Status-Sync: Discord → WordPress (✓ aktiv)</li>
+                <li>✅ Live Status-Anzeige für Bewerber</li>
+                <li>✅ Responsive Design mit Animationen</li>
+            </ul>
+           
+            <form method="post" action="options.php" style="margin-top: 30px;">
+                <?php settings_fields( 'jc_bot_settings' ); ?>
+               
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="jc_bot_api_url">Bot API URL</label>
+                        </th>
+                        <td>
+                            <input type="url"
+                                   id="jc_bot_api_url"
+                                   name="jc_bot_api_url"
+                                   value="<?php echo esc_attr( jc_get_bot_api_url() ); ?>"
+                                   class="regular-text"
+                                   placeholder="http://localhost:3000" />
+                            <p class="description">URL wo der Bot läuft</p>
+                        </td>
+                    </tr>
+                   
+                    <tr>
+                        <th scope="row">
+                            <label for="jc_bot_api_secret">API Secret</label>
+                        </th>
+                        <td>
+                            <input type="password"
+                                   id="jc_bot_api_secret"
+                                   name="jc_bot_api_secret"
+                                   value="<?php echo esc_attr( jc_get_bot_api_secret() ); ?>"
+                                   class="regular-text"
+                                   placeholder="Gleiches Secret wie in .env" />
+                            <p class="description">Muss mit API_SECRET in .env übereinstimmen</p>
+                        </td>
+                    </tr>
+                </table>
+               
+                <?php submit_button( 'Einstellungen speichern', 'primary' ); ?>
+            </form>
+           
+            <hr style="margin: 30px 0;">
+           
+            <form method="post" style="margin-top: 20px;">
+                <?php wp_nonce_field( 'jc_test_bot' ); ?>
+                <button type="submit" name="jc_test_bot" class="button button-secondary">
+                    🧪 Bot-Verbindung testen
+                </button>
+            </form>
+        </div>
+    </div>
+    <?php
+}
+// ========================================
+// SESSION & DATABASE
+// ========================================
+
+// Cleanup für abgelaufene temporäre Bewerbungen
+add_action( 'jc_cleanup_temp_applications', function() {
+    global $wpdb;
+    $temp_table = $wpdb->prefix . 'jc_discord_applications_temp';
+    $now = current_time( 'mysql' );
+    
+    $deleted = $wpdb->query( $wpdb->prepare(
+        "DELETE FROM {$temp_table} WHERE expires_at < %s",
+        $now
+    ) );
+    
+    if ( $deleted > 0 ) {
+        error_log( "JC Cleanup: {$deleted} abgelaufene temporäre Bewerbungen gelöscht" );
     }
-}
-
-.jc-bewerbung-wrap {
-    background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
-    color: #e1e3e8;
-    padding: 50px;
-    border-radius: 16px;
-    max-width: 900px;
-    margin: 50px auto;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-    animation: jc-fadeIn 0.6s ease-out;
-}
-
-.jc-card {
-    background: #2a2c36 !important;
-    padding: 35px !important;
-    border-radius: 14px !important;
-    animation: jc-fadeIn 0.8s ease-out 0.2s both !important;
-}
-
-.jc-h {
-    font-size: 28px;
-    margin-bottom: 15px;
-    color: #f0f0f0;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* ########## START: ANPASSUNG ICON (v6.15) ########## */
-.jc-h::before {
-    content: '';
-    display: inline-block;
-    width: 32px;
-    height: 32px;
-    background-image: url('https://just-creators.de/wp-content/uploads/2025/11/cropped-WordPress-Favicon-removebg-preview-2.png');
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    margin-top: 4px;
-}
-/* ########## ENDE: ANPASSUNG ICON (v6.15) ########## */
-
-.jc-status-box {
-    background: #2a2c36 !important;
-    padding: 40px !important;
-    border-radius: 14px !important;
-    text-align: center !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.3) !important;
-    animation: jc-fadeIn 0.8s ease-out !important;
-}
-
-.jc-status-pending {
-    border-left: 6px solid #ffc107;
-}
-
-.jc-status-accepted {
-    border-left: 6px solid #4caf50;
-}
-
-.jc-status-rejected {
-    border-left: 6px solid #f44336;
-}
-
-.jc-status-icon {
-    font-size: 80px;
-    margin-bottom: 20px;
-    animation: jc-pulse 2s infinite;
-}
-
-.jc-status-title {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 15px;
-    color: #f0f0f0;
-}
-
-.jc-status-desc {
-    font-size: 17px;
-    color: #f0f0f0 !important;
-    line-height: 1.8;
-    margin: 15px 0;
-}
-
-.jc-status-desc * {
-    color: inherit !important;
-}
-
-.jc-status-meta {
-    font-size: 14px;
-    color: #8a8f9e;
-    padding: 25px;
-}
-
-.jc-discord-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 12px !important;
-    padding: 14px 28px !important;
-    border-radius: 10px !important;
-    background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%) !important;
-    color: #fff !important;
-    text-decoration: none !important;
-    font-weight: 600 !important;
-    font-size: 16px !important;
-    border: none !important;
-    cursor: pointer !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4) !important;
-    position: relative !important;
-    overflow: hidden !important;
-    box-sizing: border-box !important;
-}
-
-.jc-discord-btn::before {
-    content: '' !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: -100% !important;
-    width: 100% !important;
-    height: 100% !important;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
-    transition: left 0.5s !important;
-}
-
-.jc-discord-btn:hover::before {
-    left: 100% !important;
-}
-
-.jc-discord-btn:hover {
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6) !important;
-    background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%) !important;
-}
-
-.jc-discord-logo {
-    width: 24px !important;
-    height: 24px !important;
-    fill: #fff !important;
-}
-
-.jc-label {
-    display: block !important;
-    margin-top: 20px !important;
-    margin-bottom: 8px !important;
-    font-weight: 600 !important;
-    color: #f0f0f0 !important;
-    font-size: 15px !important;
-}
-
-.jc-input,
-.jc-textarea {
-    width: 100% !important;
-    padding: 14px !important;
-    margin-top: 8px !important;
-    background: #3a3c4a !important;
-    border: 2px solid #4a4c5a !important;
-    color: #ffffff !important;
-    border-radius: 10px !important;
-    -webkit-text-fill-color: #ffffff !important;
-    font-family: inherit !important;
-    font-size: 15px !important;
-    transition: all 0.3s ease !important;
-    box-sizing: border-box !important;
-}
-
-.jc-input::placeholder,
-.jc-textarea::placeholder {
-    color: #a0a8b8 !important;
-}
-
-.jc-input:focus,
-.jc-textarea:focus {
-    outline: none !important;
-    border-color: #5865F2 !important;
-    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2) !important;
-    transform: translateY(-1px) !important;
-}
-
-.jc-input.error,
-.jc-textarea.error {
-    border-color: #f44336 !important;
-    background: rgba(244, 67, 54, 0.08) !important;
-    animation: jc-shake 0.4s ease-in-out !important;
-}
-
-.jc-input.error:focus,
-.jc-textarea.error:focus {
-    box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.2) !important;
-}
-
-@keyframes jc-shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-8px); }
-    75% { transform: translateX(8px); }
-}
-
-.jc-social-field-group {
-    display: flex !important;
-    gap: 12px !important;
-    margin-bottom: 15px !important;
-    align-items: center !important;
-    animation: jc-slideIn 0.3s ease-out !important;
-    position: relative !important;
-    padding: 12px !important;
-    background: rgba(58, 60, 74, 0.2) !important;
-    border-radius: 10px !important;
-    border: 1px solid rgba(74, 76, 90, 0.3) !important;
-    transition: all 0.3s ease !important;
-}
-
-.jc-social-field-group:hover {
-    background: rgba(58, 60, 74, 0.35) !important;
-    border-color: rgba(88, 101, 242, 0.2) !important;
-}
-
-.jc-social-field-wrapper {
-    flex: 1 !important;
-    position: relative !important;
-}
-
-.jc-social-field-group input {
-    margin-top: 0 !important;
-    padding-right: 50px !important;
-    background: #2a2c36 !important;
-}
-
-.jc-platform-icon {
-    position: absolute !important;
-    right: 14px !important;
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    width: 22px !important;
-    height: 22px !important;
-    font-size: 0 !important;
-    pointer-events: none !important;
-    opacity: 0 !important;
-    transition: opacity 0.3s ease !important;
-    background-size: contain !important;
-    background-repeat: no-repeat !important;
-    background-position: center !important;
-}
-
-.jc-platform-icon.visible {
-    opacity: 1 !important;
-}
-
-.jc-platform-icon.icon-youtube { background-image: url('https://cdn.simpleicons.org/youtube/FF0000'); }
-.jc-platform-icon.icon-twitch { background-image: url('https://cdn.simpleicons.org/twitch/9146FF'); }
-.jc-platform-icon.icon-tiktok { background-image: url('https://cdn.simpleicons.org/tiktok/000000'); }
-.jc-platform-icon.icon-instagram { background-image: url('https://cdn.simpleicons.org/instagram/E4405F'); }
-.jc-platform-icon.icon-unknown { background-image: url('https://cdn.simpleicons.org/link/8a8f9e'); }
-
-.jc-add-social-btn,
-.jc-remove-social-btn {
-    padding: 12px 20px !important;
-    border: 2px solid transparent !important;
-    border-radius: 10px !important;
-    cursor: pointer !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-    white-space: nowrap !important;
-    box-sizing: border-box !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-}
-
-.jc-add-social-btn {
-    background: rgba(88, 101, 242, 0.15) !important;
-    color: #5865F2 !important;
-    margin-top: 15px !important;
-    border: 1px solid rgba(88, 101, 242, 0.3) !important;
-    box-shadow: none !important;
-}
-
-.jc-add-social-btn::before {
-    content: '➕' !important;
-    font-size: 16px !important;
-}
-
-.jc-add-social-btn:hover {
-    background: linear-gradient(135deg, rgba(88, 101, 242, 0.25) 0%, rgba(88, 101, 242, 0.35) 100%) !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3) !important;
-    border-color: rgba(88, 101, 242, 0.5) !important;
-}
-
-.jc-remove-social-btn {
-    background: linear-gradient(135deg, rgba(244, 67, 54, 0.15) 0%, rgba(244, 67, 54, 0.25) 100%) !important;
-    color: #f44336 !important;
-    padding: 12px 16px !important;
-    margin-top: 8px !important;
-    border: 2px solid rgba(244, 67, 54, 0.3) !important;
-    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.15) !important;
-    font-size: 18px !important;
-    line-height: 1 !important;
-    min-width: 44px !important;
-}
-
-.jc-remove-social-btn:hover {
-    background: rgba(244, 67, 54, 0.25) !important;
-    transform: scale(1.05) !important;
-    border-color: rgba(244, 67, 54, 0.5) !important;
-}
-
-.jc-add-social-btn:hover {
-    background: rgba(88, 101, 242, 0.25) !important;
-    transform: translateY(-1px) !important;
-    border-color: rgba(88, 101, 242, 0.5) !important;
-}
-
-.jc-remove-social-btn {
-    background: rgba(244, 67, 54, 0.15) !important;
-    color: #f44336 !important;
-    padding: 10px 14px !important;
-    margin: 0 !important;
-    border: 1px solid rgba(244, 67, 54, 0.3) !important;
-    box-shadow: none !important;
-    font-size: 16px !important;
-    line-height: 1 !important;
-    min-width: 42px !important;
-    height: 42px !important;
-}
-
-.jc-remove-social-btn:hover {
-    background: rgba(255, 107, 107, 0.3) !important;
-}
-
-.jc-note {
-    font-size: 14px !important;
-    color: #a0a8b8 !important;
-    margin-top: 12px !important;
-    padding: 12px !important;
-    background: rgba(88, 101, 242, 0.1) !important;
-    border-left: 3px solid #5865F2 !important;
-    border-radius: 6px !important;
-}
-
-.jc-error {
-    color: #ffb4b4 !important;
-    background: #3a2323 !important;
-    padding: 16px !important;
-    border-radius: 10px !important;
-    border-left: 4px solid #ff6b6b !important;
-    margin: 15px 0 !important;
-    animation: jc-fadeIn 0.4s ease-out !important;
-}
-
-.jc-success {
-    background: linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 100%) !important;
-    padding: 30px !important;
-    border-radius: 12px !important;
-    margin-top: 20px !important;
-    text-align: center !important;
-    animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-    border: 2px solid #4ade80 !important;
-    box-shadow: 0 8px 24px rgba(74, 222, 128, 0.2) !important;
-}
-
-.jc-success-icon {
-    width: 80px !important;
-    height: 80px !important;
-    margin: 0 auto 20px !important;
-}
-
-.jc-success-icon svg {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-.jc-success-icon circle {
-    fill: #4ade80 !important;
-    animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-}
-
-.jc-success-icon path {
-    stroke: #fff !important;
-    stroke-width: 3 !important;
-    stroke-dasharray: 100 !important;
-}
-
-.jc-success h3 {
-    color: #d1f7d1 !important;
-    font-size: 24px !important;
-    margin: 0 0 15px 0 !important;
-    font-weight: 700 !important;
-}
-
-.jc-success p {
-    color: #b8e6b8 !important;
-    font-size: 16px !important;
-    line-height: 1.6 !important;
-    margin: 10px 0 !important;
-}
-
-.jc-user-badge {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 12px !important;
-    background: rgba(88, 101, 242, 0.15) !important;
-    padding: 12px 20px !important;
-    border-radius: 10px !important;
-    margin: 15px 0 !important;
-    border: 2px solid rgba(88, 101, 242, 0.3) !important;
-}
-
-.jc-user-badge strong {
-    color: #5865F2 !important;
-    font-size: 16px !important;
-}
-
-.jc-field-error {
-    color: #ff6b6b !important;
-    font-size: 13px !important;
-    margin-top: 6px !important;
-    display: block !important;
-    padding-left: 4px !important;
-    animation: jc-fadeIn 0.3s ease-out !important;
-}
-
-.jc-input.error,
-.jc-textarea.error {
-    border-color: #ff6b6b !important;
-    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2) !important;
-}
-
-.jc-status-select {
-    -webkit-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-}
-
-.jc-waiting-screen {
-    background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
-    color: #e1e3e8;
-    padding: 50px;
-    border-radius: 16px;
-    max-width: 900px;
-    margin: 50px auto;
-    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
-    animation: jc-fadeIn 0.6s ease-out;
-}
-
-.jc-waiting-content {
-    text-align: center;
-    padding: 40px 20px;
-}
-
-.jc-waiting-icon {
-    font-size: 80px;
-    margin-bottom: 20px;
-    animation: jc-pulse 2s infinite;
-}
-
-.jc-waiting-title {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 15px;
-    color: #f0f0f0;
-}
-
-.jc-waiting-desc {
-    font-size: 17px;
-    color: #a0a8b8;
-    line-height: 1.8;
-    margin: 15px 0 30px;
-}
-
-.jc-waiting-animation {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-    margin: 30px 0;
-}
-
-.jc-dot {
-    width: 12px;
-    height: 12px;
-    background: #5865F2;
-    border-radius: 50%;
-    animation: jc-dot-bounce 1.4s infinite ease-in-out;
-}
-
-.jc-dot:nth-child(1) { animation-delay: -0.32s; }
-.jc-dot:nth-child(2) { animation-delay: -0.16s; }
-.jc-dot:nth-child(3) { animation-delay: 0s; }
-
-.jc-discord-invite-box {
-    margin: 30px 0;
-}
-
-.jc-waiting-btn {
-    font-size: 18px;
-    padding: 16px 32px;
-    margin: 20px 0;
-}
-
-.jc-waiting-hint {
-    margin-top: 30px;
-    padding: 15px;
-    background: rgba(88, 101, 242, 0.1);
-    border-radius: 8px;
-    border-left: 3px solid #5865F2;
-    color: #a0a8b8;
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-@media (max-width: 768px) {
-    .jc-bewerbung-wrap {
-        padding: 30px 20px !important;
-        margin: 20px auto !important;
+});
+register_activation_hook( __FILE__, function() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
+    
+    // ########## START: AKTUALISIERTE TABELLE (v6.17) ##########
+    // Haupttabelle für Bewerbungen
+    $table_name = $wpdb->prefix . 'jc_discord_applications';
+    $sql = "CREATE TABLE $table_name (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        discord_id varchar(64) NOT NULL UNIQUE,
+        discord_name varchar(255) NOT NULL,
+        applicant_name varchar(255) NOT NULL,
+        age varchar(20) DEFAULT '',
+        social_channels text DEFAULT '',
+        social_activity varchar(255) DEFAULT '',
+        motivation text DEFAULT '',
+        forum_post_id varchar(64) DEFAULT '',
+        status varchar(50) DEFAULT 'pending',
+        created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        privacy_accepted_at datetime DEFAULT NULL, -- NEU (v6.17)
+        PRIMARY KEY (id),
+        KEY status (status),
+        KEY discord_id (discord_id)
+    ) $charset_collate;";
+    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    dbDelta( $sql );
+    
+    // Temporäre Tabelle für Pending-Bewerbungen (vor Discord-Join)
+    $temp_table_name = $wpdb->prefix . 'jc_discord_applications_temp';
+    $sql_temp = "CREATE TABLE $temp_table_name (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        discord_id varchar(64) NOT NULL UNIQUE,
+        discord_name varchar(255) NOT NULL,
+        applicant_name varchar(255) NOT NULL,
+        age varchar(20) DEFAULT '',
+        social_channels text DEFAULT '',
+        social_activity varchar(255) DEFAULT '',
+        motivation text DEFAULT '',
+        created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        expires_at datetime NOT NULL,
+        privacy_accepted_at datetime DEFAULT NULL, -- NEU (v6.17)
+        PRIMARY KEY (id),
+        KEY discord_id (discord_id),
+        KEY expires_at (expires_at)
+    ) $charset_collate;";
+    dbDelta( $sql_temp );
+    // ########## ENDE: AKTUALISIERTE TABELLE (v6.17) ##########
+    
+    // Cron Job für Cleanup
+    if ( ! wp_next_scheduled( 'jc_cleanup_temp_applications' ) ) {
+        wp_schedule_event( time(), 'hourly', 'jc_cleanup_temp_applications' );
     }
-
-    .jc-card {
-        padding: 25px 20px !important;
+});
+// ========================================
+// DISCORD OAUTH2
+// ========================================
+add_action( 'init', function() {
+    if ( isset( $_GET['discord_oauth'] ) && $_GET['discord_oauth'] == '1' && isset( $_GET['code'] ) ) {
+        $code = sanitize_text_field( wp_unslash( $_GET['code'] ) );
+        $token = jc_exchange_code_for_token( $code );
+       
+        if ( $token && isset( $token['access_token'] ) ) {
+            $user = jc_get_discord_user( $token['access_token'] );
+           
+            if ( $user && isset( $user['id'] ) ) {
+                $_SESSION['jc_discord_user'] = array(
+                    'id' => sanitize_text_field( $user['id'] ),
+                    'username' => sanitize_text_field( $user['username'] ),
+                    'discriminator' => isset( $user['discriminator'] ) ? sanitize_text_field( $user['discriminator'] ) : '0',
+                    'avatar' => isset( $user['avatar'] ) ? sanitize_text_field( $user['avatar'] ) : ''
+                );
+               
+                $redirect = remove_query_arg( array('code','state','discord_oauth'), wp_unslash( $_SERVER['REQUEST_URI'] ) );
+                wp_safe_redirect( $redirect );
+                exit;
+            }
+        }
+       
+        wp_safe_redirect( remove_query_arg( array('code','state'), wp_unslash( $_SERVER['REQUEST_URI'] ) ) . '?jc_oauth_error=1' );
+        exit;
     }
-
-    .jc-h {
-        font-size: 22px !important;
-    }
-
-    .jc-social-field-group {
-        flex-direction: column !important;
-    }
-
-    .jc-waiting-screen {
-        padding: 30px 20px !important;
-        margin: 20px auto !important;
-    }
-
-    .jc-waiting-title {
-        font-size: 24px !important;
-    }
-
-    .jc-waiting-icon {
-        font-size: 64px !important;
-    }
-}
-CSS;
-}
-
-add_action( 'wp_enqueue_scripts', function() {
-    if ( is_admin() ) {
-        return;
-    }
-    wp_register_style( 'jc-bewerbung-inline', false );
-    wp_enqueue_style( 'jc-bewerbung-inline' );
-    wp_add_inline_style( 'jc-bewerbung-inline', jc_bewerbung_get_css() );
 } );
-
+function jc_exchange_code_for_token( $code ) {
+    $response = wp_remote_post( 'https://discord.com/api/oauth2/token', array(
+        'body' => array(
+            'client_id' => JC_DISCORD_CLIENT_ID,
+            'client_secret' => JC_DISCORD_CLIENT_SECRET,
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'redirect_uri' => JC_REDIRECT_URI,
+        ),
+    ) );
+   
+    if ( is_wp_error( $response ) ) return false;
+   
+    $body = wp_remote_retrieve_body( $response );
+    return json_decode( $body, true );
+}
+function jc_get_discord_user( $access_token ) {
+    $response = wp_remote_get( 'https://discord.com/api/users/@me', array(
+        'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+    ) );
+   
+    if ( is_wp_error( $response ) ) return false;
+   
+    $body = wp_remote_retrieve_body( $response );
+    return json_decode( $body, true );
+}
+function jc_get_discord_authorize_url() {
+    return 'https://discord.com/api/oauth2/authorize?client_id=' . JC_DISCORD_CLIENT_ID .
+           '&redirect_uri=' . rawurlencode( JC_REDIRECT_URI ) .
+           '&response_type=code&scope=identify';
+}
 // ========================================
 // SOCIAL MEDIA VALIDIERUNG
 // ========================================
 function jc_validate_social_link( $url ) {
     $url = trim( $url );
-    // Handles (@username) sind nicht erlaubt
+   
+    // Handles (@username) sind nicht mehr erlaubt
     if ( strpos( $url, '@' ) === 0 ) {
         return array( 'valid' => false, 'error' => 'Handles sind nicht erlaubt. Bitte gib eine vollständige URL ein.' );
     }
+   
     if ( ! preg_match( '/^https?:\/\//i', $url ) ) {
         $url = 'https://' . $url;
     }
+   
     $parsed = parse_url( $url );
     if ( ! $parsed || ! isset( $parsed['host'] ) ) {
         return array( 'valid' => false, 'error' => 'Ungültige URL' );
     }
-    $host = strtolower( str_replace( 'www.', '', $parsed['host'] ) );
+   
+    $host = strtolower( $parsed['host'] );
+    $host = str_replace( 'www.', '', $host );
+   
     $platform = 'unknown';
+    // Nur YouTube, Twitch und TikTok sind erlaubt
     if ( strpos( $host, 'youtube.com' ) !== false || strpos( $host, 'youtu.be' ) !== false ) {
         $platform = 'youtube';
     } elseif ( strpos( $host, 'tiktok.com' ) !== false ) {
@@ -1022,11 +772,17 @@ function jc_validate_social_link( $url ) {
     } elseif ( strpos( $host, 'twitch.tv' ) !== false ) {
         $platform = 'twitch';
     } else {
+        // Alle anderen Plattformen sind nicht erlaubt
         return array( 'valid' => false, 'error' => 'Nur YouTube, Twitch und TikTok sind erlaubt.' );
     }
-    return array( 'valid' => true, 'url' => $url, 'platform' => $platform, 'host' => $host );
+   
+    return array(
+        'valid' => true,
+        'url' => $url,
+        'platform' => $platform,
+        'host' => $host
+    );
 }
-
 function jc_get_platform_icon( $platform ) {
     $icons = array(
         'youtube' => '🎥',
@@ -1037,7 +793,49 @@ function jc_get_platform_icon( $platform ) {
         'handle' => '👤',
         'unknown' => '🔗'
     );
-    return isset( $icons[ $platform ] ) ? $icons[ $platform ] : $icons['unknown'];
+   
+    return isset( $icons[$platform] ) ? $icons[$platform] : $icons['unknown'];
+}
+// ========================================
+// BOT API FUNKTIONEN
+// ========================================
+function jc_send_application_to_bot( $data ) {
+    $api_url = jc_get_bot_api_url();
+    $api_secret = jc_get_bot_api_secret();
+   
+    if ( empty( $api_url ) || empty( $api_secret ) ) {
+        error_log( 'JC Plugin: Bot API nicht konfiguriert' );
+        return array( 'success' => false, 'message' => 'Bot API nicht konfiguriert' );
+    }
+   
+    $response = wp_remote_post( $api_url . '/api/application', array(
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $api_secret,
+        ),
+        'body' => wp_json_encode( $data ),
+        'timeout' => 30
+    ) );
+   
+    if ( is_wp_error( $response ) ) {
+        error_log( 'JC Plugin Bot API Error: ' . $response->get_error_message() );
+        return array( 'success' => false, 'message' => $response->get_error_message() );
+    }
+   
+    $response_code = wp_remote_retrieve_response_code( $response );
+    $response_body = json_decode( wp_remote_retrieve_body( $response ), true );
+   
+    if ( $response_code >= 200 && $response_code < 300 ) {
+        return array(
+            'success' => true,
+            'data' => $response_body
+        );
+    }
+   
+    return array(
+        'success' => false,
+        'message' => isset( $response_body['error'] ) ? $response_body['error'] : 'Unbekannter Fehler'
+    );
 }
 function jc_delete_discord_post( $post_id ) {
     $api_url = jc_get_bot_api_url();
@@ -1097,76 +895,6 @@ function jc_test_bot_connection() {
         'message' => '❌ Bot antwortet nicht korrekt (Code: ' . $response_code . ')'
     );
 }
-// ========================================
-// MISSING HELPER STUBS (placeholders)
-// ========================================
-if ( ! function_exists( 'jc_get_bot_api_url' ) ) {
-    function jc_get_bot_api_url() {
-        if ( defined( 'JC_BOT_API_URL' ) ) {
-            return JC_BOT_API_URL;
-        }
-        return get_option( 'jc_bot_api_url', '' );
-    }
-}
-
-if ( ! function_exists( 'jc_get_bot_api_secret' ) ) {
-    function jc_get_bot_api_secret() {
-        if ( defined( 'JC_BOT_API_SECRET' ) ) {
-            return JC_BOT_API_SECRET;
-        }
-        return get_option( 'jc_bot_api_secret', '' );
-    }
-}
-
-if ( ! function_exists( 'jc_get_discord_client_id' ) ) {
-    function jc_get_discord_client_id() {
-        if ( defined( 'JC_DISCORD_CLIENT_ID' ) ) {
-            return JC_DISCORD_CLIENT_ID;
-        }
-        return get_option( 'jc_discord_client_id', '' );
-    }
-}
-
-if ( ! function_exists( 'jc_get_discord_client_secret' ) ) {
-    function jc_get_discord_client_secret() {
-        if ( defined( 'JC_DISCORD_CLIENT_SECRET' ) ) {
-            return JC_DISCORD_CLIENT_SECRET;
-        }
-        return get_option( 'jc_discord_client_secret', '' );
-    }
-}
-
-if ( ! function_exists( 'jc_get_redirect_uri' ) ) {
-    function jc_get_redirect_uri() {
-        if ( defined( 'JC_REDIRECT_URI' ) ) {
-            return JC_REDIRECT_URI;
-        }
-        return get_option( 'jc_redirect_uri', rest_url( 'jc/v1/discord-callback' ) );
-    }
-}
-
-if ( ! function_exists( 'jc_get_discord_authorize_url' ) ) {
-    function jc_get_discord_authorize_url() {
-        // Build Discord OAuth URL
-        $client_id = jc_get_discord_client_id();
-        $redirect_uri = urlencode( jc_get_redirect_uri() );
-        $scope = urlencode( 'identify email' );
-        if ( ! $client_id ) {
-            error_log( 'JC: Discord Client ID not configured' );
-            return '#'; // Fallback link
-        }
-        return 'https://discord.com/api/oauth2/authorize?client_id=' . $client_id . '&redirect_uri=' . $redirect_uri . '&response_type=code&scope=' . $scope;
-    }
-}
-
-if ( ! function_exists( 'jc_get_application_status' ) ) {
-    function jc_get_application_status( $discord_id ) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'jc_discord_applications';
-        return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE discord_id = %s LIMIT 1", $discord_id ) );
-    }
-}
-
 function jc_check_user_on_temp_server( $discord_id ) {
     $api_url = jc_get_bot_api_url();
     $api_secret = jc_get_bot_api_secret();
@@ -1198,104 +926,570 @@ function jc_check_user_on_temp_server( $discord_id ) {
     
     return array( 'success' => false, 'is_on_temp_server' => false );
 }
-
-// ========================================
-// DISCORD OAUTH CALLBACK HANDLER
-// ========================================
-add_action( 'init', function() {
-    if ( isset( $_GET['discord_oauth'] ) && $_GET['discord_oauth'] === '1' ) {
-        if ( ! isset( $_GET['code'] ) ) {
-            wp_die( 'Fehler: Discord hat keinen Code zurückgegeben. Bitte versuche es erneut.' );
-        }
-        
-        $code = sanitize_text_field( $_GET['code'] );
-        $client_id = jc_get_discord_client_id();
-        $client_secret = jc_get_discord_client_secret();
-        $redirect_uri = jc_get_redirect_uri();
-        
-        if ( ! $client_id || ! $client_secret ) {
-            wp_die( 'Fehler: Discord Credentials sind nicht konfiguriert.' );
-        }
-        
-        // Exchange code for access token
-        $response = wp_remote_post( 'https://discord.com/api/oauth2/token', array(
-            'body' => array(
-                'client_id' => $client_id,
-                'client_secret' => $client_secret,
-                'grant_type' => 'authorization_code',
-                'code' => $code,
-                'redirect_uri' => $redirect_uri,
-            ),
-            'timeout' => 10
-        ) );
-        
-        if ( is_wp_error( $response ) ) {
-            wp_die( 'Fehler beim Austausch mit Discord: ' . $response->get_error_message() );
-        }
-        
-        $response_code = wp_remote_retrieve_response_code( $response );
-        $response_body = json_decode( wp_remote_retrieve_body( $response ), true );
-        
-        if ( 200 !== $response_code ) {
-            $error_msg = isset( $response_body['error_description'] ) ? $response_body['error_description'] : 'Unbekannter Fehler';
-            wp_die( 'Discord Fehler: ' . esc_html( $error_msg ) );
-        }
-        
-        if ( ! isset( $response_body['access_token'] ) ) {
-            wp_die( 'Fehler: Kein Access Token von Discord erhalten.' );
-        }
-        
-        $access_token = $response_body['access_token'];
-        
-        // Fetch user profile from Discord
-        $user_response = wp_remote_get( 'https://discord.com/api/users/@me', array(
-            'headers' => array(
-                'Authorization' => 'Bearer ' . $access_token,
-            ),
-            'timeout' => 10
-        ) );
-        
-        if ( is_wp_error( $user_response ) ) {
-            wp_die( 'Fehler beim Abrufen des Discord Profils: ' . $user_response->get_error_message() );
-        }
-        
-        $user_data = json_decode( wp_remote_retrieve_body( $user_response ), true );
-        
-        if ( ! isset( $user_data['id'] ) ) {
-            wp_die( 'Fehler: Discord Benutzerdaten ungültig.' );
-        }
-        
-        // Store Discord user in session
-        if ( ! isset( $_SESSION ) ) {
-            session_start();
-        }
-        
-        $_SESSION['jc_discord_user'] = array(
-            'id' => $user_data['id'],
-            'username' => $user_data['username'] ?? 'Unknown',
-            'avatar' => $user_data['avatar'] ?? '',
-            'email' => $user_data['email'] ?? '',
-            'verified' => $user_data['verified'] ?? false,
-        );
-        
-        error_log( 'JC Discord OAuth: User logged in: ' . $user_data['id'] );
-        
-        // Redirect to bewerbung page
-        wp_safe_remote_post( home_url( '/bewerbung/' ), array(
-            'blocking' => false,
-        ) );
-        
-        wp_redirect( home_url( '/bewerbung/' ) );
-        exit;
-    }
-} );
-
 // ========================================
 // BEWERBUNGSFORMULAR SHORTCODE
 // ========================================
 add_shortcode( 'discord_application_form', function( $atts ) {
     ob_start();
     ?>
+    
+    <style>
+        @keyframes jc-fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes jc-slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes jc-success-pop {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes jc-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        @keyframes jc-dot-bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .jc-bewerbung-wrap {
+            background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+            color: #e1e3e8;
+            padding: 50px;
+            border-radius: 16px;
+            max-width: 900px;
+            margin: 50px auto;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+        
+        .jc-card {
+            background: #2a2c36 !important;
+            padding: 35px !important;
+            border-radius: 14px !important;
+            animation: jc-fadeIn 0.8s ease-out 0.2s both !important;
+        }
+        
+        .jc-h {
+            font-size: 28px;
+            margin-bottom: 15px;
+            color: #f0f0f0;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* ########## START: ANPASSUNG ICON (v6.15) ########## */
+        .jc-h::before {
+            content: ''; /* Wichtig: Inhalt leeren */
+            display: inline-block; /* Wichtig für Höhe/Breite */
+            width: 32px;  /* Deine gewünschte Breite */
+            height: 32px; /* Deine gewünschte Höhe */
+            background-image: url('https://just-creators.de/wp-content/uploads/2025/11/cropped-WordPress-Favicon-removebg-preview-2.png');
+            background-size: contain; /* Stellt sicher, dass das Bild hineinpasst */
+            background-repeat: no-repeat;
+            background-position: center;
+            margin-top: 4px; /* Verschiebt es 4px nach unten */
+        }
+        /* ########## ENDE: ANPASSUNG ICON (v6.15) ########## */
+
+        .jc-status-box {
+            background: #2a2c36 !important;
+            padding: 40px !important;
+            border-radius: 14px !important;
+            text-align: center !important;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3) !important;
+            animation: jc-fadeIn 0.8s ease-out !important;
+        }
+        
+        .jc-status-pending {
+            border-left: 6px solid #ffc107;
+        }
+        
+        .jc-status-accepted {
+            border-left: 6px solid #4caf50;
+        }
+        
+        .jc-status-rejected {
+            border-left: 6px solid #f44336;
+        }
+        
+        .jc-status-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: jc-pulse 2s infinite;
+        }
+        
+        .jc-status-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #f0f0f0;
+        }
+        
+        .jc-status-desc {
+            font-size: 17px;
+            color: #f0f0f0 !important; /* Auf helles Weiß geändert */
+            line-height: 1.8;
+            margin: 15px 0;
+        }
+        
+        .jc-status-desc * {
+            color: inherit !important;
+        }
+        
+        .jc-status-meta {
+            font-size: 14px;
+            color: #8a8f9e;
+            padding: 25px; /* Padding hierher verschoben */
+        }
+        
+        .jc-discord-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 12px !important;
+            padding: 14px 28px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%) !important;
+            color: #fff !important;
+            text-decoration: none !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            border: none !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4) !important;
+            position: relative !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+        }
+        
+        .jc-discord-btn::before {
+            content: '' !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: -100% !important;
+            width: 100% !important;
+            height: 100% !important;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
+            transition: left 0.5s !important;
+        }
+        
+        .jc-discord-btn:hover::before {
+            left: 100% !important;
+        }
+        
+        .jc-discord-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6) !important;
+            background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%) !important;
+        }
+        
+        .jc-discord-logo {
+            width: 24px !important;
+            height: 24px !important;
+            fill: #fff !important;
+        }
+        
+        .jc-label {
+            display: block !important;
+            margin-top: 20px !important;
+            margin-bottom: 8px !important;
+            font-weight: 600 !important;
+            color: #f0f0f0 !important;
+            font-size: 15px !important;
+        }
+        
+        .jc-input, .jc-textarea {
+            width: 100% !important;
+            padding: 14px !important;
+            margin-top: 8px !important;
+            background: #3a3c4a !important;
+            border: 2px solid #4a4c5a !important;
+            color: #ffffff !important;
+            border-radius: 10px !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-family: inherit !important;
+            font-size: 15px !important;
+            transition: all 0.3s ease !important;
+            box-sizing: border-box !important;
+        }
+        
+        .jc-input::placeholder, .jc-textarea::placeholder {
+            color: #a0a8b8 !important;
+        }
+        
+        .jc-input:focus, .jc-textarea:focus {
+            outline: none !important;
+            border-color: #5865F2 !important;
+            box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2) !important;
+            transform: translateY(-1px) !important;
+        }
+        
+        .jc-social-field-group {
+            display: flex !important;
+            gap: 12px !important;
+            margin-bottom: 15px !important;
+            align-items: center !important;
+            animation: jc-slideIn 0.3s ease-out !important;
+            position: relative !important;
+            padding: 12px !important;
+            background: rgba(58, 60, 74, 0.2) !important;
+            border-radius: 10px !important;
+            border: 1px solid rgba(74, 76, 90, 0.3) !important;
+            transition: all 0.3s ease !important;
+        }
+        
+        .jc-social-field-group:hover {
+            background: rgba(58, 60, 74, 0.35) !important;
+            border-color: rgba(88, 101, 242, 0.2) !important;
+        }
+        
+        .jc-social-field-wrapper {
+            flex: 1 !important;
+            position: relative !important;
+        }
+        
+        .jc-social-field-group input {
+            margin-top: 0 !important;
+            padding-right: 50px !important;
+            background: #2a2c36 !important;
+        }
+        
+        .jc-platform-icon {
+            position: absolute !important;
+            right: 14px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            font-size: 24px !important;
+            pointer-events: none !important;
+            opacity: 0 !important;
+            transition: opacity 0.3s ease !important;
+        }
+        
+        .jc-platform-icon.visible {
+            opacity: 1 !important;
+        }
+        
+        .jc-add-social-btn, .jc-remove-social-btn {
+            padding: 12px 20px !important;
+            border: 2px solid transparent !important;
+            border-radius: 10px !important;
+            cursor: pointer !important;
+            font-weight: 600 !important;
+            font-size: 14px !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            white-space: nowrap !important;
+            box-sizing: border-box !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+        
+        .jc-add-social-btn {
+            background: rgba(88, 101, 242, 0.15) !important;
+            color: #5865F2 !important;
+            margin-top: 15px !important;
+            border: 1px solid rgba(88, 101, 242, 0.3) !important;
+            box-shadow: none !important;
+        }
+        
+        .jc-add-social-btn::before {
+            content: '➕' !important;
+            font-size: 16px !important;
+        }
+        
+        .jc-add-social-btn:hover {
+            background: linear-gradient(135deg, rgba(88, 101, 242, 0.25) 0%, rgba(88, 101, 242, 0.35) 100%) !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3) !important;
+            border-color: rgba(88, 101, 242, 0.5) !important;
+        }
+        
+        .jc-remove-social-btn {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.15) 0%, rgba(244, 67, 54, 0.25) 100%) !important;
+            color: #f44336 !important;
+            padding: 12px 16px !important;
+            margin-top: 8px !important;
+            border: 2px solid rgba(244, 67, 54, 0.3) !important;
+            box-shadow: 0 2px 8px rgba(244, 67, 54, 0.15) !important;
+            font-size: 18px !important;
+            line-height: 1 !important;
+            min-width: 44px !important;
+        }
+        
+        .jc-remove-social-btn:hover {
+            background: rgba(244, 67, 54, 0.25) !important;
+            transform: scale(1.05) !important;
+            border-color: rgba(244, 67, 54, 0.5) !important;
+        }
+        
+        .jc-add-social-btn:hover {
+            background: rgba(88, 101, 242, 0.25) !important;
+            transform: translateY(-1px) !important;
+            border-color: rgba(88, 101, 242, 0.5) !important;
+        }
+        
+        .jc-remove-social-btn {
+            background: rgba(244, 67, 54, 0.15) !important;
+            color: #f44336 !important;
+            padding: 10px 14px !important;
+            margin: 0 !important;
+            border: 1px solid rgba(244, 67, 54, 0.3) !important;
+            box-shadow: none !important;
+            font-size: 16px !important;
+            line-height: 1 !important;
+            min-width: 42px !important;
+            height: 42px !important;
+        }
+        
+        .jc-remove-social-btn:hover {
+            background: rgba(255, 107, 107, 0.3) !important;
+        }
+        
+        .jc-note {
+            font-size: 14px !important;
+            color: #a0a8b8 !important;
+            margin-top: 12px !important;
+            padding: 12px !important;
+            background: rgba(88, 101, 242, 0.1) !important;
+            border-left: 3px solid #5865F2 !important;
+            border-radius: 6px !important;
+        }
+        
+        .jc-error {
+            color: #ffb4b4 !important;
+            background: #3a2323 !important;
+            padding: 16px !important;
+            border-radius: 10px !important;
+            border-left: 4px solid #ff6b6b !important;
+            margin: 15px 0 !important;
+            animation: jc-fadeIn 0.4s ease-out !important;
+        }
+        
+        .jc-success {
+            background: linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 100%) !important;
+            padding: 30px !important;
+            border-radius: 12px !important;
+            margin-top: 20px !important;
+            text-align: center !important;
+            animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+            border: 2px solid #4ade80 !important;
+            box-shadow: 0 8px 24px rgba(74, 222, 128, 0.2) !important;
+        }
+        
+        .jc-success-icon {
+            width: 80px !important;
+            height: 80px !important;
+            margin: 0 auto 20px !important;
+        }
+        
+        .jc-success-icon svg {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        .jc-success-icon circle {
+            fill: #4ade80 !important;
+            animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+        }
+        
+        .jc-success-icon path {
+            stroke: #fff !important;
+            stroke-width: 3 !important;
+            stroke-dasharray: 100 !important;
+        }
+        
+        .jc-success h3 {
+            color: #d1f7d1 !important;
+            font-size: 24px !important;
+            margin: 0 0 15px 0 !important;
+            font-weight: 700 !important;
+        }
+        
+        .jc-success p {
+            color: #b8e6b8 !important;
+            font-size: 16px !important;
+            line-height: 1.6 !important;
+            margin: 10px 0 !important;
+        }
+        
+        .jc-user-badge {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 12px !important;
+            background: rgba(88, 101, 242, 0.15) !important;
+            padding: 12px 20px !important;
+            border-radius: 10px !important;
+            margin: 15px 0 !important;
+            border: 2px solid rgba(88, 101, 242, 0.3) !important;
+        }
+        
+        .jc-user-badge strong {
+            color: #5865F2 !important;
+            font-size: 16px !important;
+        }
+        
+        .jc-field-error {
+            color: #ff6b6b !important;
+            font-size: 13px !important;
+            margin-top: 6px !important;
+            display: block !important;
+            padding-left: 4px !important;
+            animation: jc-fadeIn 0.3s ease-out !important;
+        }
+        
+        .jc-input.error, .jc-textarea.error {
+            border-color: #ff6b6b !important;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2) !important;
+        }
+
+        /* ADMIN STATUS SELECT FIX */
+        .jc-status-select {
+            -webkit-appearance: none;
+            appearance: none;
+            /* FIX: %<path zu %3Cpath korrigiert */
+            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' viewBox=\'0 0 12 12\'%3E%3Cpath fill=\'%23fff\' d=\'M6 9L1 4h10z\'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+        }
+        
+        .jc-waiting-screen {
+            background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+            color: #e1e3e8;
+            padding: 50px;
+            border-radius: 16px;
+            max-width: 900px;
+            margin: 50px auto;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+        
+        .jc-waiting-content {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .jc-waiting-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: jc-pulse 2s infinite;
+        }
+        
+        .jc-waiting-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #f0f0f0;
+        }
+        
+        .jc-waiting-desc {
+            font-size: 17px;
+            color: #a0a8b8;
+            line-height: 1.8;
+            margin: 15px 0 30px;
+        }
+        
+        .jc-waiting-animation {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin: 30px 0;
+        }
+        
+        .jc-dot {
+            width: 12px;
+            height: 12px;
+            background: #5865F2;
+            border-radius: 50%;
+            animation: jc-dot-bounce 1.4s infinite ease-in-out;
+        }
+        
+        .jc-dot:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        
+        .jc-dot:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        
+        .jc-dot:nth-child(3) {
+            animation-delay: 0s;
+        }
+        
+        .jc-discord-invite-box {
+            margin: 30px 0;
+        }
+        
+        .jc-waiting-btn {
+            font-size: 18px;
+            padding: 16px 32px;
+            margin: 20px 0;
+        }
+        
+        .jc-waiting-hint {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(88, 101, 242, 0.1);
+            border-radius: 8px;
+            border-left: 3px solid #5865F2;
+            color: #a0a8b8;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        @media (max-width: 768px) {
+            .jc-bewerbung-wrap {
+                padding: 30px 20px !important;
+                margin: 20px auto !important;
+            }
+            
+            .jc-card {
+                padding: 25px 20px !important;
+            }
+            
+            .jc-h {
+                font-size: 22px !important;
+            }
+            
+            .jc-social-field-group {
+                flex-direction: column !important;
+            }
+            
+            .jc-waiting-screen {
+                padding: 30px 20px !important;
+                margin: 20px auto !important;
+            }
+            
+            .jc-waiting-title {
+                font-size: 24px !important;
+            }
+            
+            .jc-waiting-icon {
+                font-size: 64px !important;
+            }
+        }
+    </style>
+    
     <div class="jc-bewerbung-wrap">
         <div class="jc-card">
             <h2 class="jc-h">Bewerbung — JustCreators</h2>
@@ -1446,7 +1640,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
             // Fügt 'privacy_accepted_at' zur Verarbeitung hinzu
             $form_submitted = false;
             $validation_errors = array();
-            $field_errors = array(); // Inline-Fehler pro Feld
             
             if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['jc_bewerbung_nonce'] ) ) {
                 $nonce = sanitize_text_field( wp_unslash( $_POST['jc_bewerbung_nonce'] ) );
@@ -1463,7 +1656,6 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     $age = sanitize_text_field( wp_unslash( $_POST['age'] ) );
                     $social_activity = sanitize_text_field( wp_unslash( $_POST['social_activity'] ) );
                     $motivation = sanitize_textarea_field( wp_unslash( $_POST['motivation'] ) );
-                    $motivation_length = mb_strlen( $motivation );
                     
                     $social_channels = array();
                     if ( isset( $_POST['social_channels'] ) && is_array( $_POST['social_channels'] ) ) {
@@ -1471,26 +1663,20 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             $channel_clean = sanitize_text_field( wp_unslash( $channel ) );
                             if ( ! empty( $channel_clean ) ) {
                                 $validation = jc_validate_social_link( $channel_clean );
-                                $social_channels[] = array(
-                                    'url' => $validation['url'],
-                                    'platform' => $validation['platform']
-                                );
+                                if ( $validation['valid'] ) {
+                                    $social_channels[] = array(
+                                        'url' => $validation['url'],
+                                        'platform' => $validation['platform']
+                                    );
+                                } else {
+                                    $validation_errors[] = 'Ungültiger Link: ' . esc_html( $channel_clean );
+                                }
                             }
                         }
                     }
-                    if ( count( $social_channels ) > 5 ) {
-                        $social_channels = array_slice( $social_channels, 0, 5 );
-                        $field_errors['social'][] = 'Es sind maximal 5 Kanäle erlaubt.';
-                        $validation_errors[] = 'Bitte gib höchstens 5 Social Media Kanäle an.';
-                    }
                     
                     if ( empty( $social_channels ) ) {
-                        $field_errors['social'][] = 'Bitte gib mindestens einen Social Media Kanal an.';
                         $validation_errors[] = 'Bitte gib mindestens einen Social Media Kanal an.';
-                    }
-                    if ( $motivation_length < 100 || $motivation_length > 1000 ) {
-                        $field_errors['motivation'][] = 'Deine Begründung muss zwischen 100 und 1000 Zeichen lang sein.';
-                        $validation_errors[] = 'Bitte gib eine Begründung mit 100 bis 1000 Zeichen an.';
                     }
                     
                     if ( empty( $validation_errors ) ) {
@@ -1754,7 +1940,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     
                     <label class="jc-label">🌐 Social Media Kanäle *</label>
                     <div class="jc-note" style="margin-top: 8px;">
-                        Gib mindestens einen Social Media Kanal an. <strong>Nur YouTube, Twitch und TikTok sind erlaubt.</strong> Du kannst bis zu <strong>5 Kanäle</strong> angeben (1 Pflichtfeld + 4 optional).
+                        Gib deine Social Media Kanäle an. <strong>Nur YouTube, Twitch und TikTok sind erlaubt.</strong> Die Links werden automatisch validiert.
                     </div>
                     <div class="jc-social-fields" id="jc-social-fields">
                         <div class="jc-social-field-group">
@@ -1764,7 +1950,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                             </div>
                         </div>
                     </div>
-                    <button type="button" class="jc-add-social-btn" id="jc-add-social-btn" onclick="return window.jcInlineAddSocial ? window.jcInlineAddSocial() : false;">
+                    <button type="button" class="jc-add-social-btn" id="jc-add-social-btn">
                         Weiteren Kanäle hinzufügen
                     </button>
                     <span class="jc-field-error" id="jc-social-error" style="display: none;"></span>
@@ -1773,7 +1959,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     <input class="jc-input" type="text" name="social_activity" id="jc-activity-input" placeholder="z. B. täglich" required />
                     <span class="jc-field-error" id="jc-activity-error" style="display: none;"></span>
                     <label class="jc-label">💭 Warum JustCreators? *</label>
-                    <textarea class="jc-textarea" name="motivation" id="jc-motivation-input" rows="8" minlength="100" maxlength="1000" required placeholder="Erzähle uns, warum du zu JustCreators willst. Mindestens 100 und maximal 1000 Zeichen."></textarea>
+                    <textarea class="jc-textarea" name="motivation" id="jc-motivation-input" rows="6" required placeholder="Erzähle uns..."></textarea>
                     <span class="jc-field-error" id="jc-motivation-error" style="display: none;"></span>
 
                     
@@ -1798,9 +1984,304 @@ add_shortcode( 'discord_application_form', function( $atts ) {
                     </button>
                 </form>
                 
+                <script>
+                (function() {
+                    const JC_DEBUG = true;
+                    const JC_REMOTE_DEBUG = true;
+                    const JC_FE_ENDPOINT = '<?php echo esc_url( rest_url( 'jc/v1/frontend-log' ) ); ?>';
+                    const JC_SID = '<?php echo esc_js( session_id() ); ?>';
+                    window.JCLogHistory = window.JCLogHistory || [];
+                    function jcSendLog(event, payload, level) {
+                        try {
+                            if (!JC_REMOTE_DEBUG) return;
+                            const body = JSON.stringify({
+                                event: event || 'unknown',
+                                level: level || 'info',
+                                ts: Date.now(),
+                                url: location.href,
+                                ua: navigator.userAgent,
+                                sid: JC_SID,
+                                payload: payload || {}
+                            });
+                            if (navigator.sendBeacon) {
+                                const blob = new Blob([body], { type: 'application/json' });
+                                navigator.sendBeacon(JC_FE_ENDPOINT, blob);
+                            } else {
+                                fetch(JC_FE_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                    function jcLog() {
+                        try {
+                            if (JC_DEBUG) {
+                                const args = Array.prototype.slice.call(arguments);
+                                console.log.apply(console, ['[JC Bewerbungsportal]'].concat(args));
+                                window.JCLogHistory.push({ t: Date.now(), args });
+                            }
+                        } catch (e) { /* ignore */ }
+                    }
+                    // Fallback: falls console beschnitten ist, schreibe eine sichtbare Warnung ins DOM
+                    function jcWarnDom(msg) {
+                        try {
+                            const el = document.getElementById('jc-log-warning') || (function(){
+                                const d = document.createElement('div');
+                                d.id = 'jc-log-warning';
+                                d.style.cssText = 'background:#ffedc2;color:#8a5500;padding:8px 12px;margin:10px 0;border:1px solid #e0b200;border-radius:6px;font-size:13px;';
+                                const form = document.getElementById('jc-application-form');
+                                if (form) form.prepend(d);
+                                return d;
+                            })();
+                            el.textContent = msg;
+                        } catch (e) { /* ignore */ }
+                    }
+
+                    function setup() {
+                        jcLog('setup:start', { readyState: document.readyState });
+                        jcWarnDom('JS geladen – versuche Button zu binden');
+                        jcSendLog('setup:start', { readyState: document.readyState });
+                        const MAX_FIELDS = 5;
+                        const container = document.getElementById('jc-social-fields');
+                        const addBtn = document.getElementById('jc-add-social-btn');
+                        jcLog('setup:elements', { container: !!container, addBtn: !!addBtn });
+                        jcSendLog('setup:elements', { container: !!container, addBtn: !!addBtn });
+                        if (!container) { jcLog('setup:abort:no-container'); jcSendLog('setup:abort:no-container'); return; } // Falls DOM noch nicht bereit
+                        let nextIndex = getInitialNextIndex();
+                        jcLog('setup:nextIndex:init', nextIndex);
+                        jcSendLog('setup:nextIndex:init', { nextIndex });
+
+                        const icons = { youtube:'YT', tiktok:'TT', twitch:'TW', twitter:'TW', instagram:'IG', handle:'@', unknown:'?' };
+                        function detectPlatform(url) {
+                            const u = (url || '').toLowerCase();
+                            if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+                            if (u.includes('tiktok.com')) return 'tiktok';
+                            if (u.includes('twitch.tv')) return 'twitch';
+                            if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
+                            if (u.includes('instagram.com')) return 'instagram';
+                            if (u.startsWith('@')) return 'handle';
+                            return 'unknown';
+                        }
+                        function getGroupCount() { return container.querySelectorAll('.jc-social-field-group').length; }
+                        function getInitialNextIndex() {
+                            // Finde höchste vorhandene data-index und setze nextIndex = max+1
+                            let maxIdx = 0;
+                            container.querySelectorAll('input.jc-social-input').forEach(function(inp) {
+                                const idx = parseInt(inp.getAttribute('data-index') || '0', 10);
+                                if (!isNaN(idx)) maxIdx = Math.max(maxIdx, idx);
+                            });
+                            const initIdx = maxIdx + 1;
+                            jcLog('compute:initialNextIndex', { maxIdx, initIdx });
+                            jcSendLog('compute:initialNextIndex', { maxIdx, initIdx });
+                            return initIdx;
+                        }
+                        function updateAddBtnVisibility() {
+                            if (!addBtn) return;
+                            addBtn.style.display = getGroupCount() >= MAX_FIELDS ? 'none' : 'inline-block';
+                            jcLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
+                            jcSendLog('ui:addBtn:visibility', { hidden: getGroupCount() >= MAX_FIELDS, count: getGroupCount() });
+                        }
+                        function updateIconForInput(input) {
+                            const idx = input.getAttribute('data-index') || '0';
+                            const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
+                            if (!el) return;
+                            const val = (input.value || '').trim();
+                            if (val.length > 3) {
+                                const p = detectPlatform(val);
+                                el.textContent = icons[p] || icons.unknown;
+                                el.classList.add('visible');
+                                jcLog('icon:update', { idx, val, platform: p });
+                            } else {
+                                el.classList.remove('visible');
+                            }
+                        }
+                        function addField() {
+                            jcLog('addField:clicked', { count: getGroupCount(), nextIndex });
+                            jcSendLog('addField:clicked', { count: getGroupCount(), nextIndex });
+                            if (getGroupCount() >= MAX_FIELDS) {
+                                alert('Maximal ' + MAX_FIELDS + ' Social Media Kanäle erlaubt.');
+                                jcLog('addField:blocked:max-reached');
+                                jcSendLog('addField:blocked:max-reached', { count: getGroupCount() });
+                                return;
+                            }
+                            const html = (
+                                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
+                                  '<div class="jc-social-field-wrapper">' +
+                                    '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
+                                    '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
+                                  '</div>' +
+                                  '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>' +
+                                '</div>'
+                            );
+                            const before = getGroupCount();
+                            try {
+                                container.insertAdjacentHTML('beforeend', html);
+                            } catch (e) {
+                                const group = document.createElement('div');
+                                group.className = 'jc-social-field-group';
+                                group.innerHTML = (
+                                    '<div class="jc-social-field-wrapper">' +
+                                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
+                                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
+                                    '</div>' +
+                                    '<button type="button" class="jc-remove-social-btn" title="Entfernen">X</button>'
+                                );
+                                container.appendChild(group);
+                            }
+                            const after = getGroupCount();
+                            jcLog('addField:appended', { newIndex: nextIndex, before, after });
+                            jcSendLog('addField:appended', { newIndex: nextIndex, before, after });
+                            nextIndex += 1;
+                            jcLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
+                            jcSendLog('addField:nextIndex:incremented', { nextIndex, newCount: getGroupCount() });
+                            updateAddBtnVisibility();
+                            try {
+                                const last = container.querySelector('.jc-social-field-group[data-added="1"]:last-child') || container.querySelector('.jc-social-field-group:last-child');
+                                if (last) {
+                                    last.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    setTimeout(function(){ if (last && last.style) last.style.outline = 'none'; }, 900);
+                                }
+                            } catch (e) { /* ignore */ }
+                        }
+                        function removeField(btn) {
+                            const count = getGroupCount();
+                            const group = btn.closest('.jc-social-field-group');
+                            if (!group) return;
+                            if (count <= 1) {
+                                jcLog('removeField:clearing-last');
+                                jcSendLog('removeField:clearing-last');
+                                const input = group.querySelector('input.jc-social-input');
+                                if (input) {
+                                    input.value = '';
+                                    updateIconForInput(input);
+                                }
+                                return;
+                            }
+                            group.remove();
+                            jcLog('removeField:removed', { newCount: getGroupCount() });
+                            jcSendLog('removeField:removed', { newCount: getGroupCount() });
+                            updateAddBtnVisibility();
+                        }
+                        // Event binding (idempotent)
+                        if (addBtn && !addBtn.dataset.bound) {
+                            addBtn.addEventListener('click', function(e) { e.preventDefault(); jcLog('addBtn:direct-click'); jcSendLog('addBtn:direct-click'); addField(); });
+                            addBtn.addEventListener('pointerdown', function(e) { if (e.pointerType === 'touch') { e.preventDefault(); jcLog('addBtn:pointerdown'); jcSendLog('addBtn:pointerdown'); addField(); }});
+                            addBtn.dataset.bound = '1';
+                            jcWarnDom('Button gebunden (click/pointerdown)');
+                        }
+                        // Fallback Delegation (falls Button neu gerendert wird)
+                        document.addEventListener('click', function(e) {
+                            const target = e.target;
+                            if (target && (target.id === 'jc-add-social-btn' || (target.closest && target.closest('#jc-add-social-btn')))) {
+                                e.preventDefault();
+                                jcLog('addBtn:delegated-click');
+                                jcSendLog('addBtn:delegated-click');
+                                addField();
+                            }
+                        });
+                        document.addEventListener('pointerdown', function(e) {
+                            const t = e.target;
+                            if (e.pointerType === 'touch' && t && (t.id === 'jc-add-social-btn' || (t.closest && t.closest('#jc-add-social-btn')))) {
+                                e.preventDefault();
+                                jcLog('addBtn:delegated-pointerdown');
+                                jcSendLog('addBtn:delegated-pointerdown');
+                                addField();
+                            }
+                        });
+                        container.addEventListener('click', function(e) {
+                            if (e.target && e.target.classList.contains('jc-remove-social-btn')) {
+                                e.preventDefault();
+                                jcLog('removeBtn:click');
+                                jcSendLog('removeBtn:click');
+                                removeField(e.target);
+                            }
+                        });
+                        container.addEventListener('input', function(e) {
+                            if (e.target && e.target.classList.contains('jc-social-input')) {
+                                updateIconForInput(e.target);
+                            }
+                        }, true);
+                        // Initial state
+                        const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
+                        if (firstInput) updateIconForInput(firstInput);
+                        jcLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
+                        jcSendLog('init:initial-icon-updated', { hadFirstInput: !!firstInput });
+                        updateAddBtnVisibility();
+
+                        // Validation
+                        function validateAge() {
+                            const ageInput = document.getElementById('jc-age-input');
+                            if (!ageInput) return true;
+                            const val = (ageInput.value || '').trim();
+                            if (val === '') return true;
+                            const n = parseInt(val, 10);
+                            return !isNaN(n) && n >= 11 && n <= 99;
+                        }
+                        function validateName() {
+                            const el = document.getElementById('jc-name-input');
+                            if (!el) return true;
+                            return (el.value || '').trim().length >= 2;
+                        }
+                        function validateSocialLinks() {
+                            const inputs = document.querySelectorAll('.jc-social-input');
+                            return Array.from(inputs).some(function(input) {
+                                const v = (input.value || '').toLowerCase();
+                                return v.includes('youtube.com') || v.includes('youtu.be') || v.includes('twitch.tv') || v.includes('tiktok.com');
+                            });
+                        }
+                        function validateActivity() {
+                            const a = document.getElementById('jc-activity-input');
+                            if (!a) return true;
+                            return (a.value || '').trim().length >= 2;
+                        }
+                        function validateMotivation() {
+                            const m = document.getElementById('jc-motivation-input');
+                            if (!m) return true;
+                            return (m.value || '').replace(/\s/g, '').length >= 20;
+                        }
+                        function initValidation() {
+                            const form = document.getElementById('jc-application-form');
+                            if (!form) return;
+                            form.addEventListener('submit', function(e) {
+                                const checks = {
+                                    name: validateName(),
+                                    age: validateAge(),
+                                    social: validateSocialLinks(),
+                                    activity: validateActivity(),
+                                    motivation: validateMotivation()
+                                };
+                                const ok = checks.name && checks.age && checks.social && checks.activity && checks.motivation;
+                                jcLog('form:submit:validation', { ok, checks });
+                                if (!ok) jcSendLog('form:submit:validation:fail', { checks });
+                                if (!ok) { e.preventDefault(); e.stopPropagation(); }
+                            });
+                        }
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', function(){ jcLog('validation:init:DOMContentLoaded'); jcSendLog('validation:init:DOMContentLoaded'); initValidation(); });
+                        } else {
+                            jcLog('validation:init:immediate');
+                            jcSendLog('validation:init:immediate');
+                            initValidation();
+                        }
+                    }
+                    // Initial attempt
+                    setup();
+                    // Safety: run again on DOMContentLoaded in case of late rendering
+                    document.addEventListener('DOMContentLoaded', function(){ jcLog('setup:rerun:DOMContentLoaded'); jcSendLog('setup:rerun:DOMContentLoaded'); setup(); });
+                    // Observe DOM changes to re-bind if page builder re-renders
+                    try {
+                        const mo = new MutationObserver(function() {
+                            const c = document.getElementById('jc-social-fields');
+                            const b = document.getElementById('jc-add-social-btn');
+                            if (c && b && !b.dataset.bound) {
+                                jcLog('mutation:reinit');
+                                jcSendLog('mutation:reinit');
+                                setup();
+                            }
+                        });
+                        mo.observe(document.body, { childList: true, subtree: true });
+                    } catch (e) { /* ignore */ }
+                })();
+                </script>
                 <?php
-                // Kennzeichne, dass wir das Inline-JS im Footer laden sollen
-                $GLOBALS['jc_application_form_scripts'] = true;
             }
             ?>
         </div>
@@ -1809,291 +2290,12 @@ add_shortcode( 'discord_application_form', function( $atts ) {
     <?php
     return ob_get_clean();
 } );
-
-// Drucke das Formular-JavaScript im Footer, damit es nicht von Content-Filtern entfernt wird
-add_action( 'wp_footer', 'jc_print_application_form_scripts' );
-function jc_print_application_form_scripts() {
-    static $printed = false;
-    if ( $printed ) return;
-    if ( empty( $GLOBALS['jc_application_form_scripts'] ) ) return;
-    $printed = true;
-    $fe_endpoint = esc_url( rest_url( 'jc/v1/frontend-log' ) );
-    $session_id = esc_js( session_id() );
-    ?>
-    <script>
-    (function() {
-        const JC_DEBUG = false;
-        const JC_REMOTE_DEBUG = false;
-        const JC_FE_ENDPOINT = '<?php echo $fe_endpoint; ?>';
-        const JC_SID = '<?php echo $session_id; ?>';
-        const MAX_FIELDS = 5;
-        const platformClasses = ['icon-youtube','icon-tiktok','icon-twitch','icon-instagram','icon-unknown'];
-        let container = null;
-        let addBtn = null;
-        let nextIndex = 1;
-
-        function detectPlatform(url) {
-            const u = (url || '').toLowerCase();
-            if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
-            if (u.includes('tiktok.com')) return 'tiktok';
-            if (u.includes('twitch.tv')) return 'twitch';
-            if (u.includes('twitter.com') || u.includes('x.com')) return 'twitter';
-            if (u.includes('instagram.com')) return 'instagram';
-            if (u.startsWith('@')) return 'handle';
-            return 'unknown';
-        }
-
-        function getGroupCount() {
-            return container ? container.querySelectorAll('.jc-social-field-group').length : 0;
-        }
-
-        function getInitialNextIndex() {
-            let maxIdx = 0;
-            if (!container) return 1;
-            container.querySelectorAll('input.jc-social-input').forEach(function(inp) {
-                const idx = parseInt(inp.getAttribute('data-index') || '0', 10);
-                if (!isNaN(idx)) maxIdx = Math.max(maxIdx, idx);
-            });
-            return maxIdx + 1;
-        }
-
-        function updateAddBtnVisibility() {
-            if (addBtn) {
-                addBtn.style.display = getGroupCount() >= MAX_FIELDS ? 'none' : 'inline-block';
-            }
-        }
-
-        function updateIconForInput(input) {
-            if (!container || !input) return;
-            const idx = input.getAttribute('data-index') || '0';
-            const el = container.querySelector('.jc-platform-icon[data-index="' + idx + '"]');
-            const val = (input.value || '').trim();
-            if (el) platformClasses.forEach(function(c){ el.classList.remove(c); });
-            if (val.length > 3) {
-                const p = detectPlatform(val);
-                if (el) el.classList.add('icon-' + p, 'visible');
-            } else if (el) {
-                el.classList.remove('visible');
-            }
-        }
-
-        function bindInputListeners(input) {
-            if (!input || input.dataset.listenerBound) return;
-            input.addEventListener('input', function() { updateIconForInput(this); });
-            input.addEventListener('keyup', function() { updateIconForInput(this); });
-            input.addEventListener('change', function() { updateIconForInput(this); });
-            input.dataset.listenerBound = '1';
-        }
-
-        function addField() {
-            if (!container) return false;
-            if (getGroupCount() >= MAX_FIELDS) {
-                alert('Maximal ' + MAX_FIELDS + ' Social Media Kanäle erlaubt.');
-                return false;
-            }
-            const html = (
-                '<div class="jc-social-field-group" data-added="1" style="outline: 2px solid rgba(88,101,242,0.35); outline-offset: 2px;">' +
-                    '<div class="jc-social-field-wrapper">' +
-                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                    '</div>' +
-                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>' +
-                '</div>'
-            );
-            try {
-                container.insertAdjacentHTML('beforeend', html);
-            } catch (e) {
-                const group = document.createElement('div');
-                group.className = 'jc-social-field-group';
-                group.innerHTML = (
-                    '<div class="jc-social-field-wrapper">' +
-                        '<input class="jc-input jc-social-input" type="text" name="social_channels[]" placeholder="z. B. youtube.com/@username" data-index="' + nextIndex + '" />' +
-                        '<span class="jc-platform-icon" data-index="' + nextIndex + '"></span>' +
-                    '</div>' +
-                    '<button type="button" class="jc-remove-social-btn" title="Entfernen" onclick="return window.jcInlineRemove ? window.jcInlineRemove(this) : false;">×</button>'
-                );
-                container.appendChild(group);
-            }
-            const newInput = container.querySelector('input.jc-social-input[data-index="' + nextIndex + '"]');
-            if (newInput) bindInputListeners(newInput);
-            nextIndex += 1;
-            updateAddBtnVisibility();
-            return false;
-        }
-
-        function removeField(btn) {
-            if (!container) return false;
-            const count = getGroupCount();
-            const group = btn.closest('.jc-social-field-group');
-            if (!group) return false;
-            if (count <= 1) {
-                const input = group.querySelector('input.jc-social-input');
-                if (input) {
-                    input.value = '';
-                    updateIconForInput(input);
-                }
-                return false;
-            }
-            group.remove();
-            updateAddBtnVisibility();
-            return false;
-        }
-
-        function initValidation() {
-            const form = document.getElementById('jc-application-form');
-            if (!form) return;
-            function validateAge() {
-                const ageInput = document.getElementById('jc-age-input');
-                if (!ageInput) return true;
-                const val = (ageInput.value || '').trim();
-                if (val === '') return true;
-                const n = parseInt(val, 10);
-                return !isNaN(n) && n >= 11 && n <= 99;
-            }
-            function validateName() {
-                const el = document.getElementById('jc-name-input');
-                if (!el) return true;
-                return (el.value || '').trim().length >= 2;
-            }
-            function validateSocialLinks() {
-                const inputs = document.querySelectorAll('.jc-social-input');
-                const hasValue = Array.from(inputs).some(function(input) { return (input.value || '').trim().length > 0; });
-                const errorEl = document.getElementById('jc-social-error');
-                if (!hasValue && errorEl) {
-                    errorEl.textContent = 'Bitte gib mindestens einen Social Media Kanal an.';
-                    errorEl.style.display = 'block';
-                } else if (errorEl) {
-                    errorEl.style.display = 'none';
-                }
-                return hasValue;
-            }
-            function validateActivity() {
-                const a = document.getElementById('jc-activity-input');
-                if (!a) return true;
-                return (a.value || '').trim().length >= 2;
-            }
-            function validateMotivation() {
-                const m = document.getElementById('jc-motivation-input');
-                if (!m) return true;
-                const val = (m.value || '');
-                const len = val.length;
-                const err = document.getElementById('jc-motivation-error');
-                const ok = len >= 100 && len <= 1000;
-                if (err) {
-                    err.textContent = ok ? '' : 'Bitte gib zwischen 100 und 1000 Zeichen ein.';
-                    err.style.display = ok ? 'none' : 'block';
-                }
-                return ok;
-            }
-            form.addEventListener('submit', function(e) {
-                const checks = {
-                    name: validateName(),
-                    age: validateAge(),
-                    social: validateSocialLinks(),
-                    activity: validateActivity(),
-                    motivation: validateMotivation()
-                };
-                const ok = checks.name && checks.age && checks.social && checks.activity && checks.motivation;
-                if (!ok) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            });
-        }
-
-        function bindEvents() {
-            if (addBtn && !addBtn.dataset.bound) {
-                addBtn.addEventListener('click', function(e) { e.preventDefault(); addField(); });
-                addBtn.addEventListener('pointerdown', function(e) { if (e.pointerType === 'touch') { e.preventDefault(); addField(); }});
-                addBtn.dataset.bound = '1';
-            }
-            document.addEventListener('click', function(e) {
-                const target = e.target;
-                if (target && (target.id === 'jc-add-social-btn' || (target.closest && target.closest('#jc-add-social-btn')))) {
-                    e.preventDefault();
-                    addField();
-                }
-            });
-            document.addEventListener('pointerdown', function(e) {
-                const t = e.target;
-                if (e.pointerType === 'touch' && t && (t.id === 'jc-add-social-btn' || (t.closest && t.closest('#jc-add-social-btn')))) {
-                    e.preventDefault();
-                    addField();
-                }
-            });
-            if (container) {
-                container.addEventListener('click', function(e) {
-                    const target = e.target;
-                    if (target && target.classList.contains('jc-remove-social-btn')) {
-                        e.preventDefault();
-                        removeField(target);
-                    }
-                });
-                container.addEventListener('pointerdown', function(e) {
-                    const target = e.target;
-                    if (e.pointerType === 'touch' && target && target.classList.contains('jc-remove-social-btn')) {
-                        e.preventDefault();
-                        removeField(target);
-                    }
-                });
-                container.addEventListener('input', function(e) {
-                    if (e.target && e.target.classList.contains('jc-social-input')) {
-                        updateIconForInput(e.target);
-                    }
-                }, true);
-                container.addEventListener('keyup', function(e) {
-                    if (e.target && e.target.classList.contains('jc-social-input')) {
-                        updateIconForInput(e.target);
-                    }
-                }, true);
-            }
-        }
-
-        function bindInitialInputs() {
-            if (!container) return;
-            container.querySelectorAll('input.jc-social-input').forEach(function(input) {
-                bindInputListeners(input);
-            });
-            const firstInput = container.querySelector('input.jc-social-input[data-index="0"]');
-            if (firstInput) updateIconForInput(firstInput);
-        }
-
-        function setup() {
-            container = document.getElementById('jc-social-fields');
-            addBtn = document.getElementById('jc-add-social-btn');
-            if (!container) return;
-            nextIndex = getInitialNextIndex();
-            window.jcInlineAddSocial = addField;
-            window.jcInlineRemove = removeField;
-            bindInitialInputs();
-            updateAddBtnVisibility();
-            bindEvents();
-            initValidation();
-        }
-
-        // Erste Initialisierung + Fallbacks für späte DOM-Änderungen
-        setup();
-        document.addEventListener('DOMContentLoaded', setup);
-        try {
-            const mo = new MutationObserver(function() {
-                const c = document.getElementById('jc-social-fields');
-                const b = document.getElementById('jc-add-social-btn');
-                if (c && b && (!b.dataset.bound || !window.jcInlineAddSocial)) {
-                    setup();
-                }
-            });
-            mo.observe(document.body, { childList: true, subtree: true });
-        } catch (e) { /* ignore */ }
-    })();
-    </script>
-    <?php
-}
 // ========================================
 // ADMIN BEWERBUNGEN ÜBERSICHT
 // ========================================
 function jc_admin_bewerbungen_page() {
     if ( ! current_user_can( 'manage_options' ) ) return;
-
+   
     global $wpdb;
     $table = $wpdb->prefix . 'jc_discord_applications';
    
@@ -2506,111 +2708,6 @@ function jc_admin_bewerbungen_page() {
         }
     </style>';
 }
-// ========================================
-// ADMIN EINSTELLUNGEN
-// ========================================
-add_action( 'admin_menu', function() {
-    add_options_page(
-        'JustCreators Bot Setup',
-        'JC Bot Setup',
-        'manage_options',
-        'jc-bot-setup',
-        'jc_bot_setup_page'
-    );
-
-    add_menu_page(
-        'Bewerbungen',
-        'Bewerbungen',
-        'manage_options',
-        'jc-bewerbungen',
-        'jc_admin_bewerbungen_page',
-        'dashicons-list-view',
-        26
-    );
-} );
-
-add_action( 'admin_init', function() {
-    register_setting( 'jc_bot_settings', 'jc_bot_api_url' );
-    register_setting( 'jc_bot_settings', 'jc_bot_api_secret' );
-} );
-
-function jc_bot_setup_page() {
-    if ( ! current_user_can( 'manage_options' ) ) return;
-
-    if ( isset( $_POST['jc_test_bot'] ) && check_admin_referer( 'jc_test_bot' ) ) {
-        $test_result = jc_test_bot_connection();
-        echo '<div class="notice notice-' . ( $test_result['success'] ? 'success' : 'error' ) . ' is-dismissible">';
-        echo '<p>' . esc_html( $test_result['message'] ) . '</p>';
-        echo '</div>';
-    }
-
-    ?>
-    <div class="wrap">
-        <h1>🤖 JustCreators Bot Setup</h1>
-
-        <div style="background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <h2>📋 Features</h2>
-            <ul style="font-size: 15px; line-height: 2;">
-                <li>✅ Automatische Social Media Link-Validierung mit Icons</li>
-                <li>✅ Auto-Sync bei Löschung (WP → Discord)</li>
-                <li>✅ Forum Tags für Bewerbungsstatus</li>
-                <li>✅ Slash Commands: <code>/accept</code>, <code>/reject</code></li>
-                <li>✅ Status-Sync: Discord → WordPress (✓ aktiv)</li>
-                <li>✅ Live Status-Anzeige für Bewerber</li>
-                <li>✅ Responsive Design mit Animationen</li>
-            </ul>
-
-            <form method="post" action="options.php" style="margin-top: 30px;">
-                <?php settings_fields( 'jc_bot_settings' ); ?>
-
-                <table class="form-table">
-                    <tr>
-                        <th scope="row">
-                            <label for="jc_bot_api_url">Bot API URL</label>
-                        </th>
-                        <td>
-                            <input type="url"
-                                   id="jc_bot_api_url"
-                                   name="jc_bot_api_url"
-                                   value="<?php echo esc_attr( jc_get_bot_api_url() ); ?>"
-                                   class="regular-text"
-                                   placeholder="http://localhost:3000" />
-                            <p class="description">URL wo der Bot läuft</p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <th scope="row">
-                            <label for="jc_bot_api_secret">API Secret</label>
-                        </th>
-                        <td>
-                            <input type="password"
-                                   id="jc_bot_api_secret"
-                                   name="jc_bot_api_secret"
-                                   value="<?php echo esc_attr( jc_get_bot_api_secret() ); ?>"
-                                   class="regular-text"
-                                   placeholder="Gleiches Secret wie in .env" />
-                            <p class="description">Muss mit API_SECRET in .env übereinstimmen</p>
-                        </td>
-                    </tr>
-                </table>
-
-                <?php submit_button( 'Einstellungen speichern', 'primary' ); ?>
-            </form>
-
-            <hr style="margin: 30px 0;">
-
-            <form method="post" style="margin-top: 20px;">
-                <?php wp_nonce_field( 'jc_test_bot' ); ?>
-                <button type="submit" name="jc_test_bot" class="button button-secondary">
-                    🧪 Bot-Verbindung testen
-                </button>
-            </form>
-        </div>
-    </div>
-    <?php
-}
-
 // ========================================
 // MEMBER DASHBOARD LADEN
 // ========================================
