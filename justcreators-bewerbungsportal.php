@@ -706,6 +706,43 @@ function jc_test_bot_connection() {
         'message' => '❌ Bot antwortet nicht korrekt (Code: ' . $response_code . ')'
     );
 }
+// ========================================
+// MISSING HELPER STUBS (placeholders)
+// ========================================
+if ( ! function_exists( 'jc_get_bot_api_url' ) ) {
+    function jc_get_bot_api_url() {
+        return get_option( 'jc_bot_api_url', '' );
+    }
+}
+
+if ( ! function_exists( 'jc_get_bot_api_secret' ) ) {
+    function jc_get_bot_api_secret() {
+        return get_option( 'jc_bot_api_secret', '' );
+    }
+}
+
+if ( ! function_exists( 'jc_get_discord_authorize_url' ) ) {
+    function jc_get_discord_authorize_url() {
+        // Build Discord OAuth URL
+        $client_id = get_option( 'jc_discord_client_id', '' );
+        $redirect_uri = urlencode( rest_url( 'jc/v1/discord-callback' ) );
+        $scope = urlencode( 'identify email' );
+        if ( ! $client_id ) {
+            error_log( 'JC: Discord Client ID not configured' );
+            return '#'; // Fallback link
+        }
+        return 'https://discord.com/api/oauth2/authorize?client_id=' . $client_id . '&redirect_uri=' . $redirect_uri . '&response_type=code&scope=' . $scope;
+    }
+}
+
+if ( ! function_exists( 'jc_get_application_status' ) ) {
+    function jc_get_application_status( $discord_id ) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'jc_discord_applications';
+        return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE discord_id = %s LIMIT 1", $discord_id ) );
+    }
+}
+
 function jc_check_user_on_temp_server( $discord_id ) {
     $api_url = jc_get_bot_api_url();
     $api_secret = jc_get_bot_api_secret();
