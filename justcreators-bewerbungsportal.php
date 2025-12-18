@@ -10,598 +10,508 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // ========================================
 // KONFIGURATION
 // ========================================
-if ( ! defined( 'JC_DISCORD_CLIENT_ID' ) ) {
-    define( 'JC_DISCORD_CLIENT_ID', 'YOUR_CLIENT_ID_HERE' );
+function jc_bewerbung_get_css() {
+    return <<<CSS
+@keyframes jc-fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
-if ( ! defined( 'JC_DISCORD_CLIENT_SECRET' ) ) {
-    define( 'JC_DISCORD_CLIENT_SECRET', 'YOUR_CLIENT_SECRET_HERE' );
+
+@keyframes jc-slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
 }
-if ( ! defined( 'JC_REDIRECT_URI' ) ) {
-    define( 'JC_REDIRECT_URI', site_url('/bewerbung?discord_oauth=1') );
+
+@keyframes jc-success-pop {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
 }
-if ( ! defined( 'JC_TEMP_DISCORD_INVITE' ) ) {
-    define( 'JC_TEMP_DISCORD_INVITE', 'https://discord.gg/TEjEc6F3GW' ); // Füge deinen Temp-Server Invite-Link hier ein
+
+@keyframes jc-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }
-function jc_get_bot_api_url() {
-    return get_option( 'jc_bot_api_url', 'http://localhost:3000' );
+
+@keyframes jc-dot-bounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
-function jc_get_bot_api_secret() {
-    return get_option( 'jc_bot_api_secret', '' );
+
+.jc-bewerbung-wrap {
+    background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+    color: #e1e3e8;
+    padding: 50px;
+    border-radius: 16px;
+    max-width: 900px;
+    margin: 50px auto;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    animation: jc-fadeIn 0.6s ease-out;
 }
+
+.jc-card {
+    background: #2a2c36 !important;
+    padding: 35px !important;
+    border-radius: 14px !important;
+    animation: jc-fadeIn 0.8s ease-out 0.2s both !important;
+}
+
+.jc-h {
+    font-size: 28px;
+    margin-bottom: 15px;
+    color: #f0f0f0;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* ########## START: ANPASSUNG ICON (v6.15) ########## */
+.jc-h::before {
+    content: '';
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    background-image: url('https://just-creators.de/wp-content/uploads/2025/11/cropped-WordPress-Favicon-removebg-preview-2.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    margin-top: 4px;
+}
+/* ########## ENDE: ANPASSUNG ICON (v6.15) ########## */
+
+.jc-status-box {
+    background: #2a2c36 !important;
+    padding: 40px !important;
+    border-radius: 14px !important;
+    text-align: center !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3) !important;
+    animation: jc-fadeIn 0.8s ease-out !important;
+}
+
+.jc-status-pending { border-left: 6px solid #ffc107; }
+.jc-status-accepted { border-left: 6px solid #4caf50; }
+.jc-status-rejected { border-left: 6px solid #f44336; }
+
+.jc-status-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: jc-pulse 2s infinite;
+}
+
+.jc-status-title {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 15px;
+    color: #f0f0f0;
+}
+
+.jc-status-desc {
+    font-size: 17px;
+    color: #f0f0f0 !important;
+    line-height: 1.8;
+    margin: 15px 0;
+}
+
+.jc-status-desc * {
+    color: inherit !important;
+}
+
+.jc-status-meta {
+    font-size: 14px;
+    color: #8a8f9e;
+    padding: 25px;
+}
+
+.jc-discord-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    padding: 14px 28px !important;
+    border-radius: 10px !important;
+    background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%) !important;
+    color: #fff !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+    border: none !important;
+    cursor: pointer !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+.jc-discord-btn::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
+    transition: left 0.5s !important;
+}
+
+.jc-discord-btn:hover::before { left: 100% !important; }
+.jc-discord-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6) !important;
+    background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%) !important;
+}
+
+.jc-discord-logo { width: 24px !important; height: 24px !important; fill: #fff !important; }
+
+.jc-label {
+    display: block !important;
+    margin-top: 20px !important;
+    margin-bottom: 8px !important;
+    font-weight: 600 !important;
+    color: #f0f0f0 !important;
+    font-size: 15px !important;
+}
+
+.jc-input, .jc-textarea {
+    width: 100% !important;
+    padding: 14px !important;
+    margin-top: 8px !important;
+    background: #3a3c4a !important;
+    border: 2px solid #4a4c5a !important;
+    color: #ffffff !important;
+    border-radius: 10px !important;
+    -webkit-text-fill-color: #ffffff !important;
+    font-family: inherit !important;
+    font-size: 15px !important;
+    transition: all 0.3s ease !important;
+    box-sizing: border-box !important;
+}
+
+.jc-input::placeholder, .jc-textarea::placeholder { color: #a0a8b8 !important; }
+
+.jc-input:focus, .jc-textarea:focus {
+    outline: none !important;
+    border-color: #5865F2 !important;
+    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2) !important;
+    transform: translateY(-1px) !important;
+}
+
+.jc-input.error, .jc-textarea.error {
+    border-color: #f44336 !important;
+    background: rgba(244, 67, 54, 0.08) !important;
+    animation: jc-shake 0.4s ease-in-out !important;
+}
+
+.jc-input.error:focus, .jc-textarea.error:focus { box-shadow: 0 0 0 3px rgba(244, 67, 54, 0.2) !important; }
+
+@keyframes jc-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+}
+
+.jc-social-field-group {
+    display: flex !important;
+    gap: 12px !important;
+    margin-bottom: 15px !important;
+    align-items: center !important;
+    animation: jc-slideIn 0.3s ease-out !important;
+    position: relative !important;
+    padding: 12px !important;
+    background: rgba(58, 60, 74, 0.2) !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(74, 76, 90, 0.3) !important;
+    transition: all 0.3s ease !important;
+}
+
+.jc-social-field-group:hover {
+    background: rgba(58, 60, 74, 0.35) !important;
+    border-color: rgba(88, 101, 242, 0.2) !important;
+}
+
+.jc-social-field-wrapper { flex: 1 !important; position: relative !important; }
+
+.jc-social-field-group input {
+    margin-top: 0 !important;
+    padding-right: 50px !important;
+    background: #2a2c36 !important;
+}
+
+.jc-platform-icon {
+    position: absolute !important;
+    right: 14px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 0 !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease !important;
+    background-size: contain !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+}
+
+.jc-platform-icon.visible { opacity: 1 !important; }
+
+.jc-platform-icon.icon-youtube { background-image: url('https://cdn.simpleicons.org/youtube/FF0000'); }
+.jc-platform-icon.icon-twitch { background-image: url('https://cdn.simpleicons.org/twitch/9146FF'); }
+.jc-platform-icon.icon-tiktok { background-image: url('https://cdn.simpleicons.org/tiktok/000000'); }
+.jc-platform-icon.icon-instagram { background-image: url('https://cdn.simpleicons.org/instagram/E4405F'); }
+.jc-platform-icon.icon-unknown { background-image: url('https://cdn.simpleicons.org/link/8a8f9e'); }
+
+.jc-add-social-btn, .jc-remove-social-btn {
+    padding: 12px 20px !important;
+    border: 2px solid transparent !important;
+    border-radius: 10px !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.jc-add-social-btn {
+    background: rgba(88, 101, 242, 0.15) !important;
+    color: #5865F2 !important;
+    margin-top: 15px !important;
+    border: 1px solid rgba(88, 101, 242, 0.3) !important;
+    box-shadow: none !important;
+}
+
+.jc-add-social-btn::before {
+    content: '➕' !important;
+    font-size: 16px !important;
+}
+
+.jc-add-social-btn:hover {
+    background: linear-gradient(135deg, rgba(88, 101, 242, 0.25) 0%, rgba(88, 101, 242, 0.35) 100%) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.3) !important;
+    border-color: rgba(88, 101, 242, 0.5) !important;
+}
+
+.jc-remove-social-btn {
+    background: linear-gradient(135deg, rgba(244, 67, 54, 0.15) 0%, rgba(244, 67, 54, 0.25) 100%) !important;
+    color: #f44336 !important;
+    padding: 12px 16px !important;
+    margin-top: 8px !important;
+    border: 2px solid rgba(244, 67, 54, 0.3) !important;
+    box-shadow: 0 2px 8px rgba(244, 67, 54, 0.15) !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    min-width: 44px !important;
+}
+
+.jc-remove-social-btn:hover {
+    background: rgba(244, 67, 54, 0.25) !important;
+    transform: scale(1.05) !important;
+    border-color: rgba(244, 67, 54, 0.5) !important;
+}
+
+.jc-add-social-btn:hover {
+    background: rgba(88, 101, 242, 0.25) !important;
+    transform: translateY(-1px) !important;
+    border-color: rgba(88, 101, 242, 0.5) !important;
+}
+
+.jc-remove-social-btn {
+    background: rgba(244, 67, 54, 0.15) !important;
+    color: #f44336 !important;
+    padding: 10px 14px !important;
+    margin: 0 !important;
+    border: 1px solid rgba(244, 67, 54, 0.3) !important;
+    box-shadow: none !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    min-width: 42px !important;
+    height: 42px !important;
+}
+
+.jc-remove-social-btn:hover { background: rgba(255, 107, 107, 0.3) !important; }
+
+.jc-note {
+    font-size: 14px !important;
+    color: #a0a8b8 !important;
+    margin-top: 12px !important;
+    padding: 12px !important;
+    background: rgba(88, 101, 242, 0.1) !important;
+    border-left: 3px solid #5865F2 !important;
+    border-radius: 6px !important;
+}
+
+.jc-error {
+    color: #ffb4b4 !important;
+    background: #3a2323 !important;
+    padding: 16px !important;
+    border-radius: 10px !important;
+    border-left: 4px solid #ff6b6b !important;
+    margin: 15px 0 !important;
+    animation: jc-fadeIn 0.4s ease-out !important;
+}
+
+.jc-success {
+    background: linear-gradient(135deg, #1a3a1a 0%, #2d5a2d 100%) !important;
+    padding: 30px !important;
+    border-radius: 12px !important;
+    margin-top: 20px !important;
+    text-align: center !important;
+    animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+    border: 2px solid #4ade80 !important;
+    box-shadow: 0 8px 24px rgba(74, 222, 128, 0.2) !important;
+}
+
+.jc-success-icon { width: 80px !important; height: 80px !important; margin: 0 auto 20px !important; }
+.jc-success-icon svg { width: 100% !important; height: 100% !important; }
+.jc-success-icon circle { fill: #4ade80 !important; animation: jc-success-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important; }
+.jc-success-icon path { stroke: #fff !important; stroke-width: 3 !important; stroke-dasharray: 100 !important; }
+
+.jc-success h3 {
+    color: #d1f7d1 !important;
+    font-size: 24px !important;
+    margin: 0 0 15px 0 !important;
+    font-weight: 700 !important;
+}
+
+.jc-success p {
+    color: #b8e6b8 !important;
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+    margin: 10px 0 !important;
+}
+
+.jc-user-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    background: rgba(88, 101, 242, 0.15) !important;
+    padding: 12px 20px !important;
+    border-radius: 10px !important;
+    margin: 15px 0 !important;
+    border: 2px solid rgba(88, 101, 242, 0.3) !important;
+}
+
+.jc-user-badge strong { color: #5865F2 !important; font-size: 16px !important; }
+
+.jc-field-error {
+    color: #ff6b6b !important;
+    font-size: 13px !important;
+    margin-top: 6px !important;
+    display: block !important;
+    padding-left: 4px !important;
+    animation: jc-fadeIn 0.3s ease-out !important;
+}
+
+.jc-input.error, .jc-textarea.error {
+    border-color: #ff6b6b !important;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2) !important;
+}
+
+.jc-status-select {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+.jc-waiting-screen {
+    background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+    color: #e1e3e8;
+    padding: 50px;
+    border-radius: 16px;
+    max-width: 900px;
+    margin: 50px auto;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    animation: jc-fadeIn 0.6s ease-out;
+}
+
+.jc-waiting-content { text-align: center; padding: 40px 20px; }
+
+.jc-waiting-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: jc-pulse 2s infinite;
+}
+
+.jc-waiting-title { font-size: 32px; font-weight: 700; margin-bottom: 15px; color: #f0f0f0; }
+
+.jc-waiting-desc { font-size: 17px; color: #a0a8b8; line-height: 1.8; margin: 15px 0 30px; }
+
+.jc-waiting-animation {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 30px 0;
+}
+
+.jc-dot { width: 12px; height: 12px; background: #5865F2; border-radius: 50%; animation: jc-dot-bounce 1.4s infinite ease-in-out; }
+.jc-dot:nth-child(1) { animation-delay: -0.32s; }
+.jc-dot:nth-child(2) { animation-delay: -0.16s; }
+.jc-dot:nth-child(3) { animation-delay: 0s; }
+
+.jc-discord-invite-box { margin: 30px 0; }
+
+.jc-waiting-btn { font-size: 18px; padding: 16px 32px; margin: 20px 0; }
+
+.jc-waiting-hint {
+    margin-top: 30px;
+    padding: 15px;
+    background: rgba(88, 101, 242, 0.1);
+    border-radius: 8px;
+    border-left: 3px solid #5865F2;
+    color: #a0a8b8;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .jc-bewerbung-wrap {
+        padding: 30px 20px !important;
+        margin: 20px auto !important;
+    }
+
+    .jc-card { padding: 25px 20px !important; }
+    .jc-h { font-size: 22px !important; }
+    .jc-social-field-group { flex-direction: column !important; }
+    .jc-waiting-screen { padding: 30px 20px !important; margin: 20px auto !important; }
+    .jc-waiting-title { font-size: 24px !important; }
+    .jc-waiting-icon { font-size: 64px !important; }
+}
+CSS;
+}
+
+add_action( 'wp_enqueue_scripts', function() {
+    if ( is_admin() ) {
+        return;
+    }
+    wp_register_style( 'jc-bewerbung-inline', false );
+    wp_enqueue_style( 'jc-bewerbung-inline' );
+    wp_add_inline_style( 'jc-bewerbung-inline', jc_bewerbung_get_css() );
+} );
+
+// BEWERBUNGSFORMULAR SHORTCODE
 // ========================================
-// REST API für Status-Sync (Discord → WordPress)
-// ========================================
-// Session GLOBAL starten - für ALLE Seiten
-add_action( 'init', function() {
-    if ( session_status() === PHP_SESSION_NONE && ! headers_sent() ) {
-        // Session mit Cookie-Optionen starten
-        session_set_cookie_params([
-            'lifetime' => 0, // Browser-Session
-            'path' => '/',
-            'domain' => '.just-creators.de',
-            'secure' => true,
-            'httponly' => true,
-            'samesite' => 'Lax'
-        ]);
-        session_start();
-        error_log( 'JC: Session gestartet - ID: ' . session_id() . ', Cookie Domain: .just-creators.de' );
-    }
-   
-    // DEBUG: Session Status auf jeder Seite
-    if ( is_page( 'regeln' ) || is_page( 'bewerbung' ) ) {
-        $has_user = isset( $_SESSION['jc_discord_user'] ) ? 'JA' : 'NEIN';
-        $username = isset( $_SESSION['jc_discord_user']['username'] ) ? $_SESSION['jc_discord_user']['username'] : 'N/A';
-        error_log( "JC Session Check - Page: " . get_the_title() . ", Session ID: " . session_id() . ", User: {$has_user} ({$username})" );
-    }
-}, 1 );
-function jc_verify_api_secret( $request ) {
-    $auth_header = $request->get_header( 'authorization' );
-    $expected = 'Bearer ' . jc_get_bot_api_secret();
-   
-    error_log( "JC API Auth: Header=" . substr($auth_header, 0, 20) . "..., Expected=" . substr($expected, 0, 20) . "..." );
-    error_log( "JC API Auth Match: " . ($auth_header === $expected ? 'YES' : 'NO') );
-   
-    return $auth_header === $expected;
-}
-add_action('rest_api_init', function() {
-    register_rest_route('jc/v1', '/status-sync', array(
-        'methods' => 'POST',
-        'callback' => 'jc_handle_status_sync',
-        'permission_callback' => 'jc_verify_api_secret'
-    ));
-    
-    register_rest_route('jc/v1', '/check-discord-join', array(
-        'methods' => 'POST',
-        'callback' => 'jc_handle_check_discord_join',
-        'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
-    ));
-    
-    register_rest_route('jc/v1', '/send-application', array(
-        'methods' => 'POST',
-        'callback' => 'jc_handle_send_application',
-        'permission_callback' => '__return_true' // Öffentlich, aber nur für eingeloggte User
-    ));
-    
-    // NEUER Endpunkt für ioBroker (LESEN)
-    register_rest_route('jc/v1', '/applications', array(
-        'methods' => 'GET',
-        'callback' => 'jc_api_get_all_applications',
-        'permission_callback' => 'jc_verify_api_secret' // Wir nutzen dieselbe Sicheit wie der Bot
-    ));
-    
-    // NEUER Endpunkt für ioBroker (SCHREIBEN)
-    register_rest_route('jc/v1', '/update-status', array(
-        'methods' => 'POST', // Wichtig: POST, nicht GET
-        'callback' => 'jc_api_update_status',
-        'permission_callback' => 'jc_verify_api_secret' // Dieselbe Sicherheit
-    ));
+add_shortcode( 'discord_application_form', function( $atts ) {
+    ob_start();
 
-    // Frontend logging endpoint (public; logs only)
-    register_rest_route('jc/v1', '/frontend-log', array(
-        'methods' => 'POST',
-        'callback' => 'jc_handle_frontend_log',
-        'permission_callback' => '__return_true'
-    ));
-});
-function jc_handle_frontend_log( $request ) {
-    $params = $request->get_json_params();
-    $event = isset($params['event']) ? sanitize_text_field($params['event']) : 'unknown';
-    $level = isset($params['level']) ? sanitize_text_field($params['level']) : 'info';
-    $sid = isset($params['sid']) ? sanitize_text_field($params['sid']) : ( function_exists('session_id') ? session_id() : '' );
-    $url = isset($params['url']) ? esc_url_raw($params['url']) : '';
-    $ua = isset($params['ua']) ? substr( sanitize_text_field($params['ua']), 0, 200 ) : '';
-    $payload = isset($params['payload']) ? wp_json_encode($params['payload']) : '';
-    $ts = isset($params['ts']) ? intval($params['ts']) : 0;
-    error_log( sprintf('JC FE [%s] sid=%s event=%s ts=%s url=%s ua=%s payload=%s', $level, $sid, $event, $ts ?: '0', $url, $ua, $payload) );
-    return array( 'ok' => true );
-}
-function jc_handle_status_sync( $request ) {
-    $params = $request->get_json_params();
-   
-    error_log( "JC API: ========== NEW STATUS SYNC REQUEST ==========" );
-    error_log( "JC API: Raw params: " . json_encode($params) );
-   
-    if ( empty( $params['discord_id'] ) || empty( $params['status'] ) ) {
-        error_log( "JC API: ❌ FEHLER - Missing parameters!" );
-        return new WP_Error( 'missing_params', 'discord_id und status erforderlich', array( 'status' => 400 ) );
-    }
-   
-    $discord_id = sanitize_text_field( $params['discord_id'] );
-    $status = sanitize_text_field( $params['status'] );
-   
-    error_log( "JC API: Sanitized - discord_id={$discord_id}, status={$status}" );
-   
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-   
-    // Prüfen ob Eintrag existiert
-    $exists = $wpdb->get_var( $wpdb->prepare(
-        "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-   
-    error_log( "JC API: Entry exists in DB: " . ($exists ? 'YES' : 'NO') );
-   
-    if ( ! $exists ) {
-        error_log( "JC API: ❌ FEHLER - Discord ID {$discord_id} not found in database!" );
-        return new WP_Error( 'not_found', 'Bewerbung nicht gefunden', array( 'status' => 404 ) );
-    }
-   
-    // Status aktualisieren
-    error_log( "JC API: Attempting UPDATE on table={$table}" );
-   
-    $updated = $wpdb->update(
-        $table,
-        array( 'status' => $status ),
-        array( 'discord_id' => $discord_id ),
-        array( '%s' ),
-        array( '%s' )
-    );
-   
-    if ( $updated === false ) {
-        error_log( "JC API: ❌ UPDATE FAILED! DB Error: " . $wpdb->last_error );
-        return new WP_Error( 'update_failed', 'Datenbankfehler: ' . $wpdb->last_error, array( 'status' => 500 ) );
-    }
-   
-    if ( $updated === 0 ) {
-        error_log( "JC API: ⚠️ UPDATE returned 0 rows (status already same?)" );
-    } else {
-        error_log( "JC API: ✅✅✅ UPDATE SUCCESS! Rows affected: {$updated}" );
-    }
-   
-    // Verify
-    $new_status = $wpdb->get_var( $wpdb->prepare(
-        "SELECT status FROM {$table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-   
-    error_log( "JC API: Verification - New status in DB: {$new_status}" );
-    error_log( "JC API: ========== END STATUS SYNC ==========" );
-   
-    return array(
-        'success' => true,
-        'message' => 'Status erfolgreich aktualisiert',
-        'discord_id' => $discord_id,
-        'old_status' => 'unknown',
-        'new_status' => $new_status,
-        'rows_affected' => $updated
-    );
-}
-function jc_update_application_status( $discord_id, $status ) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-   
-    error_log( "JC DB: Updating table={$table}, discord_id={$discord_id}, status={$status}" );
-   
-    // Erst prüfen ob der Eintrag existiert
-    $exists = $wpdb->get_var( $wpdb->prepare(
-        "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-   
-    error_log( "JC DB: Entry exists: " . ($exists ? 'YES' : 'NO') );
-   
-    if ( ! $exists ) {
-        error_log( "JC DB: ❌ Discord ID {$discord_id} NOT FOUND in database!" );
-        return false;
-    }
-   
-    $updated = $wpdb->update(
-        $table,
-        array( 'status' => $status ),
-        array( 'discord_id' => $discord_id ),
-        array( '%s' ),
-        array( '%s' )
-    );
-   
-    if ( $updated === false ) {
-        error_log( "JC DB: ❌ UPDATE FAILED! Error: " . $wpdb->last_error );
-        return false;
-    }
-   
-    error_log( "JC DB: ✅ UPDATE SUCCESS! Rows affected: {$updated}" );
-   
-    return true;
-}
-function jc_get_application_status( $discord_id ) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-    
-    error_log( "JC DB: Fetching status for Discord ID: {$discord_id}" );
-    
-    $result = $wpdb->get_row( $wpdb->prepare(
-        "SELECT status, applicant_name, created_at, forum_post_id FROM {$table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-    
-    if ( $result ) {
-        error_log( "JC DB: Found application with status: {$result->status}" );
-    } else {
-        error_log( "JC DB: No application found for Discord ID: {$discord_id}" );
-    }
-    
-    return $result;
-}
-function jc_handle_check_discord_join( $request ) {
-    $params = $request->get_json_params();
-    
-    if ( empty( $params['discord_id'] ) ) {
-        return new WP_Error( 'missing_params', 'discord_id erforderlich', array( 'status' => 400 ) );
-    }
-    
-    $discord_id = sanitize_text_field( $params['discord_id'] );
-    
-    // Prüfe ob User in Session ist (Sicherheit)
-    if ( ! isset( $_SESSION['jc_discord_user'] ) || $_SESSION['jc_discord_user']['id'] !== $discord_id ) {
-        return new WP_Error( 'unauthorized', 'Nicht autorisiert', array( 'status' => 401 ) );
-    }
-    
-    $check_result = jc_check_user_on_temp_server( $discord_id );
-    
-    return array(
-        'success' => $check_result['success'],
-        'is_on_temp_server' => $check_result['is_on_temp_server']
-    );
-}
-
-// ########## START: AKTUALISIERTE FUNKTION (v6.17) ##########
-// Fügt 'privacy_accepted_at' zur Übertragung hinzu
-function jc_handle_send_application( $request ) {
-    $params = $request->get_json_params();
-    
-    if ( empty( $params['discord_id'] ) ) {
-        return new WP_Error( 'missing_params', 'discord_id erforderlich', array( 'status' => 400 ) );
-    }
-    
-    $discord_id = sanitize_text_field( $params['discord_id'] );
-    
-    // Prüfe ob User in Session ist (Sicherheit)
-    if ( ! isset( $_SESSION['jc_discord_user'] ) || $_SESSION['jc_discord_user']['id'] !== $discord_id ) {
-        return new WP_Error( 'unauthorized', 'Nicht autorisiert', array( 'status' => 401 ) );
-    }
-    
-    // Prüfe ob User wirklich auf Temp-Server ist
-    $check_result = jc_check_user_on_temp_server( $discord_id );
-    if ( ! $check_result['success'] || ! $check_result['is_on_temp_server'] ) {
-        return new WP_Error( 'not_on_server', 'User ist nicht auf dem temporären Server', array( 'status' => 400 ) );
-    }
-    
-    global $wpdb;
-    $temp_table = $wpdb->prefix . 'jc_discord_applications_temp';
-    $main_table = $wpdb->prefix . 'jc_discord_applications';
-    
-    // Hole Bewerbung aus temporärer Tabelle
-    $temp_application = $wpdb->get_row( $wpdb->prepare(
-        "SELECT * FROM {$temp_table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-    
-    if ( ! $temp_application ) {
-        return new WP_Error( 'not_found', 'Bewerbung nicht gefunden oder abgelaufen', array( 'status' => 404 ) );
-    }
-    
-    // Prüfe ob bereits abgelaufen
-    if ( strtotime( $temp_application->expires_at ) < time() ) {
-        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
-        return new WP_Error( 'expired', 'Bewerbung ist abgelaufen. Bitte starte eine neue Bewerbung.', array( 'status' => 410 ) );
-    }
-    
-    // Prüfe ob bereits in Haupttabelle vorhanden (redundant, aber sicher)
-    $existing = $wpdb->get_row( $wpdb->prepare(
-        "SELECT id, forum_post_id FROM {$main_table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-    
-    if ( $existing && ! empty( $existing->forum_post_id ) ) {
-        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
-        return array(
-            'success' => true,
-            'message' => 'Bewerbung wurde bereits verarbeitet',
-            'already_sent' => true
-        );
-    }
-
-    // 1. ZUERST in die Haupt-DB einfügen, um die ID zu bekommen
-    $inserted = $wpdb->insert( $main_table, array(
-        'discord_id' => $temp_application->discord_id,
-        'discord_name' => $temp_application->discord_name,
-        'applicant_name' => $temp_application->applicant_name,
-        'age' => $temp_application->age,
-        'social_channels' => $temp_application->social_channels,
-        'social_activity' => $temp_application->social_activity,
-        'motivation' => $temp_application->motivation,
-        'privacy_accepted_at' => $temp_application->privacy_accepted_at, // <-- NEU (v6.17)
-        'status' => 'pending'
-    ), array(
-        '%s','%s','%s','%s','%s','%s','%s',
-        '%s', // <-- NEU (v6.17) für privacy_accepted_at
-        '%s'
-    ) );
-
-    if ( ! $inserted ) {
-        // Wenn das Einfügen fehlschlägt (z.B. DB-Problem), abbrechen.
-        error_log("JC Handle Send: ❌ DB INSERT FAILED. " . $wpdb->last_error);
-        return new WP_Error( 'db_error', 'Fehler beim Speichern in Haupttabelle: ' . $wpdb->last_error, array( 'status' => 500 ) );
-    }
-    
-    // 2. Die neue, echte DB ID holen
-    $real_database_id = $wpdb->insert_id;
-    error_log("JC Handle Send: ✅ Eintrag in DB erstellt. Neue ID: " . $real_database_id);
-
-    // 3. Bewerbung an Bot senden, MIT der echten DB ID
-    $bot_data = array(
-        'discord_id' => $temp_application->discord_id,
-        'discord_name' => $temp_application->discord_name,
-        'applicant_name' => $temp_application->applicant_name,
-        'age' => $temp_application->age,
-        'social_channels' => json_decode( $temp_application->social_channels, true ),
-        'social_activity' => $temp_application->social_activity,
-        'motivation' => $temp_application->motivation,
-        'database_id' => $real_database_id // <-- HIER IST DER FIX
-    );
-    
-    $bot_result = jc_send_application_to_bot( $bot_data );
-    
-    // 4. Bot-Antwort verarbeiten
-    if ( $bot_result['success'] && isset( $bot_result['data']['post_id'] ) ) {
-        
-        // 5. Bot war erfolgreich, also die forum_post_id in der DB nachtragen
-        $wpdb->update(
-            $main_table,
-            array( 'forum_post_id' => $bot_result['data']['post_id'] ),
-            array( 'id' => $real_database_id ),
-            array( '%s' ),
-            array( '%d' )
-        );
-        
-        // Temporäre Bewerbung löschen
-        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
-        
-        // Session aufräumen
-        unset( $_SESSION['jc_pending_application'] );
-        unset( $_SESSION['jc_discord_user'] );
-        
-        error_log("JC Handle Send: ✅ Bot-Post erstellt und DB-Eintrag $real_database_id aktualisiert.");
-
-        return array(
-            'success' => true,
-            'message' => 'Bewerbung erfolgreich verarbeitet',
-            'post_id' => $bot_result['data']['post_id']
-        );
-
-    } else {
-        // 6. Bot ist FEHLGESCHLAGEN. Rollback!
-        error_log("JC Handle Send: ❌ Bot ist fehlgeschlagen. Rollback von DB-Eintrag $real_database_id.");
-        
-        // Lösche den Eintrag, den wir in Schritt 1 gemacht haben, da der Bot-Post nicht erstellt werden konnte.
-        $wpdb->delete( $main_table, array( 'id' => $real_database_id ), array( '%d' ) );
-        
-        return new WP_Error( 'bot_error', $bot_result['message'] ?? 'Fehler beim Senden an Bot', array( 'status' => 500 ) );
-    }
-}
-// ########## ENDE: AKTUALISIERTE FUNKTION (v6.17) ##########
-
-
-// ########## START: NEUE IOBROKER API FUNKTIONEN (v6.14) ##########
-/**
- * NEUE API-FUNKTION FÜR IOBROKER (LESEN)
- * Gibt alle Bewerbungen und eine Zusammenfassung zurück.
- * Gesichert durch jc_verify_api_secret.
- */
-function jc_api_get_all_applications( $request ) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-    
-    // Hole alle Bewerbungen
-    $applications = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" );
-    
-    if ( is_wp_error( $applications ) ) {
-        return new WP_Error( 'db_error', 'Fehler beim Abrufen der Bewerbungen', array( 'status' => 500 ) );
-    }
-    
-    // Nützliche Statistiken für ioBroker-Dashboards
-    $total = count($applications);
-    $pending = 0;
-    $accepted = 0;
-    $rejected = 0;
-    
-    foreach ( $applications as $app ) {
-        if ( $app->status === 'pending' ) {
-            $pending++;
-        } elseif ( $app->status === 'accepted' ) {
-            $accepted++;
-        } elseif ( $app->status === 'rejected' ) {
-            $rejected++;
-        }
-        
-        // Bonus: social_channels als JSON-Objekt statt als String ausgeben
-        // ioBroker kann das direkt als Objekt parsen.
-        $app->social_channels = json_decode($app->social_channels);
-    }
-    
-    // Datenpaket für ioBroker
-    $data = array(
-        'success' => true,
-        'summary' => array(
-            'total' => $total,
-            'pending' => $pending,
-            'accepted' => $accepted,
-            'rejected' => $rejected
-        ),
-        'applications' => $applications // Die komplette Liste
-    );
-    
-    return new WP_REST_Response( $data, 200 );
-}
-
-/**
- * NEUE API-FUNKTION FÜR IOBROKER (SCHREIBEN)
- * Aktualisiert den Status einer Bewerbung.
- * Akzeptiert JSON: { "discord_id": "12345", "new_status": "accepted" }
- */
-function jc_api_update_status( $request ) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-    
-    // Daten aus dem ioBroker POST-Request holen
-    $discord_id = sanitize_text_field( $request['discord_id'] );
-    $new_status = sanitize_text_field( $request['new_status'] );
-    
-    // Validierung
-    if ( empty($discord_id) || empty($new_status) ) {
-        return new WP_Error( 'missing_params', 'discord_id und new_status sind erforderlich', array( 'status' => 400 ) );
-    }
-    
-    // Prüfen, ob der Status gültig ist
-    if ( ! in_array( $new_status, ['pending', 'accepted', 'rejected'] ) ) {
-        return new WP_Error( 'invalid_status', 'Ungültiger Status. Erlaubt sind: pending, accepted, rejected', array( 'status' => 400 ) );
-    }
-
-    // Update in der Datenbank durchführen
-    $updated = $wpdb->update(
-        $table,
-        array( 'status' => $new_status ), // SET
-        array( 'discord_id' => $discord_id ), // WHERE
-        array( '%s' ), // Format für SET
-        array( '%s' )  // Format für WHERE
-    );
-
-    if ( $updated === false ) {
-        return new WP_Error( 'db_error', 'Fehler beim Update des Status', array( 'status' => 500 ) );
-    }
-    
-    if ( $updated === 0 ) {
-        return new WP_REST_Response( array(
-            'success' => false,
-            'message' => 'Keine Bewerbung mit dieser Discord ID gefunden.'
-        ), 404 );
-    }
-    
-    // Erfolg zurück an ioBroker senden
-    return new WP_REST_Response( array(
-        'success' => true,
-        'message' => "Status für $discord_id auf $new_status gesetzt."
-    ), 200 );
-}
-// ########## ENDE: NEUE IOBROKER API FUNKTIONEN (v6.14) ##########
-
-
-// ========================================
-// ADMIN EINSTELLUNGEN
-// ========================================
-add_action( 'admin_menu', function() {
-    add_options_page(
-        'JustCreators Bot Setup',
-        'JC Bot Setup',
-        'manage_options',
-        'jc-bot-setup',
-        'jc_bot_setup_page'
-    );
-   
-    add_menu_page(
-        'Bewerbungen',
-        'Bewerbungen',
-        'manage_options',
-        'jc-bewerbungen',
-        'jc_admin_bewerbungen_page',
-        'dashicons-list-view',
-        26
-    );
-});
-add_action( 'admin_init', function() {
-    register_setting( 'jc_bot_settings', 'jc_bot_api_url' );
-    register_setting( 'jc_bot_settings', 'jc_bot_api_secret' );
-});
-function jc_bot_setup_page() {
-    if ( ! current_user_can( 'manage_options' ) ) return;
-   
-    if ( isset( $_POST['jc_test_bot'] ) && check_admin_referer( 'jc_test_bot' ) ) {
-        $test_result = jc_test_bot_connection();
-        echo '<div class="notice notice-' . ($test_result['success'] ? 'success' : 'error') . ' is-dismissible">';
-        echo '<p>' . esc_html( $test_result['message'] ) . '</p>';
-        echo '</div>';
-    }
-   
     ?>
-    <div class="wrap">
-        <h1>🤖 JustCreators Bot Setup</h1>
-       
-        <div style="background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <h2>📋 Features</h2>
-            <ul style="font-size: 15px; line-height: 2;">
-                <li>✅ Automatische Social Media Link-Validierung mit Icons</li>
-                <li>✅ Auto-Sync bei Löschung (WP → Discord)</li>
-                <li>✅ Forum Tags für Bewerbungsstatus</li>
-                <li>✅ Slash Commands: <code>/accept</code>, <code>/reject</code></li>
-                <li>✅ Status-Sync: Discord → WordPress (✓ aktiv)</li>
-                <li>✅ Live Status-Anzeige für Bewerber</li>
-                <li>✅ Responsive Design mit Animationen</li>
-            </ul>
-           
-            <form method="post" action="options.php" style="margin-top: 30px;">
-                <?php settings_fields( 'jc_bot_settings' ); ?>
-               
-                <table class="form-table">
-                    <tr>
-                        <th scope="row">
-                            <label for="jc_bot_api_url">Bot API URL</label>
-                        </th>
-                        <td>
-                            <input type="url"
-                                   id="jc_bot_api_url"
-                                   name="jc_bot_api_url"
-                                   value="<?php echo esc_attr( jc_get_bot_api_url() ); ?>"
-                                   class="regular-text"
-                                   placeholder="http://localhost:3000" />
-                            <p class="description">URL wo der Bot läuft</p>
-                        </td>
-                    </tr>
-                   
-                    <tr>
-                        <th scope="row">
-                            <label for="jc_bot_api_secret">API Secret</label>
-                        </th>
-                        <td>
-                            <input type="password"
-                                   id="jc_bot_api_secret"
-                                   name="jc_bot_api_secret"
-                                   value="<?php echo esc_attr( jc_get_bot_api_secret() ); ?>"
-                                   class="regular-text"
-                                   placeholder="Gleiches Secret wie in .env" />
-                            <p class="description">Muss mit API_SECRET in .env übereinstimmen</p>
-                        </td>
-                    </tr>
-                </table>
-               
-                <?php submit_button( 'Einstellungen speichern', 'primary' ); ?>
-            </form>
-           
-            <hr style="margin: 30px 0;">
-           
-            <form method="post" style="margin-top: 20px;">
-                <?php wp_nonce_field( 'jc_test_bot' ); ?>
-                <button type="submit" name="jc_test_bot" class="button button-secondary">
-                    🧪 Bot-Verbindung testen
+    <div class="jc-bewerbung-wrap">
                 </button>
             </form>
         </div>
