@@ -1831,7 +1831,7 @@ add_shortcode( 'discord_application_form', function( $atts ) {
 // ========================================
 function jc_admin_bewerbungen_page() {
     if ( ! current_user_can( 'manage_options' ) ) return;
-   
+
     global $wpdb;
     $table = $wpdb->prefix . 'jc_discord_applications';
    
