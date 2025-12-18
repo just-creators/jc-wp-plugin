@@ -2245,166 +2245,106 @@ function jc_admin_bewerbungen_page() {
     </style>';
 }
 // ========================================
-// ADMIN MENU REGISTRATION
+// ADMIN EINSTELLUNGEN
 // ========================================
 add_action( 'admin_menu', function() {
-    // Main menu for applications
-    add_menu_page(
-        'JustCreators Bewerbungen',
-        '🎮 Bewerbungen',
+    add_options_page(
+        'JustCreators Bot Setup',
+        'JC Bot Setup',
         'manage_options',
-        'jc-applications',
-        'jc_render_applications_page',
-        'dashicons-forms',
-        59
+        'jc-bot-setup',
+        'jc_bot_setup_page'
     );
-    
-    // Submenu: Discord Configuration
-    add_submenu_page(
-        'jc-applications',
-        'Discord Bot Setup',
-        '🤖 Bot Setup',
+
+    add_menu_page(
+        'Bewerbungen',
+        'Bewerbungen',
         'manage_options',
-        'jc-bewerbung-settings',
-        'jc_bewerbung_render_settings_page'
+        'jc-bewerbungen',
+        'jc_admin_bewerbungen_page',
+        'dashicons-list-view',
+        26
     );
 } );
 
-// ========================================
-// APPLICATIONS LISTING PAGE
-// ========================================
-function jc_render_applications_page() {
-    if ( ! current_user_can( 'manage_options' ) ) {
-        wp_die( 'Unauthorized' );
-    }
-    
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-    
-    // Check if table exists
-    if ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) !== $table ) {
-        echo '<div class="wrap"><h1>🎮 JustCreators Bewerbungen</h1>';
-        echo '<div class="notice notice-warning"><p>⚠️ Bewerbungstabelle existiert noch nicht. Sie wird beim ersten Submit erstellt.</p></div>';
-        echo '</div>';
-        return;
-    }
-    
-    $applications = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" );
-    
-    ?>
-    <div class="wrap">
-        <h1>🎮 JustCreators Bewerbungen</h1>
-        <p style="color: #666;">Gesamt: <strong><?php echo count( $applications ); ?></strong> Bewerbung(en)</p>
-        
-        <?php if ( empty( $applications ) ) : ?>
-            <div class="notice notice-info"><p>📭 Noch keine Bewerbungen eingegangen.</p></div>
-        <?php else : ?>
-            <table class="wp-list-table widefat striped">
-                <thead>
-                    <tr>
-                        <th>Discord ID</th>
-                        <th>Discord Name</th>
-                        <th>Email</th>
-                        <th>Status</th>
-                        <th>Eingereicht am</th>
-                        <th>Aktion</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ( $applications as $app ) : ?>
-                        <tr>
-                            <td><code><?php echo esc_html( $app->discord_id ); ?></code></td>
-                            <td><?php echo esc_html( $app->discord_username ); ?></td>
-                            <td><?php echo esc_html( $app->email ); ?></td>
-                            <td>
-                                <span class="dashicons dashicons-<?php echo $app->status === 'approved' ? 'yes-alt' : 'dismiss'; ?>" style="color: <?php echo $app->status === 'approved' ? 'green' : 'gray'; ?>;"></span>
-                                <?php echo esc_html( ucfirst( $app->status ) ); ?>
-                            </td>
-                            <td><?php echo esc_html( $app->created_at ); ?></td>
-                            <td>
-                                <a href="?page=jc-applications&view=<?php echo esc_attr( $app->id ); ?>" class="button">👁️ Details</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-    <?php
-}
+add_action( 'admin_init', function() {
+    register_setting( 'jc_bot_settings', 'jc_bot_api_url' );
+    register_setting( 'jc_bot_settings', 'jc_bot_api_secret' );
+} );
 
-function jc_bewerbung_render_settings_page() {
-    if ( ! current_user_can( 'manage_options' ) ) {
-        wp_die( 'Unauthorized' );
+function jc_bot_setup_page() {
+    if ( ! current_user_can( 'manage_options' ) ) return;
+
+    if ( isset( $_POST['jc_test_bot'] ) && check_admin_referer( 'jc_test_bot' ) ) {
+        $test_result = jc_test_bot_connection();
+        echo '<div class="notice notice-' . ( $test_result['success'] ? 'success' : 'error' ) . ' is-dismissible">';
+        echo '<p>' . esc_html( $test_result['message'] ) . '</p>';
+        echo '</div>';
     }
-    
-    if ( isset( $_POST['submit'] ) ) {
-        check_admin_referer( 'jc_bewerbung_settings_nonce' );
-        update_option( 'jc_discord_client_id', sanitize_text_field( $_POST['jc_discord_client_id'] ?? '' ) );
-        update_option( 'jc_discord_client_secret', sanitize_text_field( $_POST['jc_discord_client_secret'] ?? '' ) );
-        update_option( 'jc_redirect_uri', sanitize_url( $_POST['jc_redirect_uri'] ?? '' ) );
-        update_option( 'jc_bot_api_url', sanitize_url( $_POST['jc_bot_api_url'] ?? '' ) );
-        update_option( 'jc_bot_api_secret', sanitize_text_field( $_POST['jc_bot_api_secret'] ?? '' ) );
-        echo '<div class="notice notice-success"><p>✅ Einstellungen gespeichert!</p></div>';
-    }
-    
-    $client_id = jc_get_discord_client_id();
-    $client_secret = jc_get_discord_client_secret();
-    $redirect_uri = jc_get_redirect_uri();
-    $bot_api_url = jc_get_bot_api_url();
-    $bot_api_secret = jc_get_bot_api_secret();
-    
-    $is_client_id_const = defined( 'JC_DISCORD_CLIENT_ID' );
-    $is_client_secret_const = defined( 'JC_DISCORD_CLIENT_SECRET' );
-    $is_redirect_uri_const = defined( 'JC_REDIRECT_URI' );
-    $is_bot_api_url_const = defined( 'JC_BOT_API_URL' );
-    $is_bot_api_secret_const = defined( 'JC_BOT_API_SECRET' );
+
     ?>
     <div class="wrap">
-        <h1>🎮 JustCreators Bewerbungsportal - Discord Konfiguration</h1>
-        <form method="post" style="max-width: 600px; background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd;">
-            <?php wp_nonce_field( 'jc_bewerbung_settings_nonce' ); ?>
-            
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><label for="jc_discord_client_id">Discord Client ID <?php echo $is_client_id_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
-                    <td>
-                        <input type="text" id="jc_discord_client_id" name="jc_discord_client_id" value="<?php echo esc_attr( $client_id ); ?>" class="regular-text" <?php echo $is_client_id_const ? 'disabled' : 'required'; ?>>
-                        <p class="description">Deine Discord App Client ID (von <a href="https://discord.com/developers/applications" target="_blank">Discord Developer Portal</a>)<?php echo $is_client_id_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><label for="jc_discord_client_secret">Discord Client Secret <?php echo $is_client_secret_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
-                    <td>
-                        <input type="password" id="jc_discord_client_secret" name="jc_discord_client_secret" value="<?php echo esc_attr( $client_secret ); ?>" class="regular-text" <?php echo $is_client_secret_const ? 'disabled' : 'required'; ?>>
-                        <p class="description">Dein Discord App Client Secret<?php echo $is_client_secret_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><label for="jc_redirect_uri">Discord Redirect URI <?php echo $is_redirect_uri_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
-                    <td>
-                        <input type="url" id="jc_redirect_uri" name="jc_redirect_uri" value="<?php echo esc_attr( $redirect_uri ); ?>" class="regular-text" <?php echo $is_redirect_uri_const ? 'disabled' : ''; ?> placeholder="https://example.com/bewerbung?discord_oauth=1">
-                        <p class="description">Die Redirect URI muss exakt so in deiner Discord App unter "OAuth2 > Redirects" eingetragen sein<?php echo $is_redirect_uri_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><label for="jc_bot_api_url">Bot API URL <?php echo $is_bot_api_url_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
-                    <td>
-                        <input type="url" id="jc_bot_api_url" name="jc_bot_api_url" value="<?php echo esc_attr( $bot_api_url ); ?>" class="regular-text" <?php echo $is_bot_api_url_const ? 'disabled' : ''; ?> placeholder="https://api.example.com">
-                        <p class="description">URL zum Bot API (optional)<?php echo $is_bot_api_url_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row"><label for="jc_bot_api_secret">Bot API Secret <?php echo $is_bot_api_secret_const ? '<span style="color: green;">✓ (Konstante)</span>' : ''; ?></label></th>
-                    <td>
-                        <input type="password" id="jc_bot_api_secret" name="jc_bot_api_secret" value="<?php echo esc_attr( $bot_api_secret ); ?>" class="regular-text" <?php echo $is_bot_api_secret_const ? 'disabled' : ''; ?>>
-                        <p class="description">Secret für Bot API (optional)<?php echo $is_bot_api_secret_const ? '<br>ⓘ Wird über wp-config.php Konstante definiert' : ''; ?></p>
-                    </td>
-                </tr>
-            </table>
-            
-            <?php submit_button( '💾 Speichern' ); ?>
-        </form>
+        <h1>🤖 JustCreators Bot Setup</h1>
+
+        <div style="background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <h2>📋 Features</h2>
+            <ul style="font-size: 15px; line-height: 2;">
+                <li>✅ Automatische Social Media Link-Validierung mit Icons</li>
+                <li>✅ Auto-Sync bei Löschung (WP → Discord)</li>
+                <li>✅ Forum Tags für Bewerbungsstatus</li>
+                <li>✅ Slash Commands: <code>/accept</code>, <code>/reject</code></li>
+                <li>✅ Status-Sync: Discord → WordPress (✓ aktiv)</li>
+                <li>✅ Live Status-Anzeige für Bewerber</li>
+                <li>✅ Responsive Design mit Animationen</li>
+            </ul>
+
+            <form method="post" action="options.php" style="margin-top: 30px;">
+                <?php settings_fields( 'jc_bot_settings' ); ?>
+
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="jc_bot_api_url">Bot API URL</label>
+                        </th>
+                        <td>
+                            <input type="url"
+                                   id="jc_bot_api_url"
+                                   name="jc_bot_api_url"
+                                   value="<?php echo esc_attr( jc_get_bot_api_url() ); ?>"
+                                   class="regular-text"
+                                   placeholder="http://localhost:3000" />
+                            <p class="description">URL wo der Bot läuft</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <label for="jc_bot_api_secret">API Secret</label>
+                        </th>
+                        <td>
+                            <input type="password"
+                                   id="jc_bot_api_secret"
+                                   name="jc_bot_api_secret"
+                                   value="<?php echo esc_attr( jc_get_bot_api_secret() ); ?>"
+                                   class="regular-text"
+                                   placeholder="Gleiches Secret wie in .env" />
+                            <p class="description">Muss mit API_SECRET in .env übereinstimmen</p>
+                        </td>
+                    </tr>
+                </table>
+
+                <?php submit_button( 'Einstellungen speichern', 'primary' ); ?>
+            </form>
+
+            <hr style="margin: 30px 0;">
+
+            <form method="post" style="margin-top: 20px;">
+                <?php wp_nonce_field( 'jc_test_bot' ); ?>
+                <button type="submit" name="jc_test_bot" class="button button-secondary">
+                    🧪 Bot-Verbindung testen
+                </button>
+            </form>
+        </div>
     </div>
     <?php
 }
