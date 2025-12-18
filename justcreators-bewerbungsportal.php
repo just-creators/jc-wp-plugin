@@ -10,8 +10,7 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-<<<<<<< HEAD
-=======
+
 function jc_handle_status_sync( $request ) {
     $params = $request->get_json_params();
    
@@ -402,7 +401,6 @@ function jc_api_update_status( $request ) {
 }
 // ########## ENDE: NEUE IOBROKER API FUNKTIONEN (v6.14) ##########
 
->>>>>>> parent of 81f1c3d (Update justcreators-bewerbungsportal.php)
 
 // ========================================
 // KONFIGURATION & STYLES
