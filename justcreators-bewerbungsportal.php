@@ -349,22 +349,12 @@ function jc_handle_send_application( $request ) {
     error_log("JC Handle Send: ✅ Eintrag in DB erstellt. Neue ID: " . $real_database_id);
 
     // 3. Bewerbung an Bot senden, MIT der echten DB ID
-    $social_channels_decoded = json_decode( $temp_application->social_channels, true );
-    // Filtere leere/null Einträge aus
-    if ( is_array( $social_channels_decoded ) ) {
-        $social_channels_decoded = array_filter( $social_channels_decoded, function( $channel ) {
-            return ! empty( $channel ) && ! empty( $channel['url'] ) && $channel['url'] !== 'null';
-        } );
-        // Re-index array (entferne Lücken)
-        $social_channels_decoded = array_values( $social_channels_decoded );
-    }
-    
     $bot_data = array(
         'discord_id' => $temp_application->discord_id,
         'discord_name' => $temp_application->discord_name,
         'applicant_name' => $temp_application->applicant_name,
         'age' => $temp_application->age,
-        'social_channels' => $social_channels_decoded,
+        'social_channels' => json_decode( $temp_application->social_channels, true ),
         'social_activity' => $temp_application->social_activity,
         'motivation' => $temp_application->motivation,
         'database_id' => $real_database_id // <-- HIER IST DER FIX
