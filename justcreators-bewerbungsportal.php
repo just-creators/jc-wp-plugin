@@ -10,6 +10,399 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+<<<<<<< HEAD
+=======
+function jc_handle_status_sync( $request ) {
+    $params = $request->get_json_params();
+   
+    error_log( "JC API: ========== NEW STATUS SYNC REQUEST ==========" );
+    error_log( "JC API: Raw params: " . json_encode($params) );
+   
+    if ( empty( $params['discord_id'] ) || empty( $params['status'] ) ) {
+        error_log( "JC API: ❌ FEHLER - Missing parameters!" );
+        return new WP_Error( 'missing_params', 'discord_id und status erforderlich', array( 'status' => 400 ) );
+    }
+   
+    $discord_id = sanitize_text_field( $params['discord_id'] );
+    $status = sanitize_text_field( $params['status'] );
+   
+    error_log( "JC API: Sanitized - discord_id={$discord_id}, status={$status}" );
+   
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+   
+    // Prüfen ob Eintrag existiert
+    $exists = $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+   
+    error_log( "JC API: Entry exists in DB: " . ($exists ? 'YES' : 'NO') );
+   
+    if ( ! $exists ) {
+        error_log( "JC API: ❌ FEHLER - Discord ID {$discord_id} not found in database!" );
+        return new WP_Error( 'not_found', 'Bewerbung nicht gefunden', array( 'status' => 404 ) );
+    }
+   
+    // Status aktualisieren
+    error_log( "JC API: Attempting UPDATE on table={$table}" );
+   
+    $updated = $wpdb->update(
+        $table,
+        array( 'status' => $status ),
+        array( 'discord_id' => $discord_id ),
+        array( '%s' ),
+        array( '%s' )
+    );
+   
+    if ( $updated === false ) {
+        error_log( "JC API: ❌ UPDATE FAILED! DB Error: " . $wpdb->last_error );
+        return new WP_Error( 'update_failed', 'Datenbankfehler: ' . $wpdb->last_error, array( 'status' => 500 ) );
+    }
+   
+    if ( $updated === 0 ) {
+        error_log( "JC API: ⚠️ UPDATE returned 0 rows (status already same?)" );
+    } else {
+        error_log( "JC API: ✅✅✅ UPDATE SUCCESS! Rows affected: {$updated}" );
+    }
+   
+    // Verify
+    $new_status = $wpdb->get_var( $wpdb->prepare(
+        "SELECT status FROM {$table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+   
+    error_log( "JC API: Verification - New status in DB: {$new_status}" );
+    error_log( "JC API: ========== END STATUS SYNC ==========" );
+   
+    return array(
+        'success' => true,
+        'message' => 'Status erfolgreich aktualisiert',
+        'discord_id' => $discord_id,
+        'old_status' => 'unknown',
+        'new_status' => $new_status,
+        'rows_affected' => $updated
+    );
+}
+function jc_update_application_status( $discord_id, $status ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+   
+    error_log( "JC DB: Updating table={$table}, discord_id={$discord_id}, status={$status}" );
+   
+    // Erst prüfen ob der Eintrag existiert
+    $exists = $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+   
+    error_log( "JC DB: Entry exists: " . ($exists ? 'YES' : 'NO') );
+   
+    if ( ! $exists ) {
+        error_log( "JC DB: ❌ Discord ID {$discord_id} NOT FOUND in database!" );
+        return false;
+    }
+   
+    $updated = $wpdb->update(
+        $table,
+        array( 'status' => $status ),
+        array( 'discord_id' => $discord_id ),
+        array( '%s' ),
+        array( '%s' )
+    );
+   
+    if ( $updated === false ) {
+        error_log( "JC DB: ❌ UPDATE FAILED! Error: " . $wpdb->last_error );
+        return false;
+    }
+   
+    error_log( "JC DB: ✅ UPDATE SUCCESS! Rows affected: {$updated}" );
+   
+    return true;
+}
+function jc_get_application_status( $discord_id ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+    
+    error_log( "JC DB: Fetching status for Discord ID: {$discord_id}" );
+    
+    $result = $wpdb->get_row( $wpdb->prepare(
+        "SELECT status, applicant_name, created_at, forum_post_id FROM {$table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+    
+    if ( $result ) {
+        error_log( "JC DB: Found application with status: {$result->status}" );
+    } else {
+        error_log( "JC DB: No application found for Discord ID: {$discord_id}" );
+    }
+    
+    return $result;
+}
+function jc_handle_check_discord_join( $request ) {
+    $params = $request->get_json_params();
+    
+    if ( empty( $params['discord_id'] ) ) {
+        return new WP_Error( 'missing_params', 'discord_id erforderlich', array( 'status' => 400 ) );
+    }
+    
+    $discord_id = sanitize_text_field( $params['discord_id'] );
+    
+    // Prüfe ob User in Session ist (Sicherheit)
+    if ( ! isset( $_SESSION['jc_discord_user'] ) || $_SESSION['jc_discord_user']['id'] !== $discord_id ) {
+        return new WP_Error( 'unauthorized', 'Nicht autorisiert', array( 'status' => 401 ) );
+    }
+    
+    $check_result = jc_check_user_on_temp_server( $discord_id );
+    
+    return array(
+        'success' => $check_result['success'],
+        'is_on_temp_server' => $check_result['is_on_temp_server']
+    );
+}
+
+// ########## START: AKTUALISIERTE FUNKTION (v6.17) ##########
+// Fügt 'privacy_accepted_at' zur Übertragung hinzu
+function jc_handle_send_application( $request ) {
+    $params = $request->get_json_params();
+    
+    if ( empty( $params['discord_id'] ) ) {
+        return new WP_Error( 'missing_params', 'discord_id erforderlich', array( 'status' => 400 ) );
+    }
+    
+    $discord_id = sanitize_text_field( $params['discord_id'] );
+    
+    // Prüfe ob User in Session ist (Sicherheit)
+    if ( ! isset( $_SESSION['jc_discord_user'] ) || $_SESSION['jc_discord_user']['id'] !== $discord_id ) {
+        return new WP_Error( 'unauthorized', 'Nicht autorisiert', array( 'status' => 401 ) );
+    }
+    
+    // Prüfe ob User wirklich auf Temp-Server ist
+    $check_result = jc_check_user_on_temp_server( $discord_id );
+    if ( ! $check_result['success'] || ! $check_result['is_on_temp_server'] ) {
+        return new WP_Error( 'not_on_server', 'User ist nicht auf dem temporären Server', array( 'status' => 400 ) );
+    }
+    
+    global $wpdb;
+    $temp_table = $wpdb->prefix . 'jc_discord_applications_temp';
+    $main_table = $wpdb->prefix . 'jc_discord_applications';
+    
+    // Hole Bewerbung aus temporärer Tabelle
+    $temp_application = $wpdb->get_row( $wpdb->prepare(
+        "SELECT * FROM {$temp_table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+    
+    if ( ! $temp_application ) {
+        return new WP_Error( 'not_found', 'Bewerbung nicht gefunden oder abgelaufen', array( 'status' => 404 ) );
+    }
+    
+    // Prüfe ob bereits abgelaufen
+    if ( strtotime( $temp_application->expires_at ) < time() ) {
+        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
+        return new WP_Error( 'expired', 'Bewerbung ist abgelaufen. Bitte starte eine neue Bewerbung.', array( 'status' => 410 ) );
+    }
+    
+    // Prüfe ob bereits in Haupttabelle vorhanden (redundant, aber sicher)
+    $existing = $wpdb->get_row( $wpdb->prepare(
+        "SELECT id, forum_post_id FROM {$main_table} WHERE discord_id = %s",
+        $discord_id
+    ) );
+    
+    if ( $existing && ! empty( $existing->forum_post_id ) ) {
+        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
+        return array(
+            'success' => true,
+            'message' => 'Bewerbung wurde bereits verarbeitet',
+            'already_sent' => true
+        );
+    }
+
+    // 1. ZUERST in die Haupt-DB einfügen, um die ID zu bekommen
+    $inserted = $wpdb->insert( $main_table, array(
+        'discord_id' => $temp_application->discord_id,
+        'discord_name' => $temp_application->discord_name,
+        'applicant_name' => $temp_application->applicant_name,
+        'age' => $temp_application->age,
+        'social_channels' => $temp_application->social_channels,
+        'social_activity' => $temp_application->social_activity,
+        'motivation' => $temp_application->motivation,
+        'privacy_accepted_at' => $temp_application->privacy_accepted_at, // <-- NEU (v6.17)
+        'status' => 'pending'
+    ), array(
+        '%s','%s','%s','%s','%s','%s','%s',
+        '%s', // <-- NEU (v6.17) für privacy_accepted_at
+        '%s'
+    ) );
+
+    if ( ! $inserted ) {
+        // Wenn das Einfügen fehlschlägt (z.B. DB-Problem), abbrechen.
+        error_log("JC Handle Send: ❌ DB INSERT FAILED. " . $wpdb->last_error);
+        return new WP_Error( 'db_error', 'Fehler beim Speichern in Haupttabelle: ' . $wpdb->last_error, array( 'status' => 500 ) );
+    }
+    
+    // 2. Die neue, echte DB ID holen
+    $real_database_id = $wpdb->insert_id;
+    error_log("JC Handle Send: ✅ Eintrag in DB erstellt. Neue ID: " . $real_database_id);
+
+    // 3. Bewerbung an Bot senden, MIT der echten DB ID
+    $bot_data = array(
+        'discord_id' => $temp_application->discord_id,
+        'discord_name' => $temp_application->discord_name,
+        'applicant_name' => $temp_application->applicant_name,
+        'age' => $temp_application->age,
+        'social_channels' => json_decode( $temp_application->social_channels, true ),
+        'social_activity' => $temp_application->social_activity,
+        'motivation' => $temp_application->motivation,
+        'database_id' => $real_database_id // <-- HIER IST DER FIX
+    );
+    
+    $bot_result = jc_send_application_to_bot( $bot_data );
+    
+    // 4. Bot-Antwort verarbeiten
+    if ( $bot_result['success'] && isset( $bot_result['data']['post_id'] ) ) {
+        
+        // 5. Bot war erfolgreich, also die forum_post_id in der DB nachtragen
+        $wpdb->update(
+            $main_table,
+            array( 'forum_post_id' => $bot_result['data']['post_id'] ),
+            array( 'id' => $real_database_id ),
+            array( '%s' ),
+            array( '%d' )
+        );
+        
+        // Temporäre Bewerbung löschen
+        $wpdb->delete( $temp_table, array( 'discord_id' => $discord_id ), array( '%s' ) );
+        
+        // Session aufräumen
+        unset( $_SESSION['jc_pending_application'] );
+        unset( $_SESSION['jc_discord_user'] );
+        
+        error_log("JC Handle Send: ✅ Bot-Post erstellt und DB-Eintrag $real_database_id aktualisiert.");
+
+        return array(
+            'success' => true,
+            'message' => 'Bewerbung erfolgreich verarbeitet',
+            'post_id' => $bot_result['data']['post_id']
+        );
+
+    } else {
+        // 6. Bot ist FEHLGESCHLAGEN. Rollback!
+        error_log("JC Handle Send: ❌ Bot ist fehlgeschlagen. Rollback von DB-Eintrag $real_database_id.");
+        
+        // Lösche den Eintrag, den wir in Schritt 1 gemacht haben, da der Bot-Post nicht erstellt werden konnte.
+        $wpdb->delete( $main_table, array( 'id' => $real_database_id ), array( '%d' ) );
+        
+        return new WP_Error( 'bot_error', $bot_result['message'] ?? 'Fehler beim Senden an Bot', array( 'status' => 500 ) );
+    }
+}
+// ########## ENDE: AKTUALISIERTE FUNKTION (v6.17) ##########
+
+
+// ########## START: NEUE IOBROKER API FUNKTIONEN (v6.14) ##########
+/**
+ * NEUE API-FUNKTION FÜR IOBROKER (LESEN)
+ * Gibt alle Bewerbungen und eine Zusammenfassung zurück.
+ * Gesichert durch jc_verify_api_secret.
+ */
+function jc_api_get_all_applications( $request ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+    
+    // Hole alle Bewerbungen
+    $applications = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" );
+    
+    if ( is_wp_error( $applications ) ) {
+        return new WP_Error( 'db_error', 'Fehler beim Abrufen der Bewerbungen', array( 'status' => 500 ) );
+    }
+    
+    // Nützliche Statistiken für ioBroker-Dashboards
+    $total = count($applications);
+    $pending = 0;
+    $accepted = 0;
+    $rejected = 0;
+    
+    foreach ( $applications as $app ) {
+        if ( $app->status === 'pending' ) {
+            $pending++;
+        } elseif ( $app->status === 'accepted' ) {
+            $accepted++;
+        } elseif ( $app->status === 'rejected' ) {
+            $rejected++;
+        }
+        
+        // Bonus: social_channels als JSON-Objekt statt als String ausgeben
+        // ioBroker kann das direkt als Objekt parsen.
+        $app->social_channels = json_decode($app->social_channels);
+    }
+    
+    // Datenpaket für ioBroker
+    $data = array(
+        'success' => true,
+        'summary' => array(
+            'total' => $total,
+            'pending' => $pending,
+            'accepted' => $accepted,
+            'rejected' => $rejected
+        ),
+        'applications' => $applications // Die komplette Liste
+    );
+    
+    return new WP_REST_Response( $data, 200 );
+}
+
+/**
+ * NEUE API-FUNKTION FÜR IOBROKER (SCHREIBEN)
+ * Aktualisiert den Status einer Bewerbung.
+ * Akzeptiert JSON: { "discord_id": "12345", "new_status": "accepted" }
+ */
+function jc_api_update_status( $request ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_discord_applications';
+    
+    // Daten aus dem ioBroker POST-Request holen
+    $discord_id = sanitize_text_field( $request['discord_id'] );
+    $new_status = sanitize_text_field( $request['new_status'] );
+    
+    // Validierung
+    if ( empty($discord_id) || empty($new_status) ) {
+        return new WP_Error( 'missing_params', 'discord_id und new_status sind erforderlich', array( 'status' => 400 ) );
+    }
+    
+    // Prüfen, ob der Status gültig ist
+    if ( ! in_array( $new_status, ['pending', 'accepted', 'rejected'] ) ) {
+        return new WP_Error( 'invalid_status', 'Ungültiger Status. Erlaubt sind: pending, accepted, rejected', array( 'status' => 400 ) );
+    }
+
+    // Update in der Datenbank durchführen
+    $updated = $wpdb->update(
+        $table,
+        array( 'status' => $new_status ), // SET
+        array( 'discord_id' => $discord_id ), // WHERE
+        array( '%s' ), // Format für SET
+        array( '%s' )  // Format für WHERE
+    );
+
+    if ( $updated === false ) {
+        return new WP_Error( 'db_error', 'Fehler beim Update des Status', array( 'status' => 500 ) );
+    }
+    
+    if ( $updated === 0 ) {
+        return new WP_REST_Response( array(
+            'success' => false,
+            'message' => 'Keine Bewerbung mit dieser Discord ID gefunden.'
+        ), 404 );
+    }
+    
+    // Erfolg zurück an ioBroker senden
+    return new WP_REST_Response( array(
+        'success' => true,
+        'message' => "Status für $discord_id auf $new_status gesetzt."
+    ), 200 );
+}
+// ########## ENDE: NEUE IOBROKER API FUNKTIONEN (v6.14) ##########
+
+>>>>>>> parent of 81f1c3d (Update justcreators-bewerbungsportal.php)
 
 // ========================================
 // KONFIGURATION & STYLES
