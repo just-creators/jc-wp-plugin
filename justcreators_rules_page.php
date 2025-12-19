@@ -749,12 +749,16 @@ function jc_rules_styles() {
         .jc-wrap { 
             background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
             max-width: 900px; 
+            width: min(900px, calc(100% - 40px));
             margin: 50px auto; 
             padding: 50px; 
             border-radius: 16px;
             font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
             box-shadow: 0 10px 40px rgba(0,0,0,0.4);
             animation: jc-fadeIn 0.6s ease-out;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         
         .jc-card { 
@@ -763,6 +767,7 @@ function jc_rules_styles() {
             border-radius: 14px !important;
             box-shadow: 0 4px 20px rgba(0,0,0,0.4);
             animation: jc-fadeIn 0.8s ease-out 0.2s both !important;
+            width: 100%;
         }
         
         .jc-h { 

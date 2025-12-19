@@ -203,6 +203,68 @@ function jc_teilnehmer_fetch_image( $platform, $url ) {
     return $img;
 }
 
+function jc_teilnehmer_fetch_channel_meta( $platform, $url ) {
+    $key = 'jc_meta_' . md5( $platform . $url );
+    if ( $cached = get_transient( $key ) ) return $cached;
+
+    $meta = array( 'title' => '', 'image' => '' );
+
+    if ( $platform === 'youtube' ) {
+        $res = wp_remote_get( 'https://www.youtube.com/oembed?url=' . urlencode( $url ) . '&format=json' );
+        if ( ! is_wp_error( $res ) ) {
+            $data = json_decode( wp_remote_retrieve_body( $res ), true );
+            $meta['title'] = $data['title'] ?? '';
+            $meta['image'] = $data['thumbnail_url'] ?? '';
+        }
+    } elseif ( $platform === 'twitch' ) {
+        if ( preg_match( '/twitch\.tv\/([\w-]+)/i', $url, $m ) ) {
+            $user = strtolower( $m[1] );
+            $meta['title'] = $user;
+            $meta['image'] = 'https://static-cdn.jtvnw.net/jtv_user_pictures/' . $user . '-profile_image-300x300.png';
+        }
+    } elseif ( $platform === 'instagram' ) {
+        if ( preg_match( '#instagram\.com/([^/?]+)/?#i', $url, $m ) ) {
+            $meta['title'] = $m[1];
+        }
+    } elseif ( $platform === 'tiktok' ) {
+        if ( preg_match( '#tiktok\.com/@([^/?]+)#i', $url, $m ) ) {
+            $meta['title'] = $m[1];
+        }
+    }
+
+    set_transient( $key, $meta, DAY_IN_SECONDS );
+    return $meta;
+}
+
+function jc_teilnehmer_resolve_social_meta( $channels, $fallback_name = '' ) {
+    $placeholder = 'https://via.placeholder.com/300x300/1e2740/6c7bff?text=JC';
+    $meta = array(
+        'title' => $fallback_name,
+        'image' => jc_teilnehmer_get_profile_image( $channels ) ?: $placeholder,
+    );
+
+    if ( empty( $channels ) || ! is_array( $channels ) ) {
+        return $meta;
+    }
+
+    $priority = array( 'youtube', 'twitch', 'instagram', 'tiktok' );
+    foreach ( $priority as $platform ) {
+        foreach ( $channels as $ch ) {
+            if ( ( $ch['platform'] ?? '' ) !== $platform || empty( $ch['url'] ) ) continue;
+            $data = jc_teilnehmer_fetch_channel_meta( $platform, $ch['url'] );
+            if ( ! empty( $data['title'] ) ) {
+                $meta['title'] = $data['title'];
+            }
+            if ( ! empty( $data['image'] ) ) {
+                $meta['image'] = $data['image'];
+            }
+            return $meta;
+        }
+    }
+
+    return $meta;
+}
+
 function jc_teilnehmer_import_from_applications() {
     global $wpdb;
     $target = $wpdb->prefix . JC_TEILNEHMER_TABLE;
@@ -365,14 +427,16 @@ function jc_teilnehmer_render_shortcode( $atts ) {
         <div class="jc-grid" id="jc-grid">
             <?php foreach ( $rows as $t ) : 
                 $chs = json_decode( $t->social_channels, true ) ?: [];
-                $search = strtolower( $t->display_name . ' ' . $t->title );
+                $meta = jc_teilnehmer_resolve_social_meta( $chs, $t->display_name );
+                $card_name = $meta['title'] ?: $t->display_name;
+                $card_image = $meta['image'];
+                $search = strtolower( $card_name );
             ?>
             <div class="jc-card" data-search="<?php echo esc_attr( $search ); ?>">
                 <div class="jc-head">
-                    <img src="<?php echo esc_url( $t->profile_image_url ); ?>" class="jc-av" alt="">
+                    <img src="<?php echo esc_url( $card_image ); ?>" class="jc-av" alt="">
                     <div>
-                        <h3 class="jc-name"><?php echo esc_html( $t->display_name ); ?></h3>
-                        <p class="jc-role"><?php echo esc_html( $t->title ); ?></p>
+                        <h3 class="jc-name"><?php echo esc_html( $card_name ); ?></h3>
                     </div>
                 </div>
                 <div class="jc-socials">
