@@ -85,6 +85,7 @@ function jc_teilnehmer_handle_actions() {
         check_admin_referer( 'jc_teilnehmer_api_settings' );
         update_option( 'jc_twitch_client_id', sanitize_text_field( $_POST['twitch_client_id'] ?? '' ) );
         update_option( 'jc_twitch_client_secret', sanitize_text_field( $_POST['twitch_client_secret'] ?? '' ) );
+        update_option( 'jc_youtube_api_key', sanitize_text_field( $_POST['youtube_api_key'] ?? '' ) );
         
         // Token Cache löschen
         delete_transient( 'jc_twitch_access_token' );
@@ -203,6 +204,73 @@ function jc_teilnehmer_get_profile_image( $channels ) {
 }
 
 /**
+ * YouTube Channel ID aus URL extrahieren
+ */
+function jc_teilnehmer_extract_youtube_channel_id( $url ) {
+    // Channel URL: youtube.com/channel/UCxxxxx oder youtube.com/@username
+    if ( preg_match( '#youtube\.com/channel/([a-zA-Z0-9_-]+)#i', $url, $m ) ) {
+        return $m[1];
+    }
+    
+    // Handle @username format - wir müssen die API verwenden um die ID zu bekommen
+    if ( preg_match( '#youtube\.com/@([a-zA-Z0-9_-]+)#i', $url, $m ) ) {
+        return '@' . $m[1]; // Marker dass es ein Handle ist
+    }
+    
+    // Video URL - Channel ID aus oEmbed holen
+    if ( preg_match( '#(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]+)#i', $url, $m ) ) {
+        return 'video:' . $m[1]; // Marker dass es eine Video-URL ist
+    }
+    
+    return false;
+}
+
+/**
+ * YouTube Channel Daten über API abrufen
+ */
+function jc_teilnehmer_fetch_youtube_channel( $identifier ) {
+    $api_key = defined( 'JC_YOUTUBE_API_KEY' ) ? JC_YOUTUBE_API_KEY : get_option( 'jc_youtube_api_key', '' );
+    if ( empty( $api_key ) ) return false;
+    
+    $api_url = 'https://www.googleapis.com/youtube/v3/channels?part=snippet';
+    
+    // Handle verschiedene ID-Typen
+    if ( strpos( $identifier, '@' ) === 0 ) {
+        // @username Format
+        $api_url .= '&forHandle=' . urlencode( substr( $identifier, 1 ) );
+    } elseif ( strpos( $identifier, 'video:' ) === 0 ) {
+        // Video URL - erst Video-Info holen, dann Channel
+        $video_id = substr( $identifier, 6 );
+        $video_url = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&id=' . urlencode( $video_id ) . '&key=' . $api_key;
+        $response = wp_remote_get( $video_url, array( 'timeout' => 10 ) );
+        if ( is_wp_error( $response ) ) return false;
+        
+        $data = json_decode( wp_remote_retrieve_body( $response ), true );
+        if ( isset( $data['items'][0]['snippet']['channelId'] ) ) {
+            $channel_id = $data['items'][0]['snippet']['channelId'];
+            $api_url .= '&id=' . urlencode( $channel_id );
+        } else {
+            return false;
+        }
+    } else {
+        // Direkte Channel ID
+        $api_url .= '&id=' . urlencode( $identifier );
+    }
+    
+    $api_url .= '&key=' . $api_key;
+    
+    $response = wp_remote_get( $api_url, array( 'timeout' => 10 ) );
+    if ( is_wp_error( $response ) ) return false;
+    
+    $data = json_decode( wp_remote_retrieve_body( $response ), true );
+    if ( isset( $data['items'][0] ) ) {
+        return $data['items'][0];
+    }
+    
+    return false;
+}
+
+/**
  * Twitch API Token abrufen
  */
 function jc_teilnehmer_get_twitch_token() {
@@ -271,11 +339,30 @@ function jc_teilnehmer_fetch_image( $platform, $url ) {
 
     $img = '';
     if ( $platform === 'youtube' ) {
-        // oEmbed Versuch
-        $res = wp_remote_get( 'https://www.youtube.com/oembed?url=' . urlencode( $url ) . '&format=json' );
-        if ( !is_wp_error( $res ) ) {
-            $data = json_decode( wp_remote_retrieve_body( $res ), true );
-            $img = $data['thumbnail_url'] ?? '';
+        // Versuche YouTube Data API für Kanal-Profilbild
+        $channel_id = jc_teilnehmer_extract_youtube_channel_id( $url );
+        if ( $channel_id ) {
+            $channel_data = jc_teilnehmer_fetch_youtube_channel( $channel_id );
+            if ( $channel_data && isset( $channel_data['snippet']['thumbnails'] ) ) {
+                // Höchste Auflösung nehmen
+                $thumbnails = $channel_data['snippet']['thumbnails'];
+                if ( isset( $thumbnails['high']['url'] ) ) {
+                    $img = $thumbnails['high']['url'];
+                } elseif ( isset( $thumbnails['medium']['url'] ) ) {
+                    $img = $thumbnails['medium']['url'];
+                } elseif ( isset( $thumbnails['default']['url'] ) ) {
+                    $img = $thumbnails['default']['url'];
+                }
+            }
+        }
+        
+        // Fallback: oEmbed für Video-Thumbnail
+        if ( empty( $img ) ) {
+            $res = wp_remote_get( 'https://www.youtube.com/oembed?url=' . urlencode( $url ) . '&format=json' );
+            if ( !is_wp_error( $res ) ) {
+                $data = json_decode( wp_remote_retrieve_body( $res ), true );
+                $img = $data['thumbnail_url'] ?? '';
+            }
         }
     } elseif ( $platform === 'twitch' ) {
         if ( preg_match( '/twitch\.tv\/([\w-]+)/i', $url, $m ) ) {
@@ -298,13 +385,33 @@ function jc_teilnehmer_fetch_channel_meta( $platform, $url ) {
     $meta = array( 'title' => '', 'image' => '' );
 
     if ( $platform === 'youtube' ) {
-        // Versuche oEmbed
-        $res = wp_remote_get( 'https://www.youtube.com/oembed?url=' . urlencode( $url ) . '&format=json', array( 'timeout' => 10 ) );
-        if ( ! is_wp_error( $res ) && wp_remote_retrieve_response_code( $res ) === 200 ) {
-            $data = json_decode( wp_remote_retrieve_body( $res ), true );
-            if ( is_array( $data ) ) {
-                $meta['title'] = $data['title'] ?? '';
-                $meta['image'] = $data['thumbnail_url'] ?? '';
+        // Versuche YouTube Data API für Kanal-Daten
+        $channel_id = jc_teilnehmer_extract_youtube_channel_id( $url );
+        if ( $channel_id ) {
+            $channel_data = jc_teilnehmer_fetch_youtube_channel( $channel_id );
+            if ( $channel_data && isset( $channel_data['snippet'] ) ) {
+                $snippet = $channel_data['snippet'];
+                $meta['title'] = $snippet['title'] ?? '';
+                // Höchste Auflösung
+                if ( isset( $snippet['thumbnails']['high']['url'] ) ) {
+                    $meta['image'] = $snippet['thumbnails']['high']['url'];
+                } elseif ( isset( $snippet['thumbnails']['medium']['url'] ) ) {
+                    $meta['image'] = $snippet['thumbnails']['medium']['url'];
+                } elseif ( isset( $snippet['thumbnails']['default']['url'] ) ) {
+                    $meta['image'] = $snippet['thumbnails']['default']['url'];
+                }
+            }
+        }
+        
+        // Fallback: oEmbed
+        if ( empty( $meta['title'] ) || empty( $meta['image'] ) ) {
+            $res = wp_remote_get( 'https://www.youtube.com/oembed?url=' . urlencode( $url ) . '&format=json', array( 'timeout' => 10 ) );
+            if ( ! is_wp_error( $res ) && wp_remote_retrieve_response_code( $res ) === 200 ) {
+                $data = json_decode( wp_remote_retrieve_body( $res ), true );
+                if ( is_array( $data ) ) {
+                    if ( empty( $meta['title'] ) ) $meta['title'] = $data['title'] ?? '';
+                    if ( empty( $meta['image'] ) ) $meta['image'] = $data['thumbnail_url'] ?? '';
+                }
             }
         }
     } elseif ( $platform === 'twitch' ) {
@@ -567,28 +674,30 @@ function jc_teilnehmer_render_shortcode( $atts ) {
 function jc_teilnehmer_render_api_settings_page() {
     if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Keine Berechtigung' );
     
-    $client_id = get_option( 'jc_twitch_client_id', '' );
-    $client_secret = get_option( 'jc_twitch_client_secret', '' );
-    $has_credentials = !empty( $client_id ) && !empty( $client_secret );
+    $twitch_client_id = get_option( 'jc_twitch_client_id', '' );
+    $twitch_client_secret = get_option( 'jc_twitch_client_secret', '' );
+    $youtube_api_key = get_option( 'jc_youtube_api_key', '' );
+    
+    $has_twitch = !empty( $twitch_client_id ) && !empty( $twitch_client_secret );
+    $has_youtube = !empty( $youtube_api_key );
     
     settings_errors( 'jc_teilnehmer' );
     ?>
     <div class="wrap">
         <h1>🔑 API Einstellungen</h1>
-        <p>Konfiguriere die Twitch API, um echte Profilbilder zu laden.</p>
+        <p>Konfiguriere die APIs, um echte Profilbilder zu laden.</p>
         
-        <?php if ( $has_credentials ) : ?>
-            <div class="notice notice-success">
-                <p>✅ Twitch API Credentials sind konfiguriert!</p>
-            </div>
-        <?php else : ?>
-            <div class="notice notice-warning">
-                <p>⚠️ Noch keine Twitch API Credentials konfiguriert. Profilbilder werden als Platzhalter angezeigt.</p>
-            </div>
-        <?php endif; ?>
+        <div class="notice notice-info">
+            <p>
+                <strong>Status:</strong>
+                <?php if ( $has_twitch ) : ?>✅ Twitch<?php else : ?>❌ Twitch<?php endif; ?>
+                &nbsp;|&nbsp;
+                <?php if ( $has_youtube ) : ?>✅ YouTube<?php else : ?>❌ YouTube<?php endif; ?>
+            </p>
+        </div>
 
         <div class="card" style="max-width: 800px;">
-            <h2>Twitch API Setup</h2>
+            <h2>🎮 Twitch API Setup</h2>
             <ol>
                 <li>Gehe zu <a href="https://dev.twitch.tv/console" target="_blank">dev.twitch.tv/console</a></li>
                 <li>Melde dich an und klicke auf "Register Your Application"</li>
@@ -609,7 +718,7 @@ function jc_teilnehmer_render_api_settings_page() {
                         <th scope="row"><label for="twitch_client_id">Twitch Client ID</label></th>
                         <td>
                             <input type="text" id="twitch_client_id" name="twitch_client_id" 
-                                   value="<?php echo esc_attr( $client_id ); ?>" 
+                                   value="<?php echo esc_attr( $twitch_client_id ); ?>" 
                                    class="regular-text" placeholder="abc123xyz...">
                             <p class="description">Deine Twitch Application Client ID</p>
                         </td>
@@ -618,20 +727,45 @@ function jc_teilnehmer_render_api_settings_page() {
                         <th scope="row"><label for="twitch_client_secret">Twitch Client Secret</label></th>
                         <td>
                             <input type="password" id="twitch_client_secret" name="twitch_client_secret" 
-                                   value="<?php echo esc_attr( $client_secret ); ?>" 
+                                   value="<?php echo esc_attr( $twitch_client_secret ); ?>" 
                                    class="regular-text" placeholder="xyz789abc...">
-                            <p class="description">Dein Twitch Application Client Secret (wird verschlüsselt gespeichert)</p>
+                            <p class="description">Dein Twitch Application Client Secret</p>
                         </td>
                     </tr>
                 </table>
+        </div>
+        
+        <div class="card" style="max-width: 800px; margin-top: 20px;">
+            <h2>📺 YouTube API Setup</h2>
+            <ol>
+                <li>Gehe zu <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a></li>
+                <li>Erstelle ein neues Projekt oder wähle ein bestehendes aus</li>
+                <li>Aktiviere die <strong>YouTube Data API v3</strong></li>
+                <li>Gehe zu "APIs & Services" → "Credentials"</li>
+                <li>Klicke "Create Credentials" → "API Key"</li>
+                <li>Kopiere den API Key und trage ihn unten ein</li>
+                <li><em>Optional:</em> Beschränke den Key auf "YouTube Data API v3" für mehr Sicherheit</li>
+            </ol>
+            
+            <table class="form-table">
+                <tr>
+                    <th scope="row"><label for="youtube_api_key">YouTube API Key</label></th>
+                    <td>
+                        <input type="text" id="youtube_api_key" name="youtube_api_key" 
+                               value="<?php echo esc_attr( $youtube_api_key ); ?>" 
+                               class="regular-text" placeholder="AIzaSy...">
+                        <p class="description">Dein Google/YouTube Data API v3 Key</p>
+                    </td>
+                </tr>
+            </table>
                 
                 <p class="submit">
-                    <button type="submit" name="jc_teilnehmer_save_api" class="button button-primary">💾 Speichern</button>
+                    <button type="submit" name="jc_teilnehmer_save_api" class="button button-primary">💾 Alle Einstellungen speichern</button>
                 </p>
             </form>
         </div>
         
-        <?php if ( $has_credentials ) : ?>
+        <?php if ( $has_twitch ) : ?>
         <div class="card" style="max-width: 800px; margin-top: 20px;">
             <h2>🧪 API Test</h2>
             <p>Teste ob die API funktioniert:</p>
