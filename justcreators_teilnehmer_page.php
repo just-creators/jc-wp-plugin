@@ -181,6 +181,69 @@ function jc_teilnehmer_get_profile_image( $channels ) {
     return 'https://via.placeholder.com/300x300/1e2740/6c7bff?text=JC';
 }
 
+/**
+ * Twitch API Token abrufen
+ */
+function jc_teilnehmer_get_twitch_token() {
+    $token = get_transient( 'jc_twitch_access_token' );
+    if ( $token ) return $token;
+
+    // Twitch Client ID und Secret (sollten in wp-config.php oder Options gespeichert werden)
+    $client_id = defined( 'JC_TWITCH_CLIENT_ID' ) ? JC_TWITCH_CLIENT_ID : get_option( 'jc_twitch_client_id', '' );
+    $client_secret = defined( 'JC_TWITCH_CLIENT_SECRET' ) ? JC_TWITCH_CLIENT_SECRET : get_option( 'jc_twitch_client_secret', '' );
+
+    if ( empty( $client_id ) || empty( $client_secret ) ) {
+        return false;
+    }
+
+    $response = wp_remote_post( 'https://id.twitch.tv/oauth2/token', array(
+        'body' => array(
+            'client_id' => $client_id,
+            'client_secret' => $client_secret,
+            'grant_type' => 'client_credentials'
+        )
+    ));
+
+    if ( is_wp_error( $response ) ) return false;
+
+    $body = json_decode( wp_remote_retrieve_body( $response ), true );
+    if ( isset( $body['access_token'] ) ) {
+        $token = $body['access_token'];
+        $expires = isset( $body['expires_in'] ) ? intval( $body['expires_in'] ) - 300 : 3600; // 5 Min Puffer
+        set_transient( 'jc_twitch_access_token', $token, $expires );
+        return $token;
+    }
+
+    return false;
+}
+
+/**
+ * Twitch Benutzerdaten über API abrufen
+ */
+function jc_teilnehmer_fetch_twitch_user( $username ) {
+    $token = jc_teilnehmer_get_twitch_token();
+    if ( ! $token ) return false;
+
+    $client_id = defined( 'JC_TWITCH_CLIENT_ID' ) ? JC_TWITCH_CLIENT_ID : get_option( 'jc_twitch_client_id', '' );
+    if ( empty( $client_id ) ) return false;
+
+    $response = wp_remote_get( 'https://api.twitch.tv/helix/users?login=' . urlencode( strtolower( $username ) ), array(
+        'headers' => array(
+            'Client-ID' => $client_id,
+            'Authorization' => 'Bearer ' . $token
+        )
+    ));
+
+    if ( is_wp_error( $response ) ) return false;
+
+    $body = json_decode( wp_remote_retrieve_body( $response ), true );
+    if ( isset( $body['data'][0] ) ) {
+        return $body['data'][0];
+    }
+
+    return false;
+}
+
 function jc_teilnehmer_fetch_image( $platform, $url ) {
     $key = 'jc_img_' . md5( $platform . $url );
     if ( $c = get_transient( $key ) ) return $c;
@@ -195,7 +258,11 @@ function jc_teilnehmer_fetch_image( $platform, $url ) {
         }
     } elseif ( $platform === 'twitch' ) {
         if ( preg_match( '/twitch\.tv\/([\w-]+)/i', $url, $m ) ) {
-            $img = 'https://static-cdn.jtvnw.net/jtv_user_pictures/' . strtolower( $m[1] ) . '-profile_image-300x300.png';
+            $username = strtolower( $m[1] );
+            $user_data = jc_teilnehmer_fetch_twitch_user( $username );
+            if ( $user_data && isset( $user_data['profile_image_url'] ) ) {
+                $img = $user_data['profile_image_url'];
+            }
         }
     }
 
@@ -210,17 +277,25 @@ function jc_teilnehmer_fetch_channel_meta( $platform, $url ) {
     $meta = array( 'title' => '', 'image' => '' );
 
     if ( $platform === 'youtube' ) {
-        $res = wp_remote_get( 'https://www.youtube.com/oembed?url=' . urlencode( $url ) . '&format=json' );
-        if ( ! is_wp_error( $res ) ) {
+        // Versuche oEmbed
+        $res = wp_remote_get( 'https://www.youtube.com/oembed?url=' . urlencode( $url ) . '&format=json', array( 'timeout' => 10 ) );
+        if ( ! is_wp_error( $res ) && wp_remote_retrieve_response_code( $res ) === 200 ) {
             $data = json_decode( wp_remote_retrieve_body( $res ), true );
-            $meta['title'] = $data['title'] ?? '';
-            $meta['image'] = $data['thumbnail_url'] ?? '';
+            if ( is_array( $data ) ) {
+                $meta['title'] = $data['title'] ?? '';
+                $meta['image'] = $data['thumbnail_url'] ?? '';
+            }
         }
     } elseif ( $platform === 'twitch' ) {
         if ( preg_match( '/twitch\.tv\/([\w-]+)/i', $url, $m ) ) {
-            $user = strtolower( $m[1] );
-            $meta['title'] = $user;
-            $meta['image'] = 'https://static-cdn.jtvnw.net/jtv_user_pictures/' . $user . '-profile_image-300x300.png';
+            $username = strtolower( $m[1] );
+            $user_data = jc_teilnehmer_fetch_twitch_user( $username );
+            if ( $user_data ) {
+                $meta['title'] = $user_data['display_name'] ?? $username;
+                $meta['image'] = $user_data['profile_image_url'] ?? '';
+            } else {
+                $meta['title'] = $username;
+            }
         }
     } elseif ( $platform === 'instagram' ) {
         if ( preg_match( '#instagram\.com/([^/?]+)/?#i', $url, $m ) ) {
@@ -240,7 +315,7 @@ function jc_teilnehmer_resolve_social_meta( $channels, $fallback_name = '' ) {
     $placeholder = 'https://via.placeholder.com/300x300/1e2740/6c7bff?text=JC';
     $meta = array(
         'title' => $fallback_name,
-        'image' => jc_teilnehmer_get_profile_image( $channels ) ?: $placeholder,
+        'image' => $placeholder,
     );
 
     if ( empty( $channels ) || ! is_array( $channels ) ) {
