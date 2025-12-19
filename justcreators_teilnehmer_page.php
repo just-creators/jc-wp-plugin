@@ -60,6 +60,15 @@ function jc_teilnehmer_register_menu() {
         'dashicons-groups',
         59
     );
+    
+    add_submenu_page(
+        'jc-teilnehmer',
+        'API Einstellungen',
+        'API Einstellungen',
+        'manage_options',
+        'jc-teilnehmer-api',
+        'jc_teilnehmer_render_api_settings_page'
+    );
 }
 
 /**
@@ -70,6 +79,18 @@ function jc_teilnehmer_handle_actions() {
 
     global $wpdb;
     $table = $wpdb->prefix . JC_TEILNEHMER_TABLE;
+
+    // API Einstellungen speichern
+    if ( isset( $_POST['jc_teilnehmer_save_api'] ) ) {
+        check_admin_referer( 'jc_teilnehmer_api_settings' );
+        update_option( 'jc_twitch_client_id', sanitize_text_field( $_POST['twitch_client_id'] ?? '' ) );
+        update_option( 'jc_twitch_client_secret', sanitize_text_field( $_POST['twitch_client_secret'] ?? '' ) );
+        
+        // Token Cache löschen
+        delete_transient( 'jc_twitch_access_token' );
+        
+        add_settings_error( 'jc_teilnehmer', 'api_saved', 'API Einstellungen gespeichert.', 'updated' );
+    }
 
     // Hinzufügen
     if ( isset( $_POST['jc_teilnehmer_add'] ) ) {
@@ -538,4 +559,126 @@ function jc_teilnehmer_render_shortcode( $atts ) {
     <script>document.addEventListener("DOMContentLoaded",function(){const i=document.getElementById("jc-search-input"),g=document.getElementById("jc-grid");if(i&&g){const c=g.querySelectorAll(".jc-card");i.addEventListener("input",e=>{const v=e.target.value.toLowerCase();c.forEach(el=>{el.style.display=el.dataset.search.includes(v)?"block":"none"})})}});</script>
     <?php
     return ob_get_clean();
+}
+
+/**
+ * 7. API EINSTELLUNGEN SEITE
+ */
+function jc_teilnehmer_render_api_settings_page() {
+    if ( ! current_user_can( 'manage_options' ) ) wp_die( 'Keine Berechtigung' );
+    
+    $client_id = get_option( 'jc_twitch_client_id', '' );
+    $client_secret = get_option( 'jc_twitch_client_secret', '' );
+    $has_credentials = !empty( $client_id ) && !empty( $client_secret );
+    
+    settings_errors( 'jc_teilnehmer' );
+    ?>
+    <div class="wrap">
+        <h1>🔑 API Einstellungen</h1>
+        <p>Konfiguriere die Twitch API, um echte Profilbilder zu laden.</p>
+        
+        <?php if ( $has_credentials ) : ?>
+            <div class="notice notice-success">
+                <p>✅ Twitch API Credentials sind konfiguriert!</p>
+            </div>
+        <?php else : ?>
+            <div class="notice notice-warning">
+                <p>⚠️ Noch keine Twitch API Credentials konfiguriert. Profilbilder werden als Platzhalter angezeigt.</p>
+            </div>
+        <?php endif; ?>
+
+        <div class="card" style="max-width: 800px;">
+            <h2>Twitch API Setup</h2>
+            <ol>
+                <li>Gehe zu <a href="https://dev.twitch.tv/console" target="_blank">dev.twitch.tv/console</a></li>
+                <li>Melde dich an und klicke auf "Register Your Application"</li>
+                <li>
+                    <strong>Name:</strong> z.B. "JustCreators WP Plugin"<br>
+                    <strong>OAuth Redirect URL:</strong> <code>http://localhost</code><br>
+                    <strong>Category:</strong> Website Integration
+                </li>
+                <li>Nach dem Erstellen: Klicke auf "Manage" und kopiere die <strong>Client ID</strong></li>
+                <li>Klicke auf "New Secret" und kopiere das <strong>Client Secret</strong></li>
+                <li>Trage beide Werte unten ein</li>
+            </ol>
+            
+            <form method="post" action="">
+                <?php wp_nonce_field( 'jc_teilnehmer_api_settings' ); ?>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><label for="twitch_client_id">Twitch Client ID</label></th>
+                        <td>
+                            <input type="text" id="twitch_client_id" name="twitch_client_id" 
+                                   value="<?php echo esc_attr( $client_id ); ?>" 
+                                   class="regular-text" placeholder="abc123xyz...">
+                            <p class="description">Deine Twitch Application Client ID</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="twitch_client_secret">Twitch Client Secret</label></th>
+                        <td>
+                            <input type="password" id="twitch_client_secret" name="twitch_client_secret" 
+                                   value="<?php echo esc_attr( $client_secret ); ?>" 
+                                   class="regular-text" placeholder="xyz789abc...">
+                            <p class="description">Dein Twitch Application Client Secret (wird verschlüsselt gespeichert)</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p class="submit">
+                    <button type="submit" name="jc_teilnehmer_save_api" class="button button-primary">💾 Speichern</button>
+                </p>
+            </form>
+        </div>
+        
+        <?php if ( $has_credentials ) : ?>
+        <div class="card" style="max-width: 800px; margin-top: 20px;">
+            <h2>🧪 API Test</h2>
+            <p>Teste ob die API funktioniert:</p>
+            <form method="post" action="">
+                <?php wp_nonce_field( 'jc_teilnehmer_api_test' ); ?>
+                <input type="text" name="test_username" placeholder="z.B. lampireloaded" class="regular-text">
+                <button type="submit" name="jc_teilnehmer_test_api" class="button">Test</button>
+            </form>
+            
+            <?php
+            if ( isset( $_POST['jc_teilnehmer_test_api'] ) ) {
+                check_admin_referer( 'jc_teilnehmer_api_test' );
+                $test_user = sanitize_text_field( $_POST['test_username'] ?? '' );
+                if ( $test_user ) {
+                    $user_data = jc_teilnehmer_fetch_twitch_user( $test_user );
+                    if ( $user_data ) {
+                        echo '<div class="notice notice-success"><p>✅ API funktioniert!</p></div>';
+                        echo '<p><strong>Username:</strong> ' . esc_html( $user_data['display_name'] ) . '</p>';
+                        echo '<p><strong>Profilbild:</strong></p>';
+                        echo '<img src="' . esc_url( $user_data['profile_image_url'] ) . '" style="width:150px;height:150px;border-radius:50%;">';
+                    } else {
+                        echo '<div class="notice notice-error"><p>❌ Fehler: User nicht gefunden oder API Problem</p></div>';
+                    }
+                }
+            }
+            ?>
+        </div>
+        <?php endif; ?>
+        
+        <div class="card" style="max-width: 800px; margin-top: 20px;">
+            <h2>🔄 Cache leeren</h2>
+            <p>Wenn du die Profilbilder aktualisieren möchtest, lösche den Cache:</p>
+            <form method="post" action="">
+                <?php wp_nonce_field( 'jc_teilnehmer_clear_cache' ); ?>
+                <button type="submit" name="jc_teilnehmer_clear_cache" class="button button-secondary">🗑️ Alle Bilder-Cache löschen</button>
+            </form>
+            
+            <?php
+            if ( isset( $_POST['jc_teilnehmer_clear_cache'] ) ) {
+                check_admin_referer( 'jc_teilnehmer_clear_cache' );
+                global $wpdb;
+                $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_jc_img_%' OR option_name LIKE '_transient_jc_meta_%'" );
+                delete_transient( 'jc_twitch_access_token' );
+                echo '<div class="notice notice-success"><p>✅ Cache gelöscht!</p></div>';
+            }
+            ?>
+        </div>
+    </div>
+    <?php
 }
