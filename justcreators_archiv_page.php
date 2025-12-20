@@ -115,6 +115,15 @@ function jc_archiv_get_css() {
 		.jc-video-item { border-radius:12px; overflow:hidden; border:1px solid var(--jc-border); background:#000; aspect-ratio:16/9; transition:all .2s; }
 		.jc-video-item:hover { border-color:rgba(108,123,255,0.5); box-shadow:0 12px 32px rgba(108,123,255,0.25); }
 		.jc-video-item iframe { width:100%; height:100%; border:none; }
+		.jc-participants { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-top:20px; }
+		.jc-participant-card { background:linear-gradient(135deg, rgba(108,123,255,0.08), rgba(86,216,255,0.05)); border:1px solid var(--jc-border); border-radius:14px; padding:16px; text-align:center; transition:all .2s; }
+		.jc-participant-card:hover { border-color:rgba(108,123,255,0.5); box-shadow:0 12px 32px rgba(108,123,255,0.15); transform:translateY(-2px); }
+		.jc-participant-avatar { width:80px; height:80px; border-radius:50%; margin:0 auto 12px; object-fit:cover; border:2px solid var(--jc-accent); }
+		.jc-participant-name { font-weight:800; color:var(--jc-text); margin:8px 0 4px; font-size:16px; }
+		.jc-participant-title { color:var(--jc-muted); font-size:13px; margin-bottom:12px; }
+		.jc-participant-socials { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; }
+		.jc-social-link { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; border-radius:50%; background:rgba(108,123,255,0.2); color:var(--jc-accent); text-decoration:none; transition:all .2s; border:1px solid rgba(108,123,255,0.3); }
+		.jc-social-link:hover { background:var(--jc-accent); color:#050712; box-shadow:0 8px 20px rgba(108,123,255,0.4); }
 		@media (max-width: 900px) {
 			.jc-hero { grid-template-columns:1fr; }
 			.jc-hero-right { justify-content:flex-start; min-height:120px; }
@@ -124,6 +133,7 @@ function jc_archiv_get_css() {
 			.jc-season-title { font-size:22px; }
 			.jc-gallery { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
 			.jc-videos { grid-template-columns:1fr; }
+			.jc-participants { grid-template-columns:1fr; }
 		}
 	EOT;
 }
@@ -380,25 +390,12 @@ function jc_archiv_render_shortcode( $atts ) {
 	ob_start();
 	?>
 	<div class="jc-wrap">
-		<section class="jc-hero">
-			<div class="jc-hero-left">
-				<div class="jc-kicker">📚 Vergangene Inhalte</div>
-				<h1 class="jc-hero-title">JustCreators Archiv</h1>
-				<p class="jc-hero-sub">Blicke auf die Seasons zurück mit Maps, Bildern und Video-Highlights aus den vergangenen Events.</p>
-			</div>
-			<div class="jc-hero-right">
-				<div class="jc-hero-badge"><?php echo count( $seasons ); ?> SEASONS</div>
-				<div class="jc-hero-glow"></div>
-			</div>
-		</section>
-
 		<?php foreach ( $seasons as $season ) :
 			$images = json_decode( $season->gallery_images, true ) ?: [];
 			$videos = json_decode( $season->videos, true ) ?: [];
 		?>
 		<div class="jc-season-card">
 			<div class="jc-season-header">
-				<div class="jc-season-badge">Season <?php echo intval( $season->season_number ); ?></div>
 				<h2 class="jc-season-title"><?php echo esc_html( $season->season_name ); ?></h2>
 			</div>
 
@@ -453,7 +450,52 @@ function jc_archiv_render_shortcode( $atts ) {
 					<?php endforeach; ?>
 				</div>
 			<?php endif; ?>
-		</div>
+			<!-- TEILNEHMER -->
+			<?php 
+				global $wpdb;
+				$teilnehmer_table = $wpdb->prefix . 'jc_teilnehmer';
+				$participants = $wpdb->get_results( "SELECT * FROM $teilnehmer_table WHERE is_active = 1 ORDER BY sort_order ASC" );
+				
+				if ( ! empty( $participants ) ) :
+			?>
+				<h3 class="jc-section-title">👥 Teilnehmer</h3>
+				<div class="jc-participants">
+					<?php foreach ( $participants as $participant ) :
+						$socials = json_decode( $participant->social_channels, true ) ?: [];
+					?>
+					<div class="jc-participant-card">
+						<?php if ( ! empty( $participant->profile_image_url ) ) : ?>
+							<img src="<?php echo esc_url( $participant->profile_image_url ); ?>" alt="<?php echo esc_attr( $participant->display_name ); ?>" class="jc-participant-avatar" loading="lazy">
+						<?php endif; ?>
+						<div class="jc-participant-name"><?php echo esc_html( $participant->display_name ); ?></div>
+						<?php if ( ! empty( $participant->title ) ) : ?>
+							<div class="jc-participant-title"><?php echo esc_html( $participant->title ); ?></div>
+						<?php endif; ?>
+						<?php if ( ! empty( $socials ) ) : ?>
+							<div class="jc-participant-socials">
+								<?php 
+									$social_icons = array(
+										'youtube' => '▶️',
+										'twitch' => '🎮',
+										'twitter' => '𝕏',
+										'instagram' => '📷',
+										'discord' => '💬',
+										'tiktok' => '🎵'
+									);
+									foreach ( $socials as $platform => $url ) :
+										if ( empty( $url ) ) continue;
+										$icon = $social_icons[ strtolower( $platform ) ] ?? '🔗';
+								?>
+									<a href="<?php echo esc_url( $url ); ?>" target="_blank" rel="noopener noreferrer" class="jc-social-link" title="<?php echo esc_attr( $platform ); ?>">
+										<?php echo $icon; ?>
+									</a>
+								<?php endforeach; ?>
+							</div>
+						<?php endif; ?>
+					</div>
+					<?php endforeach; ?>
+				</div>
+			<?php endif; ?>		</div>
 		<?php endforeach; ?>
 	</div>
 
