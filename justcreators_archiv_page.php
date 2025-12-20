@@ -51,6 +51,11 @@ function jc_archiv_install() {
     require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
     dbDelta( $sql );
 
+    // Spalte hinzufügen, falls nicht vorhanden
+    if ( $wpdb->get_var( $wpdb->prepare( "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = %s AND COLUMN_NAME = 'participants'", $table_name ) ) === null ) {
+        $wpdb->query( "ALTER TABLE $table_name ADD COLUMN participants longtext DEFAULT NULL AFTER videos" );
+    }
+
     update_option( 'jc_archiv_db_version', JC_ARCHIV_VERSION );
 }
 
@@ -68,6 +73,13 @@ function jc_archiv_register_menu() {
         60
     );
 }
+
+// Stelle sicher, dass die DB aktualisiert wird, wenn die Admin-Seite geladen wird
+add_action( 'admin_menu', function() {
+    if ( current_user_can( 'manage_options' ) ) {
+        jc_archiv_install();
+    }
+} );
 
 /**
  * 3. ENQUEUE SCRIPTS & STYLES
