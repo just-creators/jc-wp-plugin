@@ -34,7 +34,6 @@ function jc_archiv_install() {
         description longtext DEFAULT '',
         map_download_url varchar(500) DEFAULT '',
         map_file_name varchar(255) DEFAULT '',
-        minecraft_version varchar(50) DEFAULT '',
         content_type varchar(50) DEFAULT 'gallery',
         content_data longtext DEFAULT NULL,
         gallery_images longtext DEFAULT NULL,
@@ -55,11 +54,6 @@ function jc_archiv_install() {
     // Spalte hinzufügen, falls nicht vorhanden
     if ( $wpdb->get_var( $wpdb->prepare( "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = %s AND COLUMN_NAME = 'participants'", $table_name ) ) === null ) {
         $wpdb->query( "ALTER TABLE $table_name ADD COLUMN participants longtext DEFAULT NULL AFTER videos" );
-    }
-
-    // Minecraft-Version Spalte hinzufügen, falls nicht vorhanden
-    if ( $wpdb->get_var( $wpdb->prepare( "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = %s AND COLUMN_NAME = 'minecraft_version'", $table_name ) ) === null ) {
-        $wpdb->query( "ALTER TABLE $table_name ADD COLUMN minecraft_version varchar(50) DEFAULT '' AFTER map_file_name" );
     }
 
     update_option( 'jc_archiv_db_version', JC_ARCHIV_VERSION );
@@ -174,7 +168,6 @@ function jc_archiv_handle_actions() {
         // Map Download URL
         $map_download_url = sanitize_url( $_POST['map_download_url'] ?? '' );
         $map_file_name = sanitize_file_name( $_POST['map_file_name'] ?? '' );
-        $minecraft_version = sanitize_text_field( $_POST['minecraft_version'] ?? '' );
 
         // Bilder (JSON)
         $gallery_images = isset( $_POST['gallery_images'] ) ? wp_json_encode( array_filter( explode( "\n", $_POST['gallery_images'] ) ) ) : '[]';
@@ -196,7 +189,6 @@ function jc_archiv_handle_actions() {
             'description' => $description,
             'map_download_url' => $map_download_url,
             'map_file_name' => $map_file_name,
-            'minecraft_version' => $minecraft_version,
             'gallery_images' => $gallery_images,
             'videos' => $video_ids,
             'participants' => $participants,
@@ -293,15 +285,6 @@ function jc_archiv_render_admin_page() {
                                    value="<?php echo esc_attr( $edit_row->map_download_url ?? '' ); ?>" 
                                    class="regular-text" placeholder="https://...">
                             <p class="description">Direkter Download Link zur Map (z.B. Google Drive oder Cloud Storage)</p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th><label for="minecraft_version">Minecraft Version</label></th>
-                        <td>
-                            <input type="text" id="minecraft_version" name="minecraft_version"
-                                   value="<?php echo esc_attr( $edit_row->minecraft_version ?? '' ); ?>"
-                                   class="regular-text" placeholder="z.B. 1.21.4">
-                            <p class="description">Die Minecraft-Version, für die die Map gedacht ist.</p>
                         </td>
                     </tr>
                     <tr>
@@ -459,9 +442,6 @@ function jc_archiv_render_shortcode( $atts ) {
 						<span>⬇️</span>
 						<span><?php echo esc_html( $season->map_file_name ?: 'Map herunterladen' ); ?></span>
 					</a>
-                    <?php if ( ! empty( $season->minecraft_version ) ) : ?>
-                        <p style="margin-top:10px;">🧭 Minecraft Version: <strong><?php echo esc_html( $season->minecraft_version ); ?></strong></p>
-                    <?php endif; ?>
 				</div>
 			<?php endif; ?>
 
