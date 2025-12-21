@@ -162,8 +162,24 @@ function jc_teilnehmer_handle_actions() {
     // Alle Profilbilder zurücksetzen
     if ( isset( $_POST['jc_teilnehmer_reset_images'] ) ) {
         check_admin_referer( 'jc_teilnehmer_reset_images' );
-        $updated = $wpdb->query( "UPDATE $table SET profile_image_url = 'https://via.placeholder.com/300x300/1e2740/6c7bff?text=JC'" );
-        add_settings_error( 'jc_teilnehmer', 'images_reset', "✅ Alle Profilbilder zurückgesetzt ($updated Einträge). Bearbeite die Teilnehmer und speichere sie, um neue Bilder zu laden.", 'updated' );
+        
+        // Cache löschen (wichtig!)
+        $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_jc_img_%' OR option_name LIKE '_transient_jc_meta_%'" );
+        delete_transient( 'jc_twitch_access_token' );
+        
+        // Alle Bilder neu laden
+        $rows = $wpdb->get_results( "SELECT id, social_channels FROM $table" );
+        $updated = 0;
+        foreach ( $rows as $row ) {
+            $channels = json_decode( $row->social_channels, true );
+            if ( is_array( $channels ) ) {
+                $new_image = jc_teilnehmer_get_profile_image( $channels );
+                $wpdb->update( $table, array( 'profile_image_url' => $new_image ), array( 'id' => $row->id ) );
+                $updated++;
+            }
+        }
+        
+        add_settings_error( 'jc_teilnehmer', 'images_reset', "✅ Alle Profilbilder aktualisiert ($updated Einträge).", 'updated' );
     }
 }
 
@@ -561,9 +577,9 @@ function jc_teilnehmer_render_admin_page() {
                 <button type="submit" name="jc_teilnehmer_import_from_db" class="button">📥 Aus Bewerbungs-DB importieren</button>
             </form>
             
-            <form method="post" style="margin:0;" onsubmit="return confirm('⚠️ Wirklich alle Profilbilder zurücksetzen?\n\nDu musst danach jeden Teilnehmer neu speichern, um die Bilder neu zu laden.')">
+            <form method="post" style="margin:0;" onsubmit="return confirm('🔄 Alle Profilbilder werden neu von den Social Media Plattformen geladen.\n\nDies kann einen Moment dauern. Fortfahren?')">
                 <?php wp_nonce_field( 'jc_teilnehmer_reset_images' ); ?>
-                <button type="submit" name="jc_teilnehmer_reset_images" class="button" style="color:#d63638;">🔄 Alle Bilder zurücksetzen</button>
+                <button type="submit" name="jc_teilnehmer_reset_images" class="button">🔄 Alle Bilder aktualisieren</button>
             </form>
         </div>
 
