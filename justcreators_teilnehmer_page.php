@@ -158,6 +158,13 @@ function jc_teilnehmer_handle_actions() {
             add_settings_error( 'jc_teilnehmer', 'imp_ok', $res['message'], 'updated' );
         }
     }
+    
+    // Alle Profilbilder zurücksetzen
+    if ( isset( $_POST['jc_teilnehmer_reset_images'] ) ) {
+        check_admin_referer( 'jc_teilnehmer_reset_images' );
+        $updated = $wpdb->query( "UPDATE $table SET profile_image_url = 'https://via.placeholder.com/300x300/1e2740/6c7bff?text=JC'" );
+        add_settings_error( 'jc_teilnehmer', 'images_reset', "✅ Alle Profilbilder zurückgesetzt ($updated Einträge). Bearbeite die Teilnehmer und speichere sie, um neue Bilder zu laden.", 'updated' );
+    }
 }
 
 /**
@@ -548,10 +555,17 @@ function jc_teilnehmer_render_admin_page() {
             </form>
         </div>
 
-        <form method="post" style="margin-bottom:20px;">
-            <?php wp_nonce_field( 'jc_teilnehmer_import_db' ); ?>
-            <button type="submit" name="jc_teilnehmer_import_from_db" class="button">Aus Bewerbungs-DB importieren</button>
-        </form>
+        <div style="margin-bottom:20px; display:flex; gap:10px;">
+            <form method="post" style="margin:0;">
+                <?php wp_nonce_field( 'jc_teilnehmer_import_db' ); ?>
+                <button type="submit" name="jc_teilnehmer_import_from_db" class="button">📥 Aus Bewerbungs-DB importieren</button>
+            </form>
+            
+            <form method="post" style="margin:0;" onsubmit="return confirm('⚠️ Wirklich alle Profilbilder zurücksetzen?\n\nDu musst danach jeden Teilnehmer neu speichern, um die Bilder neu zu laden.')">
+                <?php wp_nonce_field( 'jc_teilnehmer_reset_images' ); ?>
+                <button type="submit" name="jc_teilnehmer_reset_images" class="button" style="color:#d63638;">🔄 Alle Bilder zurücksetzen</button>
+            </form>
+        </div>
 
         <form method="post">
             <?php wp_nonce_field( 'jc_teilnehmer_order' ); ?>
