@@ -2123,7 +2123,9 @@ add_shortcode( 'discord_application_form', function( $atts ) {
 // ADMIN BEWERBUNGEN ÜBERSICHT
 // ========================================
 function jc_admin_bewerbungen_page() {
-    if ( ! current_user_can( 'manage_options' ) ) return;
+    if ( ! current_user_can( 'manage_options' ) ) {
+        return;
+    }
    
     global $wpdb;
     $table = $wpdb->prefix . 'jc_discord_applications';
@@ -2146,7 +2148,6 @@ function jc_admin_bewerbungen_page() {
         if ( $updated !== false ) {
             echo '<div class="notice notice-success is-dismissible"><p>✅ Status erfolgreich geändert auf: <strong>' . esc_html( $new_status ) . '</strong></p></div>';
            
-            // Optional: Bot benachrichtigen
             $app = $wpdb->get_row( $wpdb->prepare( "SELECT discord_id FROM $table WHERE id = %d", $app_id ) );
             if ( $app ) {
                 error_log( "JC Admin: Status manuell geändert für Discord ID {$app->discord_id} auf {$new_status}" );
@@ -2162,15 +2163,16 @@ function jc_admin_bewerbungen_page() {
         if ( wp_verify_nonce( $_GET['_wpnonce'], 'jc_delete_application_' . $id ) ) {
             $application = $wpdb->get_row( $wpdb->prepare( "SELECT forum_post_id FROM $table WHERE id = %d", $id ) );
            
-            $deleted = $wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) );
-           
-            if ( $deleted ) {
-                if ( ! empty( $application->forum_post_id ) ) {
-                    jc_delete_discord_post( $application->forum_post_id );
+            if ( $application ) {
+                $deleted = $wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) );
+               
+                if ( $deleted ) {
+                    if ( ! empty( $application->forum_post_id ) ) {
+                        jc_delete_discord_post( $application->forum_post_id );
+                    }
+                    wp_redirect( admin_url( 'admin.php?page=jc-bewerbungen&deleted=1' ) );
+                    exit;
                 }
-                // Redirect zurück zur Seite nach erfolgreichem Löschen
-                wp_redirect( admin_url( 'admin.php?page=jc-bewerbungen&deleted=1' ) );
-                exit;
             }
         } else {
             echo '<div class="notice notice-error"><p>❌ Sicherheitsprüfung fehlgeschlagen. Bitte versuche es erneut.</p></div>';
