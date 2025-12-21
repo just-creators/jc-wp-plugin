@@ -643,20 +643,22 @@ function jc_shop_admin_page() {
     $table = $wpdb->prefix . JC_SHOP_TABLE;
     jc_shop_install();
 
-    // Handle Delete
-    if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && isset( $_GET['_wpnonce'] ) ) {
-        $id = intval( $_GET['id'] );
-        if ( wp_verify_nonce( $_GET['_wpnonce'], 'jc_shop_delete_' . $id ) ) {
-            $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
-            wp_redirect( admin_url( 'admin.php?page=jc-shops&deleted=1' ) );
-            exit;
+    // Handle Delete - MUSS VOR HTML OUTPUT erfolgen!
+    $delete_message = '';
+    if ( isset( $_POST['jc_shop_delete'] ) && isset( $_POST['delete_shop_id'] ) ) {
+        if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'jc_shop_delete_nonce' ) ) {
+            $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Sicherheitsprüfung fehlgeschlagen!</p></div>';
         } else {
-            echo '<div class="notice notice-error"><p>Sicherheitsprüfung fehlgeschlagen.</p></div>';
+            $id = intval( $_POST['delete_shop_id'] );
+            $deleted = $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+            
+            if ( $deleted ) {
+                error_log( "JC Shop: Shop ID {$id} gelöscht" );
+                $delete_message = '<div class="notice notice-success is-dismissible"><p>✅ Shop erfolgreich gelöscht!</p></div>';
+            } else {
+                $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Fehler beim Löschen!</p></div>';
+            }
         }
-    }
-
-    if ( isset( $_GET['deleted'] ) && $_GET['deleted'] === '1' ) {
-        echo '<div class="notice notice-success is-dismissible"><p>Shop gelöscht.</p></div>';
     }
 
     // Handle Edit
@@ -711,6 +713,10 @@ function jc_shop_admin_page() {
         <h1>🛍️ Shop Verwaltung</h1>
         <p>Verwalte alle geclaimten Shops im Shopping District.</p>
 
+        <?php if ( ! empty( $delete_message ) ) : ?>
+            <?php echo $delete_message; ?>
+        <?php endif; ?>
+
         <?php if ( $edit_message ) : ?>
             <div class="notice notice-success is-dismissible"><p><?php echo esc_html( $edit_message ); ?></p></div>
         <?php endif; ?>
@@ -752,10 +758,12 @@ function jc_shop_admin_page() {
                             <td><?php echo esc_html( date( 'd.m.Y', strtotime( $shop->claimed_at ) ) ); ?></td>
                             <td>
                                 <button class="button button-small" onclick="jcEditShop(<?php echo esc_js( json_encode( $shop ) ); ?>)">Bearbeiten</button>
-                                          <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=jc-shops&action=delete&id=' . $shop->id ), 'jc_shop_delete_' . $shop->id ) ); ?>" 
-                                   class="button button-small" 
-                                   onclick="return confirm('Shop wirklich löschen?');" 
-                                   style="color:#b32d2e;">Löschen</a>
+                                <form method="POST" style="display:inline;" onsubmit="return confirm('Shop wirklich löschen?');">
+                                    <?php wp_nonce_field( 'jc_shop_delete_nonce' ); ?>
+                                    <input type="hidden" name="jc_shop_delete" value="1">
+                                    <input type="hidden" name="delete_shop_id" value="<?php echo esc_attr( $shop->id ); ?>">
+                                    <button type="submit" class="button button-small" style="color:#b32d2e;">Löschen</button>
+                                </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>
