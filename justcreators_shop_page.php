@@ -174,17 +174,18 @@ function jc_shop_fetch_member( $discord_id ) {
 }
 
 function jc_shop_get_available_items() {
+    $base = 'https://mc-heads.net/minecraft-item/';
     return array(
-        array( 'key' => 'netherite_ingot', 'name' => 'Netherit-Barren', 'icon' => '🪨' ),
-        array( 'key' => 'elytra', 'name' => 'Elytra', 'icon' => '🪽' ),
-        array( 'key' => 'rocket', 'name' => 'Raketen', 'icon' => '🚀' ),
-        array( 'key' => 'beacon', 'name' => 'Beacon', 'icon' => '🔆' ),
-        array( 'key' => 'totem', 'name' => 'Totem', 'icon' => '🛡️' ),
-        array( 'key' => 'diamond_block', 'name' => 'Diamantblock', 'icon' => '💎' ),
-        array( 'key' => 'mending_book', 'name' => 'Verzauberung: Mending', 'icon' => '📕' ),
-        array( 'key' => 'golden_carrot', 'name' => 'Goldene Karotten', 'icon' => '🥕' ),
-        array( 'key' => 'potion', 'name' => 'Tränke', 'icon' => '🧪' ),
-        array( 'key' => 'farm_kit', 'name' => 'Farm-Kits', 'icon' => '🌾' ),
+        array( 'key' => 'netherite_ingot', 'name' => 'Netherit-Barren', 'icon' => $base . 'netherite_ingot/50.png' ),
+        array( 'key' => 'elytra', 'name' => 'Elytra', 'icon' => $base . 'elytra/50.png' ),
+        array( 'key' => 'rocket', 'name' => 'Raketen', 'icon' => $base . 'firework_rocket/50.png' ),
+        array( 'key' => 'beacon', 'name' => 'Beacon', 'icon' => $base . 'beacon/50.png' ),
+        array( 'key' => 'totem', 'name' => 'Totem', 'icon' => $base . 'totem_of_undying/50.png' ),
+        array( 'key' => 'diamond_block', 'name' => 'Diamantblock', 'icon' => $base . 'diamond_block/50.png' ),
+        array( 'key' => 'mending_book', 'name' => 'Verzauberung: Mending', 'icon' => $base . 'enchanted_book/50.png' ),
+        array( 'key' => 'golden_carrot', 'name' => 'Goldene Karotten', 'icon' => $base . 'golden_carrot/50.png' ),
+        array( 'key' => 'potion', 'name' => 'Tränke', 'icon' => $base . 'potion/50.png' ),
+        array( 'key' => 'farm_kit', 'name' => 'Farm-Kits', 'icon' => $base . 'wheat/50.png' ),
     );
 }
 
@@ -473,7 +474,10 @@ function jc_shop_render_page( $user, $application, $member, $shop, $message, $er
                     <div class="jc-claim-actions">
                         <?php if ( $shop->item_key ) : ?>
                             <div class="jc-label">Dein Item</div>
-                            <div class="jc-item-chip"><?php echo esc_html( $shop->item_icon . ' ' . $shop->item_name ); ?></div>
+                            <div class="jc-item-chip">
+                                <img src="<?php echo esc_url( $shop->item_icon ); ?>" alt="Item" class="jc-mc-texture-small"> 
+                                <?php echo esc_html( $shop->item_name ); ?>
+                            </div>
                         <?php else : ?>
                             <div class="jc-label">Schritt 2</div>
                             <button type="button" class="jc-btn" onclick="document.getElementById('jc-item-modal').classList.add('open');">📦 Item hinzufügen</button>
@@ -511,7 +515,7 @@ function jc_shop_render_page( $user, $application, $member, $shop, $message, $er
                     <?php $taken = jc_shop_item_is_taken( $item['key'], $shop->id ); ?>
                     <label class="jc-item-card <?php echo $taken ? 'disabled' : ''; ?>">
                         <input type="radio" name="item_key" value="<?php echo esc_attr( $item['key'] ); ?>" <?php disabled( $taken ); ?> required>
-                        <div class="jc-item-icon"><?php echo esc_html( $item['icon'] ); ?></div>
+                        <div class="jc-item-icon"><img src="<?php echo esc_url( $item['icon'] ); ?>" alt="<?php echo esc_attr( $item['name'] ); ?>" class="jc-mc-texture"></div>
                         <div class="jc-item-name"><?php echo esc_html( $item['name'] ); ?></div>
                         <?php if ( $taken ) : ?><span class="jc-tag">vergeben</span><?php endif; ?>
                     </label>
@@ -542,12 +546,15 @@ function jc_shop_render_public_grid() {
 
     foreach ( $rows as $row ) {
         $skin = $row->minecraft_name ? 'https://mc-heads.net/head/' . rawurlencode( $row->minecraft_name ) . '/200.png' : 'https://via.placeholder.com/200x200/0b0f1d/6c7bff?text=?';
-        $item = $row->item_key ? $row->item_icon . ' ' . $row->item_name : 'Noch kein Item';
         echo '<div class="jc-shop-card">';
         echo '<div class="jc-shop-skin"><img src="' . esc_url( $skin ) . '" alt="Skin"></div>';
         echo '<div class="jc-shop-body">';
         echo '<div class="jc-shop-name">' . esc_html( $row->creator_name ) . '</div>';
-        echo '<div class="jc-shop-item">' . esc_html( $item ) . '</div>';
+        if ( $row->item_key ) {
+            echo '<div class="jc-shop-item"><img src="' . esc_url( $row->item_icon ) . '" alt="Item" class="jc-mc-texture-small"> ' . esc_html( $row->item_name ) . '</div>';
+        } else {
+            echo '<div class="jc-shop-item" style="opacity:0.5;">Noch kein Item</div>';
+        }
         echo '</div>';
         echo '</div>';
     }
@@ -590,7 +597,7 @@ function jc_shop_inline_styles() {
         .jc-shop-skin img { width:120px; height:120px; display:block; background:#050712; border-radius:12px; image-rendering: pixelated; box-shadow:0 8px 20px rgba(0,0,0,0.3); }
         .jc-shop-body { padding:14px 16px 18px; display:flex; flex-direction:column; gap:6px; }
         .jc-shop-name { font-weight:800; font-size:18px; color:var(--jc-text); }
-        .jc-shop-item { color:var(--jc-muted); font-weight:700; }
+        .jc-shop-item { color:var(--jc-muted); font-weight:700; display:flex; align-items:center; gap:8px; }
         .jc-social-names { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
         .jc-modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; z-index:999; }
         .jc-modal.open { opacity:1; pointer-events:auto; }
@@ -602,7 +609,9 @@ function jc_shop_inline_styles() {
         .jc-item-card input { display:none; }
         .jc-item-card:hover { border-color:rgba(108,123,255,0.6); }
         .jc-item-card input:checked + .jc-item-icon, .jc-item-card input:checked ~ .jc-item-name { color:var(--jc-text); }
-        .jc-item-icon { font-size:24px; }
+        .jc-item-icon { font-size:24px; display:flex; align-items:center; justify-content:center; }
+        .jc-mc-texture { width:40px; height:40px; image-rendering: pixelated; image-rendering: crisp-edges; }
+        .jc-mc-texture-small { width:24px; height:24px; image-rendering: pixelated; image-rendering: crisp-edges; vertical-align:middle; display:inline-block; }
         .jc-item-name { font-weight:700; color:var(--jc-text); }
         .jc-tag { position:absolute; top:10px; right:10px; background:rgba(255,105,105,0.15); color:#ffb3b3; padding:4px 8px; border-radius:999px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
         .jc-item-card.disabled { opacity:0.5; cursor:not-allowed; }
@@ -635,10 +644,14 @@ function jc_shop_admin_page() {
     jc_shop_install();
 
     // Handle Delete
-    if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && check_admin_referer( 'jc_shop_delete_' . $_GET['id'] ) ) {
+    if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && isset( $_GET['_wpnonce'] ) ) {
         $id = intval( $_GET['id'] );
-        $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
-        echo '<div class="notice notice-success"><p>Shop gelöscht.</p></div>';
+        if ( wp_verify_nonce( $_GET['_wpnonce'], 'jc_shop_delete_' . $id ) ) {
+            $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+            echo '<div class="notice notice-success"><p>Shop gelöscht.</p></div>';
+        } else {
+            echo '<div class="notice notice-error"><p>Sicherheitsprüfung fehlgeschlagen.</p></div>';
+        }
     }
 
     // Handle Edit
@@ -718,7 +731,7 @@ function jc_shop_admin_page() {
                             <td><?php echo esc_html( date( 'd.m.Y', strtotime( $shop->claimed_at ) ) ); ?></td>
                             <td>
                                 <button class="button button-small" onclick="jcEditShop(<?php echo esc_js( json_encode( $shop ) ); ?>)">Bearbeiten</button>
-                                <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=jc-shops&action=delete&id=' . $shop->id ), 'jc_shop_delete_' . $shop->id ) ); ?>" 
+                                <a href="<?php echo esc_url( add_query_arg( [ 'action' => 'delete', 'id' => $shop->id, '_wpnonce' => wp_create_nonce( 'jc_shop_delete_' . $shop->id ) ], admin_url( 'admin.php?page=jc-shops' ) ) ); ?>" 
                                    class="button button-small" 
                                    onclick="return confirm('Shop wirklich löschen?');" 
                                    style="color:#b32d2e;">Löschen</a>
