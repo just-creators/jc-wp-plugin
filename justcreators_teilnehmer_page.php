@@ -28,6 +28,7 @@ function jc_teilnehmer_install() {
 
     $sql = "CREATE TABLE IF NOT EXISTS $table_name (
         id bigint(20) NOT NULL AUTO_INCREMENT,
+        application_id bigint(20) DEFAULT NULL,
         display_name varchar(255) NOT NULL,
         title varchar(255) DEFAULT '',
         social_channels longtext DEFAULT NULL,
@@ -37,6 +38,7 @@ function jc_teilnehmer_install() {
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
+        UNIQUE KEY application_id (application_id),
         KEY sort_order (sort_order),
         KEY is_active (is_active)
     ) $charset_collate;";
@@ -46,6 +48,17 @@ function jc_teilnehmer_install() {
 
     update_option( 'jc_teilnehmer_db_version', JC_TEILNEHMER_VERSION );
 }
+
+// Sicherstellen, dass neue Spalten/Indizes existieren (Migration für Bestandsinstallationen)
+add_action( 'admin_init', function() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . JC_TEILNEHMER_TABLE;
+    $has_column = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", 'application_id' ) );
+    if ( ! $has_column ) {
+        $wpdb->query( "ALTER TABLE $table_name ADD COLUMN application_id bigint(20) DEFAULT NULL" );
+        $wpdb->query( "ALTER TABLE $table_name ADD UNIQUE KEY application_id (application_id)" );
+    }
+});
 
 /**
  * 2. ADMIN MENU
@@ -132,8 +145,8 @@ function jc_teilnehmer_handle_actions() {
     }
 
     // Löschen
-    if ( isset( $_GET['action'], $_GET['id'] ) && $_GET['action'] === 'delete' ) {
-        $id = intval( $_GET['id'] );
+    if ( isset( $_POST['jc_teilnehmer_delete'], $_POST['teilnehmer_id'] ) ) {
+        $id = intval( $_POST['teilnehmer_id'] );
         check_admin_referer( 'jc_teilnehmer_delete_' . $id );
         $wpdb->delete( $table, array( 'id' => $id ) );
         add_settings_error( 'jc_teilnehmer', 'deleted', 'Gelöscht.', 'updated' );
@@ -535,22 +548,45 @@ function jc_teilnehmer_import_from_applications() {
     $count = 0;
 
     foreach ( $apps as $app ) {
-        $exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $target WHERE display_name = %s", $app->applicant_name ) );
+        // Nur neue Einträge basierend auf application_id einfügen
+        $exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $target WHERE application_id = %d", $app->id ) );
         if ( $exists ) continue;
 
-        $ch = json_decode( $app->social_channels, true );
-        if ( !is_array( $ch ) ) $ch = array();
-        
-        $wpdb->insert( $target, array(
-            'display_name' => $app->applicant_name,
-            'title' => 'Creator',
-            'social_channels' => wp_json_encode( array_values( array_filter( $ch ) ) ),
-            'profile_image_url' => jc_teilnehmer_get_profile_image( $ch ),
-            'is_active' => 1
-        ));
+        jc_teilnehmer_add_from_application( $app );
         $count++;
     }
     return array( 'message' => "$count importiert." );
+}
+
+// Fügt einen Teilnehmer aus einer Bewerbung hinzu, wenn noch nicht vorhanden
+function jc_teilnehmer_add_from_application( $app ) {
+    if ( ! $app || ! isset( $app->id ) ) return false;
+    global $wpdb;
+    $target = $wpdb->prefix . JC_TEILNEHMER_TABLE;
+
+    // Doppelte anhand application_id verhindern
+    $exists = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $target WHERE application_id = %d", $app->id ) );
+    if ( $exists ) return false;
+
+    $ch = json_decode( $app->social_channels, true );
+    if ( ! is_array( $ch ) ) $ch = array();
+
+    $name = $app->applicant_name;
+    // Meta-Daten versuchen zu holen (kann Name überschreiben, falls API-Titel vorhanden)
+    $meta = jc_teilnehmer_resolve_social_meta( $ch, $name );
+    if ( ! empty( $meta['title'] ) ) {
+        $name = $meta['title'];
+    }
+
+    $wpdb->insert( $target, array(
+        'application_id' => $app->id,
+        'display_name' => $name,
+        'title' => 'Creator',
+        'social_channels' => wp_json_encode( array_values( array_filter( $ch ) ) ),
+        'profile_image_url' => ! empty( $meta['image'] ) ? $meta['image'] : jc_teilnehmer_get_profile_image( $ch ),
+        'is_active' => 1
+    ) );
+    return true;
 }
 
 /**
@@ -639,7 +675,11 @@ function jc_teilnehmer_render_admin_page() {
                         <td><input type="number" name="order[<?php echo $r->id; ?>]" value="<?php echo $r->sort_order; ?>" style="width:50px"></td>
                         <td>
                             <a href="?page=jc-teilnehmer&edit=<?php echo $r->id; ?>" class="button button-small">Edit</a>
-                            <a href="<?php echo wp_nonce_url( "?page=jc-teilnehmer&action=delete&id=$r->id", 'jc_teilnehmer_delete_' . $r->id ); ?>" class="button button-small" style="color:red" onclick="return confirm('Löschen?')">X</a>
+                            <form method="post" style="display:inline; margin-left:4px;" onsubmit="return confirm('Löschen?');">
+                                <?php wp_nonce_field( 'jc_teilnehmer_delete_' . $r->id ); ?>
+                                <input type="hidden" name="teilnehmer_id" value="<?php echo $r->id; ?>">
+                                <button type="submit" name="jc_teilnehmer_delete" class="button button-small" style="color:red">X</button>
+                            </form>
                         </td>
                     </tr>
                     <?php endforeach; ?>

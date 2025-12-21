@@ -149,6 +149,12 @@ function jc_handle_status_sync( $request ) {
     } else {
         error_log( "JC API: ✅✅✅ UPDATE SUCCESS! Rows affected: {$updated}" );
     }
+    
+    // Teilnehmer-Sync falls angenommen
+    if ( $status === 'accepted' ) {
+        $application = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE discord_id = %s", $discord_id ) );
+        jc_maybe_add_teilnehmer_from_application( $application );
+    }
    
     // Verify
     $new_status = $wpdb->get_var( $wpdb->prepare(
@@ -476,6 +482,12 @@ function jc_api_update_status( $request ) {
             'success' => false,
             'message' => 'Keine Bewerbung mit dieser Discord ID gefunden.'
         ), 404 );
+    }
+    
+    // Teilnehmer-Sync falls angenommen
+    if ( $new_status === 'accepted' ) {
+        $application = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE discord_id = %s", $discord_id ) );
+        jc_maybe_add_teilnehmer_from_application( $application );
     }
     
     // Erfolg zurück an ioBroker senden
@@ -1118,6 +1130,12 @@ function jc_get_platform_icon( $platform ) {
     );
    
     return isset( $icons[$platform] ) ? $icons[$platform] : $icons['unknown'];
+}
+
+// Teilnehmer-Sync: Nur wenn das Teilnehmer-Plugin aktiv ist
+function jc_maybe_add_teilnehmer_from_application( $application ) {
+    if ( ! $application || ! function_exists( 'jc_teilnehmer_add_from_application' ) ) return;
+    jc_teilnehmer_add_from_application( $application );
 }
 // ========================================
 // BOT API FUNKTIONEN
@@ -2490,9 +2508,13 @@ function jc_admin_bewerbungen_page() {
         if ( $updated !== false ) {
             echo '<div class="notice notice-success is-dismissible"><p>✅ Status erfolgreich geändert auf: <strong>' . esc_html( $new_status ) . '</strong></p></div>';
            
-            $app = $wpdb->get_row( $wpdb->prepare( "SELECT discord_id FROM $table WHERE id = %d", $app_id ) );
+            $app = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $app_id ) );
             if ( $app ) {
                 error_log( "JC Admin: Status manuell geändert für Discord ID {$app->discord_id} auf {$new_status}" );
+                // Wenn angenommen → in Teilnehmer-Liste übernehmen
+                if ( $new_status === 'accepted' ) {
+                    jc_maybe_add_teilnehmer_from_application( $app );
+                }
             }
         } else {
             echo '<div class="notice notice-error is-dismissible"><p>❌ Fehler beim Ändern des Status!</p></div>';
