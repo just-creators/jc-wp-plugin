@@ -2158,8 +2158,8 @@ function jc_admin_bewerbungen_page() {
    
     // Löschung mit Discord Sync
     if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && isset( $_GET['_wpnonce'] ) ) {
-        if ( wp_verify_nonce( $_GET['_wpnonce'], 'jc_delete_application_' . intval( $_GET['id'] ) ) ) {
-            $id = intval( $_GET['id'] );
+        $id = intval( $_GET['id'] );
+        if ( wp_verify_nonce( $_GET['_wpnonce'], 'jc_delete_application_' . $id ) ) {
             $application = $wpdb->get_row( $wpdb->prepare( "SELECT forum_post_id FROM $table WHERE id = %d", $id ) );
            
             $deleted = $wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) );
@@ -2168,11 +2168,14 @@ function jc_admin_bewerbungen_page() {
                 if ( ! empty( $application->forum_post_id ) ) {
                     jc_delete_discord_post( $application->forum_post_id );
                 }
-                echo '<div class="notice notice-success is-dismissible"><p>✅ Bewerbung gelöscht (inkl. Discord).</p></div>';
-            } else {
-                echo '<div class="notice notice-error is-dismissible"><p>❌ Fehler beim Löschen.</p></div>';
+                // Redirect zurück zur Seite nach erfolgreichem Löschen
+                wp_redirect( admin_url( 'admin.php?page=jc-bewerbungen&deleted=1' ) );
+                exit;
             }
+        } else {
+            echo '<div class="notice notice-error"><p>❌ Sicherheitsprüfung fehlgeschlagen. Bitte versuche es erneut.</p></div>';
         }
+    }
     }
    
     $rows = $wpdb->get_results( "SELECT * FROM $table ORDER BY created_at DESC" );

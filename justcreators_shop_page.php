@@ -644,11 +644,14 @@ function jc_shop_admin_page() {
     jc_shop_install();
 
     // Handle Delete
-    if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) ) {
+    if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && isset( $_GET['_wpnonce'] ) ) {
         $id = intval( $_GET['id'] );
-        if ( isset( $_GET['_wpnonce'] ) && wp_verify_nonce( $_GET['_wpnonce'], 'jc_shop_delete_' . $id ) ) {
+        if ( wp_verify_nonce( $_GET['_wpnonce'], 'jc_shop_delete_' . $id ) ) {
             $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
-            wp_safe_remote_post( add_query_arg( 'deleted', '1', admin_url( 'admin.php?page=jc-shops' ) ) );
+            wp_redirect( admin_url( 'admin.php?page=jc-shops&deleted=1' ) );
+            exit;
+        } else {
+            echo '<div class="notice notice-error"><p>Sicherheitsprüfung fehlgeschlagen.</p></div>';
         }
     }
 
@@ -749,7 +752,7 @@ function jc_shop_admin_page() {
                             <td><?php echo esc_html( date( 'd.m.Y', strtotime( $shop->claimed_at ) ) ); ?></td>
                             <td>
                                 <button class="button button-small" onclick="jcEditShop(<?php echo esc_js( json_encode( $shop ) ); ?>)">Bearbeiten</button>
-                                <a href="<?php echo esc_url( add_query_arg( [ 'action' => 'delete', 'id' => $shop->id, '_wpnonce' => wp_create_nonce( 'jc_shop_delete_' . $shop->id ) ], admin_url( 'admin.php?page=jc-shops' ) ) ); ?>" 
+                                          <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=jc-shops&action=delete&id=' . $shop->id ), 'jc_shop_delete_' . $shop->id ) ); ?>" 
                                    class="button button-small" 
                                    onclick="return confirm('Shop wirklich löschen?');" 
                                    style="color:#b32d2e;">Löschen</a>
@@ -816,3 +819,4 @@ function jc_shop_admin_page() {
 }
 
 // END
+                                                          
