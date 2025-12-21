@@ -207,24 +207,28 @@ function jc_shop_save_claim( $user, $application, $member ) {
     global $wpdb;
     $table = $wpdb->prefix . JC_SHOP_TABLE;
 
-    $existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE discord_id = %s", $user->id ) );
+    $existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE discord_id = %s", $user['id'] ) );
     if ( $existing ) {
-        return;
+        return $existing;
     }
 
-    $social = maybe_unserialize( $member->social_channels ?? '' );
+    $social = $member && isset( $member->social_channels ) ? maybe_unserialize( $member->social_channels ) : null;
+
+    $discriminator = isset( $user['discriminator'] ) && $user['discriminator'] !== '0' ? '#' . $user['discriminator'] : '';
 
     $wpdb->insert(
         $table,
         [
-            'discord_id'      => $user->id,
-            'discord_name'    => $user->username . '#' . $user->discriminator,
-            'creator_name'    => $application->creator_name ?? $user->username,
-            'minecraft_name'  => $member->minecraft_name ?? null,
+            'discord_id'      => $user['id'],
+            'discord_name'    => $user['username'] . $discriminator,
+            'creator_name'    => $application->creator_name ?? $user['username'],
+            'minecraft_name'  => $member ? ( $member->minecraft_name ?? null ) : null,
             'social_channels' => is_array( $social ) ? serialize( $social ) : null,
         ],
         [ '%s', '%s', '%s', '%s', '%s' ]
     );
+
+    return $wpdb->insert_id;
 }
 
 function jc_shop_update_item( $shop_id, $item_key ) {
@@ -333,10 +337,10 @@ function jc_shop_render_shortcode() {
     if ( isset( $_POST['jc_shop_item'] ) && $current_shop && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( $_POST['_wpnonce'], 'jc_shop_item' ) ) {
         $item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
         $result = jc_shop_update_item( $current_shop->id, $item_key );
-        if ( is_wp_error( $result ) ) {
-            $error = $result->get_error_message();
+        if ( isset( $result['error'] ) ) {
+            $error = $result['error'];
         } else {
-            $message = 'Item gespeichert.';
+            $message = $result['message'] ?? 'Item gespeichert.';
             $current_shop = jc_shop_get_user_shop( $discord_id );
         }
     }
@@ -415,7 +419,8 @@ function jc_shop_render_denied( $discord_name ) {
 
 function jc_shop_render_page( $user, $application, $member, $shop, $message, $error ) {
     $items = jc_shop_get_available_items();
-    $social_names = $application ? jc_shop_get_social_names( $application->social_channels ) : array();
+    $social_channels = $application && isset( $application->social_channels ) ? maybe_unserialize( $application->social_channels ) : [];
+    $social_names = jc_shop_get_social_names( $social_channels );
     ?>
     <div class="jc-wrap">
         <div class="jc-hero">
