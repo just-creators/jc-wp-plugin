@@ -181,6 +181,38 @@ function jc_teilnehmer_handle_actions() {
         
         add_settings_error( 'jc_teilnehmer', 'images_reset', "✅ Alle Profilbilder aktualisiert ($updated Einträge).", 'updated' );
     }
+    
+    // Kompletter API Reload (Namen + Bilder)
+    if ( isset( $_POST['jc_teilnehmer_full_reload'] ) ) {
+        check_admin_referer( 'jc_teilnehmer_full_reload' );
+        
+        // Cache komplett löschen
+        $wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_jc_img_%' OR option_name LIKE '_transient_jc_meta_%'" );
+        delete_transient( 'jc_twitch_access_token' );
+        
+        // Alle Teilnehmer durchgehen und Namen + Bilder neu laden
+        $rows = $wpdb->get_results( "SELECT id, social_channels FROM $table" );
+        $updated = 0;
+        foreach ( $rows as $row ) {
+            $channels = json_decode( $row->social_channels, true );
+            if ( is_array( $channels ) && !empty( $channels ) ) {
+                // Hole Meta-Daten (Name + Bild) von der API
+                $meta = jc_teilnehmer_resolve_social_meta( $channels, '' );
+                $new_name = !empty( $meta['title'] ) ? $meta['title'] : null;
+                $new_image = !empty( $meta['image'] ) ? $meta['image'] : jc_teilnehmer_get_profile_image( $channels );
+                
+                $update_data = array( 'profile_image_url' => $new_image );
+                if ( $new_name ) {
+                    $update_data['display_name'] = $new_name;
+                }
+                
+                $wpdb->update( $table, $update_data, array( 'id' => $row->id ) );
+                $updated++;
+            }
+        }
+        
+        add_settings_error( 'jc_teilnehmer', 'full_reload', "✅ Alle Daten von APIs neu geladen ($updated Einträge: Namen + Bilder aktualisiert).", 'updated' );
+    }
 }
 
 /**
@@ -571,7 +603,7 @@ function jc_teilnehmer_render_admin_page() {
             </form>
         </div>
 
-        <div style="margin-bottom:20px; display:flex; gap:10px;">
+        <div style="margin-bottom:20px; display:flex; gap:10px; flex-wrap:wrap;">
             <form method="post" style="margin:0;">
                 <?php wp_nonce_field( 'jc_teilnehmer_import_db' ); ?>
                 <button type="submit" name="jc_teilnehmer_import_from_db" class="button">📥 Aus Bewerbungs-DB importieren</button>
@@ -579,7 +611,12 @@ function jc_teilnehmer_render_admin_page() {
             
             <form method="post" style="margin:0;" onsubmit="return confirm('🔄 Alle Profilbilder werden neu von den Social Media Plattformen geladen.\n\nDies kann einen Moment dauern. Fortfahren?')">
                 <?php wp_nonce_field( 'jc_teilnehmer_reset_images' ); ?>
-                <button type="submit" name="jc_teilnehmer_reset_images" class="button">🔄 Alle Bilder aktualisieren</button>
+                <button type="submit" name="jc_teilnehmer_reset_images" class="button">🔄 Nur Bilder aktualisieren</button>
+            </form>
+            
+            <form method="post" style="margin:0;" onsubmit="return confirm('⚡ VOLLSTÄNDIGER API RELOAD\n\nDies lädt ALLE Daten neu von den APIs:\n• Channel-Namen\n• Profilbilder\n\nDies kann länger dauern. Fortfahren?')">
+                <?php wp_nonce_field( 'jc_teilnehmer_full_reload' ); ?>
+                <button type="submit" name="jc_teilnehmer_full_reload" class="button button-primary">⚡ Kompletter API Reload</button>
             </form>
         </div>
 
