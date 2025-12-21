@@ -2159,12 +2159,12 @@ function jc_admin_bewerbungen_page() {
    
     // Löschung mit Discord Sync - MUSS VOR HTML OUTPUT erfolgen!
     $delete_message = '';
-    if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && isset( $_GET['_wpnonce'] ) ) {
-        $id = intval( $_GET['id'] );
-        $nonce = sanitize_text_field( $_GET['_wpnonce'] );
-        $action = 'jc_delete_application_' . $id;
-        
-        if ( wp_verify_nonce( $nonce, $action ) ) {
+    if ( isset( $_POST['jc_delete_app'] ) && isset( $_POST['delete_app_id'] ) ) {
+        // Nonce prüfen
+        if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'jc_delete_nonce' ) ) {
+            $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Sicherheitsprüfung fehlgeschlagen!</p></div>';
+        } else {
+            $id = intval( $_POST['delete_app_id'] );
             $application = $wpdb->get_row( $wpdb->prepare( "SELECT forum_post_id FROM $table WHERE id = %d", $id ) );
            
             if ( $application ) {
@@ -2176,16 +2176,12 @@ function jc_admin_bewerbungen_page() {
                     }
                     error_log( "JC Admin: Bewerbung ID {$id} gelöscht" );
                     $delete_message = '<div class="notice notice-success is-dismissible"><p>✅ Bewerbung erfolgreich gelöscht!</p></div>';
-                    // Entferne die action/id/nonce aus der URL für sauberen Refresh
-                    wp_safe_remote_get( admin_url( 'admin.php?page=jc-bewerbungen' ) );
                 } else {
                     $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Fehler beim Löschen der Bewerbung!</p></div>';
                 }
             } else {
                 $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Bewerbung nicht gefunden!</p></div>';
             }
-        } else {
-            $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Sicherheitsprüfung fehlgeschlagen!</p></div>';
         }
     }
    
@@ -2250,11 +2246,6 @@ function jc_admin_bewerbungen_page() {
         echo '</tr></thead><tbody>';
        
         foreach ( $rows as $r ) {
-            $delete_url = wp_nonce_url(
-                admin_url( 'admin.php?page=jc-bewerbungen&action=delete&id=' . $r->id ),
-                'jc_delete_application_' . $r->id
-            );
-           
             // Social Channels anzeigen
             $social_channels = json_decode( $r->social_channels, true );
             $social_display = '';
@@ -2306,7 +2297,16 @@ function jc_admin_bewerbungen_page() {
             echo '</form>';
             echo '</td>';
             
-            echo '<td class="jc-cell-actions"><a href="' . esc_url( $delete_url ) . '" class="jc-delete-btn" onclick="return confirm(\'⚠️ Wirklich löschen?\\n\\nDies entfernt auch den Discord Post!\');">🗑️</a></td>';
+            // Delete-Form
+            echo '<td class="jc-cell-actions">';
+            echo '<form method="POST" style="display:inline;" onsubmit="return confirm(\'⚠️ Wirklich löschen?\\n\\nDies entfernt auch den Discord Post!\');">';
+            wp_nonce_field( 'jc_delete_nonce' );
+            echo '<input type="hidden" name="jc_delete_app" value="1" />';
+            echo '<input type="hidden" name="delete_app_id" value="' . esc_attr( $r->id ) . '" />';
+            echo '<button type="submit" class="jc-delete-btn">🗑️</button>';
+            echo '</form>';
+            echo '</td>';
+            
             echo '</tr>';
         }
        
