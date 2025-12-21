@@ -207,64 +207,68 @@ function jc_shop_save_claim( $user, $application, $member ) {
     global $wpdb;
     $table = $wpdb->prefix . JC_SHOP_TABLE;
 
-    function jc_shop_inline_styles() {
-        ?>
-        <style>
-            :root { --jc-bg:#050712; --jc-panel:#0b0f1d; --jc-border:#1e2740; --jc-text:#e9ecf7; --jc-muted:#9eb3d5; --jc-accent:#6c7bff; --jc-accent-2:#56d8ff; }
-            .jc-wrap { max-width: 1220px; margin: 26px auto; padding: 0 18px 40px; color: var(--jc-text); font-family: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif; }
-            .jc-hero { display:grid; grid-template-columns:2fr 1fr; gap:22px; background: radial-gradient(120% 140% at 10% 10%, rgba(108,123,255,0.12), transparent 50%), radial-gradient(110% 120% at 90% 20%, rgba(86,216,255,0.1), transparent 45%), var(--jc-panel); border:1px solid var(--jc-border); border-radius:20px; padding:28px; position:relative; overflow:hidden; box-shadow:0 22px 60px rgba(0,0,0,0.45); }
-            .jc-hero-left { position:relative; z-index:1; }
-            .jc-kicker { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); border-radius:999px; color:var(--jc-text); font-size:13px; letter-spacing:0.04em; text-transform:uppercase; }
-            .jc-hero-title { margin:10px 0 6px; font-size:32px; line-height:1.2; color:var(--jc-text); }
-            .jc-hero-sub { margin:0 0 14px; color:var(--jc-muted); line-height:1.6; max-width:780px; }
-            .jc-hero-actions { display:flex; gap:10px; flex-wrap:wrap; }
-            .jc-pill { background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); color:var(--jc-text); padding:8px 12px; border-radius:999px; font-weight:700; }
-            .jc-pill-ghost { background:transparent; border-color:var(--jc-border); color:var(--jc-muted); }
-            .jc-hero-right { position:relative; min-height:120px; display:flex; align-items:center; justify-content:flex-end; }
-            .jc-hero-badge { position:relative; z-index:1; padding:12px 18px; border-radius:14px; background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#040510; font-weight:800; letter-spacing:0.08em; box-shadow:0 18px 40px rgba(108,123,255,0.45); }
-            .jc-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; padding:22px; box-shadow:0 20px 54px rgba(0,0,0,0.4); margin-top:20px; }
-            .jc-section { margin-top:28px; }
-            .jc-section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-            .jc-section-title { margin:4px 0 0; font-size:22px; color:var(--jc-text); }
-            .jc-label { color:var(--jc-muted); font-size:13px; letter-spacing:0.05em; text-transform:uppercase; }
-            .jc-msg { margin-top:16px; padding:12px 14px; border-radius:12px; font-weight:700; border:1px solid var(--jc-border); }
-            .jc-success { background:rgba(86,216,255,0.08); border-color:rgba(86,216,255,0.4); color:#d1f2ff; }
-            .jc-error { background:rgba(255,105,105,0.12); border-color:rgba(255,105,105,0.35); color:#ffb3b3; }
-            .jc-btn { display:inline-flex; align-items:center; gap:8px; justify-content:center; padding:12px 16px; border-radius:12px; background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#050712; text-decoration:none; font-weight:800; letter-spacing:0.01em; box-shadow:0 14px 34px rgba(108,123,255,0.45); transition:transform .2s, box-shadow .2s; border:none; cursor:pointer; }
-            .jc-btn:hover { transform:translateY(-2px); box-shadow:0 16px 40px rgba(86,216,255,0.5); color:#050712; }
-            .jc-btn-ghost { background:transparent; color:var(--jc-text); border:1px solid var(--jc-border); box-shadow:none; }
-            .jc-claim-row { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
-            .jc-shop-title { font-size:24px; font-weight:800; color:var(--jc-text); }
-            .jc-shop-sub { color:var(--jc-muted); margin-top:6px; }
-            .jc-claim-actions { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
-            .jc-item-chip { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); border-radius:12px; font-weight:700; }
-            .jc-shops-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; margin-top:14px; }
-            .jc-shop-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:16px; overflow:hidden; box-shadow:0 16px 40px rgba(0,0,0,0.35); display:flex; flex-direction:column; }
-            .jc-shop-skin img { width:100%; display:block; background:#050712; }
-            .jc-shop-body { padding:14px 16px 18px; display:flex; flex-direction:column; gap:6px; }
-            .jc-shop-name { font-weight:800; font-size:18px; color:var(--jc-text); }
-            .jc-shop-item { color:var(--jc-muted); font-weight:700; }
-            .jc-social-names { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
-            .jc-modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; z-index:999; }
-            .jc-modal.open { opacity:1; pointer-events:auto; }
-            .jc-modal-content { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; padding:18px; max-width:720px; width:calc(100% - 40px); box-shadow:0 24px 60px rgba(0,0,0,0.6); }
-            .jc-modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-            .jc-close { background:transparent; border:none; color:var(--jc-text); font-size:22px; cursor:pointer; }
-            .jc-items-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
-            .jc-item-card { border:1px solid var(--jc-border); border-radius:14px; padding:12px; display:flex; flex-direction:column; align-items:flex-start; gap:8px; cursor:pointer; position:relative; background:rgba(255,255,255,0.02); }
-            .jc-item-card input { display:none; }
-            .jc-item-card:hover { border-color:rgba(108,123,255,0.6); }
-            .jc-item-card input:checked + .jc-item-icon, .jc-item-card input:checked ~ .jc-item-name { color:var(--jc-text); }
-            .jc-item-icon { font-size:24px; }
-            .jc-item-name { font-weight:700; color:var(--jc-text); }
-            .jc-tag { position:absolute; top:10px; right:10px; background:rgba(255,105,105,0.15); color:#ffb3b3; padding:4px 8px; border-radius:999px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
-            .jc-item-card.disabled { opacity:0.5; cursor:not-allowed; }
-            .jc-item-card.disabled:hover { border-color:var(--jc-border); }
-            @media (max-width: 900px) { .jc-hero { grid-template-columns:1fr; } .jc-hero-right { justify-content:flex-start; min-height:120px; } }
-            @media (max-width: 640px) { .jc-claim-row { align-items:flex-start; } }
-        </style>
-        <?php
+    $existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE discord_id = %s", $user->id ) );
+    if ( $existing ) {
+        return;
     }
+
+    $social = maybe_unserialize( $member->social_channels ?? '' );
+
+    $wpdb->insert(
+        $table,
+        [
+            'discord_id'      => $user->id,
+            'discord_name'    => $user->username . '#' . $user->discriminator,
+            'creator_name'    => $application->creator_name ?? $user->username,
+            'minecraft_name'  => $member->minecraft_name ?? null,
+            'social_channels' => is_array( $social ) ? serialize( $social ) : null,
+        ],
+        [ '%s', '%s', '%s', '%s', '%s' ]
+    );
+}
+
+function jc_shop_update_item( $shop_id, $item_key ) {
+    global $wpdb;
+    $table = $wpdb->prefix . JC_SHOP_TABLE;
+    $items = jc_shop_get_available_items();
+
+    $selected = null;
+    foreach ( $items as $it ) {
+        if ( $it['key'] === $item_key ) {
+            $selected = $it;
+            break;
+        }
+    }
+
+    if ( ! $selected ) {
+        return [ 'error' => 'Ungültiges Item.' ];
+    }
+
+    if ( jc_shop_item_is_taken( $item_key, $shop_id ) ) {
+        return [ 'error' => 'Item bereits vergeben.' ];
+    }
+
+    $updated = $wpdb->update(
+        $table,
+        [
+            'item_key'  => $selected['key'],
+            'item_name' => $selected['name'],
+            'item_icon' => $selected['icon'],
+        ],
+        [ 'id' => $shop_id ],
+        [ '%s', '%s', '%s' ],
+        [ '%d' ]
+    );
+
+    if ( $updated === false ) {
+        return [ 'error' => 'Speichern fehlgeschlagen.' ];
+    }
+
+    return [ 'message' => 'Item gespeichert!' ];
+}
+
+function jc_shop_get_social_names( $channels ) {
+    $names = [];
 
     if ( ! is_array( $channels ) ) {
         return $names;
