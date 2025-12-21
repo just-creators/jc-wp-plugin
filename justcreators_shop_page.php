@@ -32,6 +32,7 @@ register_activation_hook( __FILE__, 'jc_shop_install' );
 add_action( 'wp', 'jc_shop_ensure_session', 1 );
 add_action( 'template_redirect', 'jc_shop_handle_oauth', 5 );
 add_shortcode( 'jc_shop_claim', 'jc_shop_render_shortcode' );
+add_action( 'admin_menu', 'jc_shop_admin_menu' );
 
 function jc_shop_get_redirect_uri() {
     return home_url( '/' . JC_SHOP_REDIRECT_SLUG );
@@ -445,11 +446,11 @@ function jc_shop_render_page( $user, $application, $member, $shop, $message, $er
 
         <?php if ( ! $shop ) : ?>
             <div class="jc-card">
-                <h3 class="jc-section-title">Shop claimen</h3>
-                <p class="jc-hero-sub">Reserve deinen Shop mit deinem Creator-Namen.</p>
-                <form method="post" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                <h3 class="jc-section-title">Schritt 1: Shop claimen</h3>
+                <p class="jc-hero-sub">Reserviere deinen Shop-Platz im Shopping District.</p>
+                <form method="post" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px;">
                     <?php wp_nonce_field( 'jc_shop_claim' ); ?>
-                    <button type="submit" name="jc_shop_claim" class="jc-btn">Shop jetzt claimen</button>
+                    <button type="submit" name="jc_shop_claim" class="jc-btn">🛍️ Shop claimen</button>
                 </form>
             </div>
         <?php else : ?>
@@ -471,11 +472,11 @@ function jc_shop_render_page( $user, $application, $member, $shop, $message, $er
                     </div>
                     <div class="jc-claim-actions">
                         <?php if ( $shop->item_key ) : ?>
-                            <div class="jc-label">Verkaufst</div>
+                            <div class="jc-label">Dein Item</div>
                             <div class="jc-item-chip"><?php echo esc_html( $shop->item_icon . ' ' . $shop->item_name ); ?></div>
                         <?php else : ?>
-                            <div class="jc-label">Item wählen</div>
-                            <button type="button" class="jc-btn" onclick="document.getElementById('jc-item-modal').classList.add('open');">Item auswählen</button>
+                            <div class="jc-label">Schritt 2</div>
+                            <button type="button" class="jc-btn" onclick="document.getElementById('jc-item-modal').classList.add('open');">📦 Item hinzufügen</button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -500,7 +501,7 @@ function jc_shop_render_page( $user, $application, $member, $shop, $message, $er
     <div id="jc-item-modal" class="jc-modal">
         <div class="jc-modal-content">
             <div class="jc-modal-head">
-                <h4>Wähle dein Item</h4>
+                <h4>📦 Item hinzufügen</h4>
                 <button type="button" class="jc-close" onclick="document.getElementById('jc-item-modal').classList.remove('open');">×</button>
             </div>
             <form method="post" class="jc-items-grid">
@@ -540,7 +541,7 @@ function jc_shop_render_public_grid() {
     }
 
     foreach ( $rows as $row ) {
-        $skin = $row->minecraft_name ? 'https://mc-heads.net/body/' . rawurlencode( $row->minecraft_name ) . '/250.png' : 'https://via.placeholder.com/250x400/0b0f1d/6c7bff?text=Shop';
+        $skin = $row->minecraft_name ? 'https://mc-heads.net/head/' . rawurlencode( $row->minecraft_name ) . '/200.png' : 'https://via.placeholder.com/200x200/0b0f1d/6c7bff?text=?';
         $item = $row->item_key ? $row->item_icon . ' ' . $row->item_name : 'Noch kein Item';
         echo '<div class="jc-shop-card">';
         echo '<div class="jc-shop-skin"><img src="' . esc_url( $skin ) . '" alt="Skin"></div>';
@@ -583,9 +584,10 @@ function jc_shop_inline_styles() {
         .jc-shop-sub { color:var(--jc-muted); margin-top:6px; }
         .jc-claim-actions { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
         .jc-item-chip { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); border-radius:12px; font-weight:700; }
-        .jc-shops-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; margin-top:14px; }
+        .jc-shops-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-top:14px; }
         .jc-shop-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:16px; overflow:hidden; box-shadow:0 16px 40px rgba(0,0,0,0.35); display:flex; flex-direction:column; }
-        .jc-shop-skin img { width:100%; display:block; background:#050712; }
+        .jc-shop-skin { padding:16px; display:flex; justify-content:center; background:linear-gradient(135deg, rgba(108,123,255,0.05), rgba(86,216,255,0.05)); }
+        .jc-shop-skin img { width:120px; height:120px; display:block; background:#050712; border-radius:12px; image-rendering: pixelated; box-shadow:0 8px 20px rgba(0,0,0,0.3); }
         .jc-shop-body { padding:14px 16px 18px; display:flex; flex-direction:column; gap:6px; }
         .jc-shop-name { font-weight:800; font-size:18px; color:var(--jc-text); }
         .jc-shop-item { color:var(--jc-muted); font-weight:700; }
@@ -608,6 +610,176 @@ function jc_shop_inline_styles() {
         @media (max-width: 900px) { .jc-hero { grid-template-columns:1fr; } .jc-hero-right { justify-content:flex-start; min-height:120px; } }
         @media (max-width: 640px) { .jc-claim-row { align-items:flex-start; } }
     </style>
+    <?php
+}
+
+// ============================================
+// ADMIN PAGE
+// ============================================
+
+function jc_shop_admin_menu() {
+    add_menu_page(
+        'Shop Verwaltung',
+        'Shops',
+        'manage_options',
+        'jc-shops',
+        'jc_shop_admin_page',
+        'dashicons-store',
+        30
+    );
+}
+
+function jc_shop_admin_page() {
+    global $wpdb;
+    $table = $wpdb->prefix . JC_SHOP_TABLE;
+    jc_shop_install();
+
+    // Handle Delete
+    if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && check_admin_referer( 'jc_shop_delete_' . $_GET['id'] ) ) {
+        $id = intval( $_GET['id'] );
+        $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+        echo '<div class="notice notice-success"><p>Shop gelöscht.</p></div>';
+    }
+
+    // Handle Edit
+    if ( isset( $_POST['jc_shop_edit'] ) && check_admin_referer( 'jc_shop_edit' ) ) {
+        $id = intval( $_POST['shop_id'] );
+        $item_key = sanitize_text_field( $_POST['item_key'] );
+        $creator_name = sanitize_text_field( $_POST['creator_name'] );
+        $minecraft_name = sanitize_text_field( $_POST['minecraft_name'] );
+
+        $items = jc_shop_get_available_items();
+        $selected = null;
+        foreach ( $items as $it ) {
+            if ( $it['key'] === $item_key ) {
+                $selected = $it;
+                break;
+            }
+        }
+
+        if ( $selected ) {
+            $wpdb->update(
+                $table,
+                [
+                    'creator_name' => $creator_name,
+                    'minecraft_name' => $minecraft_name,
+                    'item_key' => $selected['key'],
+                    'item_name' => $selected['name'],
+                    'item_icon' => $selected['icon'],
+                ],
+                [ 'id' => $id ],
+                [ '%s', '%s', '%s', '%s', '%s' ],
+                [ '%d' ]
+            );
+            echo '<div class="notice notice-success"><p>Shop aktualisiert.</p></div>';
+        }
+    }
+
+    // Get all shops
+    $shops = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY claimed_at DESC" );
+    $items = jc_shop_get_available_items();
+
+    ?>
+    <div class="wrap">
+        <h1>🛍️ Shop Verwaltung</h1>
+        <p>Verwalte alle geclaimten Shops im Shopping District.</p>
+
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th style="width:60px;">ID</th>
+                    <th>Creator Name</th>
+                    <th>Minecraft Name</th>
+                    <th>Discord</th>
+                    <th>Item</th>
+                    <th style="width:100px;">Datum</th>
+                    <th style="width:150px;">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ( empty( $shops ) ) : ?>
+                    <tr><td colspan="7">Keine Shops vorhanden.</td></tr>
+                <?php else : ?>
+                    <?php foreach ( $shops as $shop ) : ?>
+                        <tr>
+                            <td><?php echo esc_html( $shop->id ); ?></td>
+                            <td><strong><?php echo esc_html( $shop->creator_name ); ?></strong></td>
+                            <td><?php echo esc_html( $shop->minecraft_name ?: '—' ); ?></td>
+                            <td><?php echo esc_html( $shop->discord_name ); ?></td>
+                            <td>
+                                <?php if ( $shop->item_key ) : ?>
+                                    <span style="background:#f0f0f1;padding:4px 8px;border-radius:4px;display:inline-block;">
+                                        <?php echo esc_html( $shop->item_icon . ' ' . $shop->item_name ); ?>
+                                    </span>
+                                <?php else : ?>
+                                    <span style="color:#999;">Kein Item</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?php echo esc_html( date( 'd.m.Y', strtotime( $shop->claimed_at ) ) ); ?></td>
+                            <td>
+                                <button class="button button-small" onclick="jcEditShop(<?php echo esc_js( json_encode( $shop ) ); ?>)">Bearbeiten</button>
+                                <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=jc-shops&action=delete&id=' . $shop->id ), 'jc_shop_delete_' . $shop->id ) ); ?>" 
+                                   class="button button-small" 
+                                   onclick="return confirm('Shop wirklich löschen?');" 
+                                   style="color:#b32d2e;">Löschen</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="jc-edit-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:24px;border-radius:8px;max-width:500px;width:calc(100% - 40px);box-shadow:0 8px 24px rgba(0,0,0,0.3);">
+            <h2 style="margin-top:0;">Shop bearbeiten</h2>
+            <form method="post">
+                <?php wp_nonce_field( 'jc_shop_edit' ); ?>
+                <input type="hidden" name="shop_id" id="edit-shop-id">
+                
+                <p>
+                    <label><strong>Creator Name:</strong></label><br>
+                    <input type="text" name="creator_name" id="edit-creator-name" class="regular-text" required>
+                </p>
+                
+                <p>
+                    <label><strong>Minecraft Name:</strong></label><br>
+                    <input type="text" name="minecraft_name" id="edit-minecraft-name" class="regular-text">
+                </p>
+                
+                <p>
+                    <label><strong>Item:</strong></label><br>
+                    <select name="item_key" id="edit-item-key" class="regular-text">
+                        <option value="">Kein Item</option>
+                        <?php foreach ( $items as $item ) : ?>
+                            <option value="<?php echo esc_attr( $item['key'] ); ?>">
+                                <?php echo esc_html( $item['icon'] . ' ' . $item['name'] ); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </p>
+                
+                <p style="display:flex;gap:10px;">
+                    <button type="submit" name="jc_shop_edit" class="button button-primary">Speichern</button>
+                    <button type="button" class="button" onclick="jcCloseEdit()">Abbrechen</button>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    function jcEditShop(shop) {
+        document.getElementById('edit-shop-id').value = shop.id;
+        document.getElementById('edit-creator-name').value = shop.creator_name;
+        document.getElementById('edit-minecraft-name').value = shop.minecraft_name || '';
+        document.getElementById('edit-item-key').value = shop.item_key || '';
+        document.getElementById('jc-edit-modal').style.display = 'flex';
+    }
+    function jcCloseEdit() {
+        document.getElementById('jc-edit-modal').style.display = 'none';
+    }
+    </script>
     <?php
 }
 
