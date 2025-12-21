@@ -813,3 +813,6 @@ function jc_shop_admin_page() {
     }
     </script>
     <?php
+}
+
+// END
