@@ -630,9 +630,9 @@ function jc_teilnehmer_render_shortcode( $atts ) {
         <div class="jc-grid" id="jc-grid">
             <?php foreach ( $rows as $t ) : 
                 $chs = json_decode( $t->social_channels, true ) ?: [];
-                $meta = jc_teilnehmer_resolve_social_meta( $chs, $t->display_name );
-                $card_name = $meta['title'] ?: $t->display_name;
-                $card_image = $meta['image'];
+                // Verwende das gespeicherte Profilbild aus der DB (wie im Admin-Panel)
+                $card_name = $t->display_name;
+                $card_image = $t->profile_image_url ?: 'https://via.placeholder.com/300x300/1e2740/6c7bff?text=JC';
                 $search = strtolower( $card_name );
             ?>
             <div class="jc-card" data-search="<?php echo esc_attr( $search ); ?>">

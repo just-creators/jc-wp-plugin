@@ -391,9 +391,8 @@ function jc_rules_form( $discord_name, $member ) {
                         <li><strong>§12:</strong> Das End darf erst beim offiziellen End Event (10.02.2026 um 18:30) betreten werden.</li>
                         <li><strong>§13:</strong> Das verändern, griefen und verwüsten vom Spawn ist strengstens untersagt</li>
                         <li><strong>§14:</strong> Regelmäßiges Streamen / Video Uploads sind Pflicht! (Informationen stehen im Upload/Stream Plan im Discord)</li>
-                        <li><strong>§15:</strong> Bei einem Ban oder einer Konsequenz, darf der Bann nicht von einem selber/anderen Spielern in einem Video erwähnt werden</li>
-                        <li><strong>§16:</strong> Öffentliche Kritiken über den Server zu verbreiten folgt zu einem Projekt Ausschluss</li>
-                        <li><strong>§17:</strong> Mehrere Minecraft Accounts eines Teilnehmers sind in diesem Projekt nicht gestattet</li>
+                        <li><strong>§15:</strong> Öffentliche Kritiken über den Server zu verbreiten folgt zu einem Projekt Ausschluss</li>
+                        <li><strong>§16:</strong> Mehrere Minecraft Accounts eines Teilnehmers sind in diesem Projekt nicht gestattet</li>
                     </ul>
                 </div>
                 

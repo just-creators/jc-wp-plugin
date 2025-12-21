@@ -2538,13 +2538,6 @@ function jc_admin_bewerbungen_page() {
     echo '<div class="wrap jc-admin-wrap">';
     echo '<h1 class="jc-admin-title">🎮 Bewerbungen <span class="jc-count-badge">' . $total . '</span></h1>';
     
-    // Button für neue Bewerbung
-    echo '<div style="margin-bottom: 20px;">';
-    echo '<a href="' . admin_url( 'admin.php?page=jc-new-bewerbung' ) . '" class="button button-primary button-large">';
-    echo '➕ Neue Bewerbung erstellen';
-    echo '</a>';
-    echo '</div>';
-    
     // Zeige Delete-Nachricht wenn vorhanden
     if ( ! empty( $delete_message ) ) {
         echo $delete_message;
