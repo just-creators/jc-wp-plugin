@@ -777,41 +777,6 @@ function jc_shop_admin_page() {
                 
                 <p>
                     <label><strong>Minecraft Name:</strong></label><br>
-                                    </span>
-                                <?php else : ?>
-                                    <span style="color:#999;">Kein Item</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?php echo esc_html( date( 'd.m.Y', strtotime( $shop->claimed_at ) ) ); ?></td>
-                            <td>
-                                <button class="button button-small" onclick="jcEditShop(<?php echo esc_js( json_encode( $shop ) ); ?>)">Bearbeiten</button>
-                                <a href="<?php echo esc_url( add_query_arg( [ 'action' => 'delete', 'id' => $shop->id, '_wpnonce' => wp_create_nonce( 'jc_shop_delete_' . $shop->id ) ], admin_url( 'admin.php?page=jc-shops' ) ) ); ?>" 
-                                   class="button button-small" 
-                                   onclick="return confirm('Shop wirklich löschen?');" 
-                                   style="color:#b32d2e;">Löschen</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Edit Modal -->
-    <div id="jc-edit-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;align-items:center;justify-content:center;">
-        <div style="background:#fff;padding:24px;border-radius:8px;max-width:500px;width:calc(100% - 40px);box-shadow:0 8px 24px rgba(0,0,0,0.3);">
-            <h2 style="margin-top:0;">Shop bearbeiten</h2>
-            <form method="post">
-                <?php wp_nonce_field( 'jc_shop_edit' ); ?>
-                <input type="hidden" name="shop_id" id="edit-shop-id">
-                
-                <p>
-                    <label><strong>Creator Name:</strong></label><br>
-                    <input type="text" name="creator_name" id="edit-creator-name" class="regular-text" required>
-                </p>
-                
-                <p>
-                    <label><strong>Minecraft Name:</strong></label><br>
                     <input type="text" name="minecraft_name" id="edit-minecraft-name" class="regular-text">
                 </p>
                 
@@ -821,14 +786,14 @@ function jc_shop_admin_page() {
                         <option value="">Kein Item</option>
                         <?php foreach ( $items as $item ) : ?>
                             <option value="<?php echo esc_attr( $item['key'] ); ?>">
-                                <?php echo esc_html( $item['icon'] . ' ' . $item['name'] ); ?>
+                                <?php echo esc_html( $item['name'] ); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </p>
                 
                 <p style="display:flex;gap:10px;">
-                    <button type="submit" name="jc_shop_edit" class="button button-primary">Speichern</button>
+                    <button type="submit" class="button button-primary">Speichern</button>
                     <button type="button" class="button" onclick="jcCloseEdit()">Abbrechen</button>
                 </p>
             </form>
@@ -848,6 +813,3 @@ function jc_shop_admin_page() {
     }
     </script>
     <?php
-}
-
-// END
