@@ -2157,10 +2157,14 @@ function jc_admin_bewerbungen_page() {
         }
     }
    
-    // Löschung mit Discord Sync
+    // Löschung mit Discord Sync - MUSS VOR HTML OUTPUT erfolgen!
+    $delete_message = '';
     if ( isset( $_GET['action'] ) && $_GET['action'] === 'delete' && isset( $_GET['id'] ) && isset( $_GET['_wpnonce'] ) ) {
         $id = intval( $_GET['id'] );
-        if ( wp_verify_nonce( $_GET['_wpnonce'], 'jc_delete_application_' . $id ) ) {
+        $nonce = sanitize_text_field( $_GET['_wpnonce'] );
+        $action = 'jc_delete_application_' . $id;
+        
+        if ( wp_verify_nonce( $nonce, $action ) ) {
             $application = $wpdb->get_row( $wpdb->prepare( "SELECT forum_post_id FROM $table WHERE id = %d", $id ) );
            
             if ( $application ) {
@@ -2170,12 +2174,18 @@ function jc_admin_bewerbungen_page() {
                     if ( ! empty( $application->forum_post_id ) ) {
                         jc_delete_discord_post( $application->forum_post_id );
                     }
-                    wp_redirect( admin_url( 'admin.php?page=jc-bewerbungen&deleted=1' ) );
-                    exit;
+                    error_log( "JC Admin: Bewerbung ID {$id} gelöscht" );
+                    $delete_message = '<div class="notice notice-success is-dismissible"><p>✅ Bewerbung erfolgreich gelöscht!</p></div>';
+                    // Entferne die action/id/nonce aus der URL für sauberen Refresh
+                    wp_safe_remote_get( admin_url( 'admin.php?page=jc-bewerbungen' ) );
+                } else {
+                    $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Fehler beim Löschen der Bewerbung!</p></div>';
                 }
+            } else {
+                $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Bewerbung nicht gefunden!</p></div>';
             }
         } else {
-            echo '<div class="notice notice-error"><p>❌ Sicherheitsprüfung fehlgeschlagen. Bitte versuche es erneut.</p></div>';
+            $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Sicherheitsprüfung fehlgeschlagen!</p></div>';
         }
     }
    
@@ -2189,6 +2199,11 @@ function jc_admin_bewerbungen_page() {
    
     echo '<div class="wrap jc-admin-wrap">';
     echo '<h1 class="jc-admin-title">🎮 Bewerbungen <span class="jc-count-badge">' . $total . '</span></h1>';
+    
+    // Zeige Delete-Nachricht wenn vorhanden
+    if ( ! empty( $delete_message ) ) {
+        echo $delete_message;
+    }
     
     // Statistik-Boxen
     echo '<div class="jc-stats-grid">';
