@@ -508,6 +508,15 @@ add_action( 'admin_menu', function() {
         'dashicons-list-view',
         26
     );
+    
+    add_submenu_page(
+        'jc-bewerbungen',
+        'Neue Bewerbung erstellen',
+        '➕ Neue Bewerbung',
+        'manage_options',
+        'jc-new-bewerbung',
+        'jc_admin_new_bewerbung_page'
+    );
 });
 add_action( 'admin_init', function() {
     register_setting( 'jc_bot_settings', 'jc_bot_api_url' );
@@ -589,6 +598,339 @@ function jc_bot_setup_page() {
     </div>
     <?php
 }
+
+// ========================================
+// MANUELLE BEWERBUNG ERSTELLEN
+// ========================================
+function jc_admin_new_bewerbung_page() {
+    if ( ! current_user_can( 'manage_options' ) ) return;
+    
+    $success_message = '';
+    $error_message = '';
+    
+    // POST-Handler für neue Bewerbung
+    if ( isset( $_POST['jc_create_manual_bewerbung'] ) && check_admin_referer( 'jc_manual_bewerbung_create' ) ) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'jc_discord_applications';
+        
+        // Eingaben validieren und bereinigen
+        $discord_id = sanitize_text_field( $_POST['discord_id'] );
+        $discord_name = sanitize_text_field( $_POST['discord_name'] );
+        $applicant_name = sanitize_text_field( $_POST['applicant_name'] );
+        $age = sanitize_text_field( $_POST['age'] );
+        $social_activity = sanitize_text_field( $_POST['social_activity'] );
+        $motivation = sanitize_textarea_field( $_POST['motivation'] );
+        
+        // Social Channels verarbeiten
+        $social_channels = array();
+        if ( ! empty( $_POST['social_urls'] ) && is_array( $_POST['social_urls'] ) ) {
+            foreach ( $_POST['social_urls'] as $index => $url ) {
+                $url = esc_url_raw( $url );
+                if ( ! empty( $url ) ) {
+                    $platform = isset( $_POST['social_platforms'][$index] ) ? sanitize_text_field( $_POST['social_platforms'][$index] ) : 'unknown';
+                    $social_channels[] = array(
+                        'platform' => $platform,
+                        'url' => $url
+                    );
+                }
+            }
+        }
+        $social_channels_json = json_encode( $social_channels );
+        
+        // Prüfen ob Discord ID bereits existiert
+        $exists = $wpdb->get_var( $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
+            $discord_id
+        ));
+        
+        if ( $exists ) {
+            $error_message = '<div class="notice notice-error is-dismissible"><p>❌ Eine Bewerbung mit dieser Discord ID existiert bereits!</p></div>';
+        } else {
+            // In Datenbank einfügen
+            $inserted = $wpdb->insert(
+                $table,
+                array(
+                    'discord_id' => $discord_id,
+                    'discord_name' => $discord_name,
+                    'applicant_name' => $applicant_name,
+                    'age' => $age,
+                    'social_channels' => $social_channels_json,
+                    'social_activity' => $social_activity,
+                    'motivation' => $motivation,
+                    'status' => 'pending',
+                    'created_at' => current_time( 'mysql' ),
+                    'privacy_accepted_at' => current_time( 'mysql' ) // Manuell erstellt = Datenschutz OK
+                ),
+                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+            );
+            
+            if ( $inserted ) {
+                $new_id = $wpdb->insert_id;
+                
+                // An Discord Bot senden
+                $bot_data = array(
+                    'discord_id' => $discord_id,
+                    'discord_name' => $discord_name,
+                    'applicant_name' => $applicant_name,
+                    'age' => $age,
+                    'social_channels' => $social_channels,
+                    'social_activity' => $social_activity,
+                    'motivation' => $motivation,
+                    'database_id' => $new_id
+                );
+                
+                $bot_result = jc_send_application_to_bot( $bot_data );
+                
+                if ( $bot_result['success'] && isset( $bot_result['data']['post_id'] ) ) {
+                    // Forum Post ID speichern
+                    $wpdb->update(
+                        $table,
+                        array( 'forum_post_id' => $bot_result['data']['post_id'] ),
+                        array( 'id' => $new_id ),
+                        array( '%s' ),
+                        array( '%d' )
+                    );
+                    $success_message = '<div class="notice notice-success is-dismissible"><p>✅ Bewerbung erfolgreich erstellt und an Discord gesendet!</p></div>';
+                } else {
+                    $success_message = '<div class="notice notice-warning is-dismissible"><p>⚠️ Bewerbung wurde erstellt, konnte aber nicht an Discord gesendet werden: ' . esc_html( $bot_result['message'] ?? 'Unbekannter Fehler' ) . '</p></div>';
+                }
+            } else {
+                $error_message = '<div class="notice notice-error is-dismissible"><p>❌ Fehler beim Speichern in der Datenbank: ' . esc_html( $wpdb->last_error ) . '</p></div>';
+            }
+        }
+    }
+    
+    ?>
+    <div class="wrap jc-manual-bewerbung-wrap">
+        <h1>➕ Manuelle Bewerbung erstellen</h1>
+        
+        <?php echo $success_message . $error_message; ?>
+        
+        <div class="jc-manual-form-container">
+            <form method="POST" class="jc-manual-form">
+                <?php wp_nonce_field( 'jc_manual_bewerbung_create' ); ?>
+                
+                <div class="jc-form-section">
+                    <h2>👤 Discord Informationen</h2>
+                    
+                    <div class="jc-form-group">
+                        <label for="discord_name">Discord Name *</label>
+                        <input type="text" id="discord_name" name="discord_name" required class="regular-text" placeholder="z.B. MaxMustermann#1234">
+                        <p class="description">Der vollständige Discord Username</p>
+                    </div>
+                    
+                    <div class="jc-form-group">
+                        <label for="discord_id">Discord ID *</label>
+                        <input type="text" id="discord_id" name="discord_id" required class="regular-text" placeholder="z.B. 123456789012345678">
+                        <p class="description">Die numerische Discord User ID (18 Zeichen)</p>
+                    </div>
+                </div>
+                
+                <div class="jc-form-section">
+                    <h2>📝 Bewerbungsdaten</h2>
+                    
+                    <div class="jc-form-group">
+                        <label for="applicant_name">Name des Bewerbers *</label>
+                        <input type="text" id="applicant_name" name="applicant_name" required class="regular-text" placeholder="z.B. Max Mustermann">
+                    </div>
+                    
+                    <div class="jc-form-group">
+                        <label for="age">Alter *</label>
+                        <input type="text" id="age" name="age" required class="regular-text" placeholder="z.B. 25">
+                    </div>
+                    
+                    <div class="jc-form-group">
+                        <label for="social_activity">Social Media Aktivität *</label>
+                        <select id="social_activity" name="social_activity" required class="regular-text">
+                            <option value="">Bitte wählen...</option>
+                            <option value="täglich">Täglich</option>
+                            <option value="mehrmals pro Woche">Mehrmals pro Woche</option>
+                            <option value="einmal pro Woche">Einmal pro Woche</option>
+                            <option value="gelegentlich">Gelegentlich</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="jc-form-section">
+                    <h2>🌐 Social Media Kanäle</h2>
+                    <div id="social-channels-container">
+                        <div class="jc-social-channel-row">
+                            <select name="social_platforms[]" class="jc-platform-select">
+                                <option value="youtube">YouTube</option>
+                                <option value="twitch">Twitch</option>
+                                <option value="instagram">Instagram</option>
+                                <option value="tiktok">TikTok</option>
+                                <option value="twitter">Twitter/X</option>
+                                <option value="other">Andere</option>
+                            </select>
+                            <input type="url" name="social_urls[]" class="regular-text" placeholder="https://...">
+                            <button type="button" class="button jc-remove-channel" style="display:none;">❌</button>
+                        </div>
+                    </div>
+                    <button type="button" id="add-channel" class="button">➕ Weiteren Kanal hinzufügen</button>
+                    <p class="description">Mindestens einen Social Media Kanal hinzufügen</p>
+                </div>
+                
+                <div class="jc-form-section">
+                    <h2>💭 Motivation</h2>
+                    
+                    <div class="jc-form-group">
+                        <label for="motivation">Warum möchte die Person bei JustCreators mitmachen? *</label>
+                        <textarea id="motivation" name="motivation" required rows="6" class="large-text" placeholder="Beschreibe die Motivation..."></textarea>
+                    </div>
+                </div>
+                
+                <div class="jc-form-actions">
+                    <button type="submit" name="jc_create_manual_bewerbung" class="button button-primary button-hero">
+                        ✅ Bewerbung erstellen
+                    </button>
+                    <a href="<?php echo admin_url( 'admin.php?page=jc-bewerbungen' ); ?>" class="button button-secondary button-hero">
+                        ← Zurück zur Übersicht
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <style>
+        .jc-manual-bewerbung-wrap {
+            max-width: 900px;
+            margin: 20px auto;
+        }
+        
+        .jc-manual-form-container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .jc-form-section {
+            margin-bottom: 35px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .jc-form-section:last-of-type {
+            border-bottom: none;
+        }
+        
+        .jc-form-section h2 {
+            font-size: 20px;
+            margin: 0 0 20px 0;
+            color: #1e1f26;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .jc-form-group {
+            margin-bottom: 20px;
+        }
+        
+        .jc-form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2a2c36;
+        }
+        
+        .jc-form-group input[type="text"],
+        .jc-form-group input[type="url"],
+        .jc-form-group select,
+        .jc-form-group textarea {
+            width: 100%;
+            max-width: 600px;
+        }
+        
+        .jc-form-group .description {
+            margin-top: 5px;
+            color: #666;
+            font-size: 13px;
+        }
+        
+        .jc-social-channel-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        .jc-platform-select {
+            width: 150px !important;
+            max-width: 150px !important;
+        }
+        
+        .jc-social-channel-row input[type="url"] {
+            flex: 1;
+        }
+        
+        .jc-remove-channel {
+            padding: 6px 12px;
+            height: auto;
+            line-height: 1;
+        }
+        
+        .jc-form-actions {
+            margin-top: 30px;
+            padding-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .button-hero {
+            padding: 12px 24px !important;
+            height: auto !important;
+            font-size: 16px !important;
+        }
+    </style>
+    
+    <script>
+        jQuery(document).ready(function($) {
+            let channelCount = 1;
+            const maxChannels = 5;
+            
+            $('#add-channel').on('click', function() {
+                if (channelCount >= maxChannels) {
+                    alert('Maximal ' + maxChannels + ' Kanäle erlaubt!');
+                    return;
+                }
+                
+                const newRow = `
+                    <div class="jc-social-channel-row">
+                        <select name="social_platforms[]" class="jc-platform-select">
+                            <option value="youtube">YouTube</option>
+                            <option value="twitch">Twitch</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="tiktok">TikTok</option>
+                            <option value="twitter">Twitter/X</option>
+                            <option value="other">Andere</option>
+                        </select>
+                        <input type="url" name="social_urls[]" class="regular-text" placeholder="https://...">
+                        <button type="button" class="button jc-remove-channel">❌</button>
+                    </div>
+                `;
+                $('#social-channels-container').append(newRow);
+                channelCount++;
+                
+                if (channelCount > 1) {
+                    $('.jc-remove-channel').show();
+                }
+            });
+            
+            $(document).on('click', '.jc-remove-channel', function() {
+                $(this).closest('.jc-social-channel-row').remove();
+                channelCount--;
+                
+                if (channelCount === 1) {
+                    $('.jc-remove-channel').hide();
+                }
+            });
+        });
+    </script>
+    <?php
+}
+
 // ========================================
 // SESSION & DATABASE
 // ========================================
@@ -2195,6 +2537,13 @@ function jc_admin_bewerbungen_page() {
    
     echo '<div class="wrap jc-admin-wrap">';
     echo '<h1 class="jc-admin-title">🎮 Bewerbungen <span class="jc-count-badge">' . $total . '</span></h1>';
+    
+    // Button für neue Bewerbung
+    echo '<div style="margin-bottom: 20px;">';
+    echo '<a href="' . admin_url( 'admin.php?page=jc-new-bewerbung' ) . '" class="button button-primary button-large">';
+    echo '➕ Neue Bewerbung erstellen';
+    echo '</a>';
+    echo '</div>';
     
     // Zeige Delete-Nachricht wenn vorhanden
     if ( ! empty( $delete_message ) ) {
