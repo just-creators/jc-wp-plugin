@@ -2176,7 +2176,6 @@ function jc_admin_bewerbungen_page() {
             echo '<div class="notice notice-error"><p>❌ Sicherheitsprüfung fehlgeschlagen. Bitte versuche es erneut.</p></div>';
         }
     }
-    }
    
     $rows = $wpdb->get_results( "SELECT * FROM $table ORDER BY created_at DESC" );
    
