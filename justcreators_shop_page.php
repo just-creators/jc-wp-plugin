@@ -359,6 +359,25 @@ function jc_shop_get_user_shop( $discord_id ) {
 }
 
 function jc_shop_render_login() {
+    // Check if constants are defined
+    if ( ! defined( 'JC_SHOP_CLIENT_ID' ) || ! defined( 'JC_SHOP_CLIENT_SECRET' ) ) {
+        ?>
+        <div class="jc-wrap">
+            <div class="jc-hero">
+                <div class="jc-hero-left">
+                    <div class="jc-kicker">⚠️ Konfigurationsfehler</div>
+                    <h1 class="jc-hero-title">Discord OAuth nicht konfiguriert</h1>
+                    <p class="jc-hero-sub">Bitte füge in wp-config.php folgende Zeilen hinzu:</p>
+                    <pre style="background:#0b0f1d;padding:12px;border-radius:8px;overflow-x:auto;color:#e9ecf7;">define('JC_DISCORD_CLIENT_ID', 'DEINE_CLIENT_ID');
+define('JC_DISCORD_CLIENT_SECRET', 'DEIN_CLIENT_SECRET');</pre>
+                    <p class="jc-hero-sub">Redirect URI: <strong><?php echo esc_html( jc_shop_get_redirect_uri() ); ?></strong></p>
+                </div>
+            </div>
+        </div>
+        <?php
+        return;
+    }
+
     $auth_url = 'https://discord.com/api/oauth2/authorize?' . http_build_query( array(
         'client_id' => JC_SHOP_CLIENT_ID,
         'redirect_uri' => jc_shop_get_redirect_uri(),
