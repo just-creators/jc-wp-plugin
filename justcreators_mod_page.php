@@ -8,6 +8,28 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+// Gemeinsamer Admin-Parent für alle JustCreators Screens
+if ( ! defined( 'JC_ADMIN_PARENT_SLUG' ) ) {
+	define( 'JC_ADMIN_PARENT_SLUG', 'justcreators-hub' );
+}
+
+if ( ! function_exists( 'jc_register_parent_menu' ) ) {
+	function jc_register_parent_menu() {
+		add_menu_page(
+			'JustCreators',
+			'JustCreators',
+			'manage_options',
+			JC_ADMIN_PARENT_SLUG,
+			function() {
+				echo '<div class="wrap"><h1>JustCreators</h1><p>Wähle einen Unterpunkt aus der linken Navigation.</p></div>';
+			},
+			'dashicons-admin-multisite',
+			30
+		);
+	}
+	add_action( 'admin_menu', 'jc_register_parent_menu', 0 );
+}
+
 // Optionen
 define( 'JC_MODS_OPTION_KEY', 'jc_modrinth_mods' );
 define( 'JC_MODS_MC_VERSION_OPTION', 'jc_modrinth_mc_version' );
@@ -91,14 +113,13 @@ function jc_mods_get_css() {
 }
 
 function jc_mods_register_menu() {
-	add_menu_page(
+	add_submenu_page(
+		JC_ADMIN_PARENT_SLUG,
 		'JustCreators Mods',
 		'Mods',
 		'manage_options',
 		'jc-mods',
-		'jc_mods_render_admin_page',
-		'dashicons-admin-plugins',
-		58
+		'jc_mods_render_admin_page'
 	);
 }
 

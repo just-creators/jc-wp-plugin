@@ -11,6 +11,28 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JC_SHOP_TABLE', 'jc_shops' );
 define( 'JC_SHOP_REDIRECT_SLUG', 'shops' ); // Passe den Slug an die Seite mit dem Shortcode an
 
+// Gemeinsamer Admin-Parent für alle JustCreators Screens
+if ( ! defined( 'JC_ADMIN_PARENT_SLUG' ) ) {
+    define( 'JC_ADMIN_PARENT_SLUG', 'justcreators-hub' );
+}
+
+if ( ! function_exists( 'jc_register_parent_menu' ) ) {
+    function jc_register_parent_menu() {
+        add_menu_page(
+            'JustCreators',
+            'JustCreators',
+            'manage_options',
+            JC_ADMIN_PARENT_SLUG,
+            function() {
+                echo '<div class="wrap"><h1>JustCreators</h1><p>Wähle einen Unterpunkt aus der linken Navigation.</p></div>';
+            },
+            'dashicons-admin-multisite',
+            30
+        );
+    }
+    add_action( 'admin_menu', 'jc_register_parent_menu', 0 );
+}
+
 // OAuth: nutze Werte aus wp-config (JC_DISCORD_CLIENT_ID/SECRET) wie die anderen Pages, fallback auf Regeln-Constants
 if ( ! defined( 'JC_SHOP_CLIENT_ID' ) ) {
     if ( defined( 'JC_DISCORD_CLIENT_ID' ) ) {
@@ -730,14 +752,13 @@ function jc_shop_inline_styles() {
 // ============================================
 
 function jc_shop_admin_menu() {
-    add_menu_page(
+    add_submenu_page(
+        JC_ADMIN_PARENT_SLUG,
         'Shop Verwaltung',
         'Shops',
         'manage_options',
         'jc-shops',
-        'jc_shop_admin_page',
-        'dashicons-store',
-        30
+        'jc_shop_admin_page'
     );
 }
 
