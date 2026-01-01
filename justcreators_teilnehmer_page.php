@@ -54,6 +54,7 @@ function jc_teilnehmer_install() {
         display_name varchar(255) NOT NULL,
         title varchar(255) DEFAULT '',
         title_color varchar(7) DEFAULT '#6c7bff',
+        notes text DEFAULT NULL,
         social_channels longtext DEFAULT NULL,
         profile_image_url varchar(500) DEFAULT '',
         sort_order int(11) DEFAULT 0,
@@ -88,6 +89,12 @@ add_action( 'admin_init', function() {
     $has_color = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", 'title_color' ) );
     if ( ! $has_color ) {
         $wpdb->query( "ALTER TABLE $table_name ADD COLUMN title_color varchar(7) DEFAULT '#6c7bff'" );
+    }
+    
+    // notes Spalte
+    $has_notes = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", 'notes' ) );
+    if ( ! $has_notes ) {
+        $wpdb->query( "ALTER TABLE $table_name ADD COLUMN notes text DEFAULT NULL" );
     }
 });
 
@@ -149,6 +156,7 @@ function jc_teilnehmer_handle_actions() {
                 'display_name' => $display_name,
                 'title' => sanitize_text_field( $_POST['title'] ?? '' ),
                 'title_color' => sanitize_hex_color( $_POST['title_color'] ?? '#6c7bff' ),
+                'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
                 'social_channels' => wp_json_encode( $channels ),
                 'profile_image_url' => jc_teilnehmer_get_profile_image( $channels ),
                 'is_active' => 1,
@@ -168,6 +176,7 @@ function jc_teilnehmer_handle_actions() {
             'display_name' => sanitize_text_field( $_POST['display_name'] ),
             'title' => sanitize_text_field( $_POST['title'] ),
             'title_color' => sanitize_hex_color( $_POST['title_color'] ?? '#6c7bff' ),
+            'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
             'social_channels' => wp_json_encode( $channels ),
             'profile_image_url' => jc_teilnehmer_get_profile_image( $channels ), // Bild aktualisieren
             'is_active' => isset( $_POST['is_active'] ) ? 1 : 0
@@ -669,8 +678,15 @@ function jc_teilnehmer_render_admin_page() {
                     <input type="hidden" name="teilnehmer_id" value="<?php echo $row->id; ?>">
                     <table class="form-table">
                         <tr><th>Name</th><td><input name="display_name" value="<?php echo esc_attr( $row->display_name ); ?>" class="regular-text"></td></tr>
-                        <tr><th>Titel</th><td><input name="title" value="<?php echo esc_attr( $row->title ); ?>" class="regular-text"></td></tr>
+                        <tr><th>Titel</th><td>
+                            <input name="title" value="<?php echo esc_attr( $row->title ); ?>" class="regular-text" placeholder="Creator, Moderator">
+                            <p style="font-size:12px;color:#999;">Mehrere Titel mit Komma trennen. Beispiel: <code>Creator, Moderator</code></p>
+                        </td></tr>
                         <tr><th>Farbe der Rolle</th><td><input type="color" name="title_color" value="<?php echo esc_attr( $row->title_color ?? '#6c7bff' ); ?>" style="width:50px;height:40px;cursor:pointer;"></td></tr>
+                        <tr><th>Notizen</th><td>
+                            <textarea name="notes" rows="2" class="large-text" placeholder="Kurze Notiz für die Kachel"><?php echo esc_textarea( $row->notes ?? '' ); ?></textarea>
+                            <p style="font-size:12px;color:#999;">Wird klein unter dem Namen und Titel angezeigt</p>
+                        </td></tr>
                         <tr><th>Links</th><td>
                             <textarea name="social_channels" rows="5" class="large-text code" placeholder="Pro Zeile ein Link. Mit [image_only] markieren um nur für Profilbild zu nutzen."><?php echo esc_textarea( $txt ); ?></textarea>
                             <p style="font-size:12px;color:#999;">Beispiel: <code>[image_only] https://youtube.com/@mychannel</code> - Link wird nur für Profilbild verwendet</p>
@@ -694,10 +710,14 @@ function jc_teilnehmer_render_admin_page() {
             <h3>Neu hinzufügen</h3>
             <form method="post">
                 <?php wp_nonce_field( 'jc_teilnehmer_add' ); ?>
-                <p><input name="display_name" placeholder="Name *" required class="regular-text"> <input name="title" placeholder="Titel / Rolle (optional)" class="regular-text"></p>
+                <p><input name="display_name" placeholder="Name *" required class="regular-text"> <input name="title" placeholder="Creator, Moderator (optional)" class="regular-text"></p>
                 <p style="display:flex;gap:10px;align-items:center;">
                     <label>Farbe der Rolle:</label>
                     <input type="color" name="title_color" value="#6c7bff" style="width:50px;height:40px;cursor:pointer;">
+                    <span style="font-size:12px;color:#999;">Mehrere Titel mit Komma trennen</span>
+                </p>
+                <p>
+                    <textarea name="notes" rows="2" class="large-text" placeholder="Kurze Notiz (optional) - z.B. 'Spielt hauptsächlich Minecraft'"></textarea>
                 </p>
                 <p>
                     <textarea name="social_channels" rows="3" class="large-text code" placeholder="Links (optional) - Pro Zeile ein Link. Mit [image_only] nur für Profilbild.&#10;Beispiel: [image_only] https://youtube.com/@mychannel"></textarea>
@@ -744,11 +764,15 @@ function jc_teilnehmer_render_admin_page() {
                         <td><img src="<?php echo esc_url( $r->profile_image_url ); ?>" style="width:40px;height:40px;border-radius:50%;object-fit:cover;"></td>
                         <td><strong><?php echo esc_html( $r->display_name ); ?></strong></td>
                         <td>
-                            <?php if ( $r->title ) : ?>
-                                <span style="background-color:<?php echo esc_attr( $r->title_color ?? '#6c7bff' ); ?>;color:white;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:bold;">
-                                    <?php echo esc_html( $r->title ); ?>
+                            <?php if ( $r->title ) : 
+                                $titles = array_map('trim', explode(',', $r->title));
+                                foreach ( $titles as $single_title ) : 
+                                    if ( empty($single_title) ) continue;
+                            ?>
+                                <span style="background-color:<?php echo esc_attr( $r->title_color ?? '#6c7bff' ); ?>;color:white;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:bold;margin-right:4px;display:inline-block;">
+                                    <?php echo esc_html( $single_title ); ?>
                                 </span>
-                            <?php endif; ?>
+                            <?php endforeach; endif; ?>
                         </td>
                         <td><?php echo $cc; ?></td>
                         <td><input type="number" name="order[<?php echo $r->id; ?>]" value="<?php echo $r->sort_order; ?>" style="width:50px"></td>
@@ -826,10 +850,17 @@ function jc_teilnehmer_render_shortcode( $atts ) {
                     <img src="<?php echo esc_url( $card_image ); ?>" class="jc-av" alt="">
                     <div>
                         <h3 class="jc-name"><?php echo esc_html( $card_name ); ?></h3>
-                        <?php if ( $t->title ) : ?>
-                            <span style="display:inline-block;background-color:<?php echo esc_attr( $t->title_color ?? '#6c7bff' ); ?>;color:white;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;margin-top:4px;">
-                                <?php echo esc_html( $t->title ); ?>
+                        <?php if ( $t->title ) : 
+                            $titles = array_map('trim', explode(',', $t->title));
+                            foreach ( $titles as $single_title ) : 
+                                if ( empty($single_title) ) continue;
+                        ?>
+                            <span style="display:inline-block;background-color:<?php echo esc_attr( $t->title_color ?? '#6c7bff' ); ?>;color:white;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;margin-top:4px;margin-right:4px;">
+                                <?php echo esc_html( $single_title ); ?>
                             </span>
+                        <?php endforeach; endif; ?>
+                        <?php if ( !empty($t->notes) ) : ?>
+                            <p style="font-size:12px;color:var(--jc-muted);margin:6px 0 0;line-height:1.4;"><?php echo esc_html( $t->notes ); ?></p>
                         <?php endif; ?>
                     </div>
                 </div>
