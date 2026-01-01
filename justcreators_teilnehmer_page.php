@@ -53,6 +53,7 @@ function jc_teilnehmer_install() {
         application_id bigint(20) DEFAULT NULL,
         display_name varchar(255) NOT NULL,
         title varchar(255) DEFAULT '',
+        title_color varchar(7) DEFAULT '#6c7bff',
         social_channels longtext DEFAULT NULL,
         profile_image_url varchar(500) DEFAULT '',
         sort_order int(11) DEFAULT 0,
@@ -75,10 +76,18 @@ function jc_teilnehmer_install() {
 add_action( 'admin_init', function() {
     global $wpdb;
     $table_name = $wpdb->prefix . JC_TEILNEHMER_TABLE;
+    
+    // application_id Spalte
     $has_column = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", 'application_id' ) );
     if ( ! $has_column ) {
         $wpdb->query( "ALTER TABLE $table_name ADD COLUMN application_id bigint(20) DEFAULT NULL" );
         $wpdb->query( "ALTER TABLE $table_name ADD UNIQUE KEY application_id (application_id)" );
+    }
+    
+    // title_color Spalte
+    $has_color = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", 'title_color' ) );
+    if ( ! $has_color ) {
+        $wpdb->query( "ALTER TABLE $table_name ADD COLUMN title_color varchar(7) DEFAULT '#6c7bff'" );
     }
 });
 
@@ -139,6 +148,7 @@ function jc_teilnehmer_handle_actions() {
             $wpdb->insert( $table, array(
                 'display_name' => $display_name,
                 'title' => sanitize_text_field( $_POST['title'] ?? '' ),
+                'title_color' => sanitize_hex_color( $_POST['title_color'] ?? '#6c7bff' ),
                 'social_channels' => wp_json_encode( $channels ),
                 'profile_image_url' => jc_teilnehmer_get_profile_image( $channels ),
                 'is_active' => 1,
@@ -157,6 +167,7 @@ function jc_teilnehmer_handle_actions() {
         $wpdb->update( $table, array(
             'display_name' => sanitize_text_field( $_POST['display_name'] ),
             'title' => sanitize_text_field( $_POST['title'] ),
+            'title_color' => sanitize_hex_color( $_POST['title_color'] ?? '#6c7bff' ),
             'social_channels' => wp_json_encode( $channels ),
             'profile_image_url' => jc_teilnehmer_get_profile_image( $channels ), // Bild aktualisieren
             'is_active' => isset( $_POST['is_active'] ) ? 1 : 0
@@ -246,6 +257,15 @@ function jc_teilnehmer_handle_actions() {
         }
         
         add_settings_error( 'jc_teilnehmer', 'full_reload', "✅ Alle Daten von APIs neu geladen ($updated Einträge: Namen + Bilder aktualisiert).", 'updated' );
+    }
+    
+    // Alle Rollen/Titel entfernen
+    if ( isset( $_POST['jc_teilnehmer_clear_all_titles'] ) ) {
+        check_admin_referer( 'jc_teilnehmer_clear_all_titles' );
+        
+        $wpdb->query( "UPDATE $table SET title = '', title_color = '#6c7bff'" );
+        
+        add_settings_error( 'jc_teilnehmer', 'titles_cleared', "✅ Alle Rollen/Titel entfernt.", 'updated' );
     }
 }
 
@@ -634,6 +654,7 @@ function jc_teilnehmer_render_admin_page() {
                     <table class="form-table">
                         <tr><th>Name</th><td><input name="display_name" value="<?php echo esc_attr( $row->display_name ); ?>" class="regular-text"></td></tr>
                         <tr><th>Titel</th><td><input name="title" value="<?php echo esc_attr( $row->title ); ?>" class="regular-text"></td></tr>
+                        <tr><th>Farbe der Rolle</th><td><input type="color" name="title_color" value="<?php echo esc_attr( $row->title_color ?? '#6c7bff' ); ?>" style="width:50px;height:40px;cursor:pointer;"></td></tr>
                         <tr><th>Links</th><td><textarea name="social_channels" rows="5" class="large-text code"><?php echo esc_textarea( $txt ); ?></textarea></td></tr>
                         <tr><th>Aktiv</th><td><input type="checkbox" name="is_active" value="1" <?php checked( $row->is_active, 1 ); ?>></td></tr>
                     </table>
@@ -654,7 +675,11 @@ function jc_teilnehmer_render_admin_page() {
             <h3>Neu hinzufügen</h3>
             <form method="post">
                 <?php wp_nonce_field( 'jc_teilnehmer_add' ); ?>
-                <p><input name="display_name" placeholder="Name *" required class="regular-text"> <input name="title" placeholder="Titel" class="regular-text"></p>
+                <p><input name="display_name" placeholder="Name *" required class="regular-text"> <input name="title" placeholder="Titel / Rolle" class="regular-text"></p>
+                <p style="display:flex;gap:10px;align-items:center;">
+                    <label>Farbe der Rolle:</label>
+                    <input type="color" name="title_color" value="#6c7bff" style="width:50px;height:40px;cursor:pointer;">
+                </p>
                 <p><textarea name="social_channels" rows="3" class="large-text code" placeholder="Links (YouTube, Twitch...)"></textarea></p>
                 <button type="submit" name="jc_teilnehmer_add" class="button button-primary">Hinzufügen</button>
             </form>
@@ -675,6 +700,11 @@ function jc_teilnehmer_render_admin_page() {
                 <?php wp_nonce_field( 'jc_teilnehmer_full_reload' ); ?>
                 <button type="submit" name="jc_teilnehmer_full_reload" class="button button-primary">⚡ Kompletter API Reload</button>
             </form>
+            
+            <form method="post" style="margin:0;" onsubmit="return confirm('⚠️ Alle Rollen/Titel werden entfernt!\n\nFortfahren?')">
+                <?php wp_nonce_field( 'jc_teilnehmer_clear_all_titles' ); ?>
+                <button type="submit" name="jc_teilnehmer_clear_all_titles" class="button" style="color:#cc0000;">✖️ Alle Rollen entfernen</button>
+            </form>
         </div>
 
         <form method="post">
@@ -691,7 +721,13 @@ function jc_teilnehmer_render_admin_page() {
                     <tr style="<?php echo $r->is_active ? '' : 'opacity:0.6'; ?>">
                         <td><img src="<?php echo esc_url( $r->profile_image_url ); ?>" style="width:40px;height:40px;border-radius:50%;object-fit:cover;"></td>
                         <td><strong><?php echo esc_html( $r->display_name ); ?></strong></td>
-                        <td><?php echo esc_html( $r->title ); ?></td>
+                        <td>
+                            <?php if ( $r->title ) : ?>
+                                <span style="background-color:<?php echo esc_attr( $r->title_color ?? '#6c7bff' ); ?>;color:white;padding:4px 8px;border-radius:4px;font-size:12px;font-weight:bold;">
+                                    <?php echo esc_html( $r->title ); ?>
+                                </span>
+                            <?php endif; ?>
+                        </td>
                         <td><?php echo $cc; ?></td>
                         <td><input type="number" name="order[<?php echo $r->id; ?>]" value="<?php echo $r->sort_order; ?>" style="width:50px"></td>
                         <td>
@@ -768,6 +804,11 @@ function jc_teilnehmer_render_shortcode( $atts ) {
                     <img src="<?php echo esc_url( $card_image ); ?>" class="jc-av" alt="">
                     <div>
                         <h3 class="jc-name"><?php echo esc_html( $card_name ); ?></h3>
+                        <?php if ( $t->title ) : ?>
+                            <span style="display:inline-block;background-color:<?php echo esc_attr( $t->title_color ?? '#6c7bff' ); ?>;color:white;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:bold;margin-top:4px;">
+                                <?php echo esc_html( $t->title ); ?>
+                            </span>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="jc-socials">
