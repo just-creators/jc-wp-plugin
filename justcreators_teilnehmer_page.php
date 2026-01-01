@@ -690,7 +690,7 @@ function jc_teilnehmer_add_from_application( $app ) {
     $wpdb->insert( $target, array(
         'application_id' => $app->id,
         'display_name' => $name,
-        'title' => '',
+        'title' => 'Creator',
         'social_channels' => wp_json_encode( array_values( array_filter( $ch ) ) ),
         'profile_image_url' => ! empty( $meta['image'] ) ? $meta['image'] : jc_teilnehmer_get_profile_image( $ch ),
         'is_active' => 1
