@@ -780,7 +780,7 @@ function jc_teilnehmer_render_shortcode( $atts ) {
                 <p class="jc-hero-sub">Entdecke die Kanäle der Creator.</p>
             </div>
             <div class="jc-hero-right">
-                <div class="jc-hero-badge"><?php echo count($rows); ?> CREATORS</div>
+                <div class="jc-hero-badge"><?php echo count($rows); ?> CREATOR</div>
             </div>
         </div>
 
