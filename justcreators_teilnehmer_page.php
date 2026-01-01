@@ -201,6 +201,46 @@ function jc_teilnehmer_handle_actions() {
         }
         add_settings_error( 'jc_teilnehmer', 'order', 'Reihenfolge gespeichert.', 'updated' );
     }
+    
+    // Reihenfolge nach oben
+    if ( isset( $_POST['jc_teilnehmer_move_up'], $_POST['teilnehmer_id'] ) ) {
+        $id = intval( $_POST['teilnehmer_id'] );
+        check_admin_referer( 'jc_teilnehmer_move_' . $id );
+        
+        $current = $wpdb->get_row( $wpdb->prepare( "SELECT id, sort_order FROM $table WHERE id = %d", $id ) );
+        if ( $current ) {
+            $prev = $wpdb->get_row( $wpdb->prepare( 
+                "SELECT id, sort_order FROM $table WHERE sort_order < %d ORDER BY sort_order DESC LIMIT 1", 
+                $current->sort_order 
+            ) );
+            
+            if ( $prev ) {
+                $wpdb->update( $table, array( 'sort_order' => $prev->sort_order ), array( 'id' => $current->id ) );
+                $wpdb->update( $table, array( 'sort_order' => $current->sort_order ), array( 'id' => $prev->id ) );
+                add_settings_error( 'jc_teilnehmer', 'moved', 'Nach oben verschoben.', 'updated' );
+            }
+        }
+    }
+    
+    // Reihenfolge nach unten
+    if ( isset( $_POST['jc_teilnehmer_move_down'], $_POST['teilnehmer_id'] ) ) {
+        $id = intval( $_POST['teilnehmer_id'] );
+        check_admin_referer( 'jc_teilnehmer_move_' . $id );
+        
+        $current = $wpdb->get_row( $wpdb->prepare( "SELECT id, sort_order FROM $table WHERE id = %d", $id ) );
+        if ( $current ) {
+            $next = $wpdb->get_row( $wpdb->prepare( 
+                "SELECT id, sort_order FROM $table WHERE sort_order > %d ORDER BY sort_order ASC LIMIT 1", 
+                $current->sort_order 
+            ) );
+            
+            if ( $next ) {
+                $wpdb->update( $table, array( 'sort_order' => $next->sort_order ), array( 'id' => $current->id ) );
+                $wpdb->update( $table, array( 'sort_order' => $current->sort_order ), array( 'id' => $next->id ) );
+                add_settings_error( 'jc_teilnehmer', 'moved', 'Nach unten verschoben.', 'updated' );
+            }
+        }
+    }
 
     // Import
     if ( isset( $_POST['jc_teilnehmer_import_from_db'] ) ) {
@@ -752,11 +792,11 @@ function jc_teilnehmer_render_admin_page() {
         <form method="post">
             <?php wp_nonce_field( 'jc_teilnehmer_order' ); ?>
             <table class="wp-list-table widefat fixed striped">
-                <thead><tr><th width="50">Bild</th><th>Name</th><th>Titel</th><th>Kanäle</th><th width="60">Sort</th><th width="120">Aktionen</th></tr></thead>
+                <thead><tr><th width="50">Bild</th><th>Name</th><th>Titel</th><th>Kanäle</th><th width="100">Reihenfolge</th><th width="180">Aktionen</th></tr></thead>
                 <tbody>
                     <?php 
                     $rows = $wpdb->get_results( "SELECT * FROM $table ORDER BY sort_order ASC, display_name ASC" );
-                    if ( empty( $rows ) ) echo '<tr><td colspan="6">Keine Teilnehmer.</td></tr>';
+                    if ( empty( $rows ) ) echo '<tr><td colspan="7">Keine Teilnehmer.</td></tr>';
                     foreach ( $rows as $r ) : 
                         $cc = count( json_decode( $r->social_channels, true ) ?: [] );
                     ?>
@@ -775,7 +815,18 @@ function jc_teilnehmer_render_admin_page() {
                             <?php endforeach; endif; ?>
                         </td>
                         <td><?php echo $cc; ?></td>
-                        <td><input type="number" name="order[<?php echo $r->id; ?>]" value="<?php echo $r->sort_order; ?>" style="width:50px"></td>
+                        <td>
+                            <form method="post" style="display:inline;">
+                                <?php wp_nonce_field( 'jc_teilnehmer_move_' . $r->id ); ?>
+                                <input type="hidden" name="teilnehmer_id" value="<?php echo $r->id; ?>">
+                                <button type="submit" name="jc_teilnehmer_move_up" class="button button-small" title="Nach oben">↑</button>
+                            </form>
+                            <form method="post" style="display:inline;">
+                                <?php wp_nonce_field( 'jc_teilnehmer_move_' . $r->id ); ?>
+                                <input type="hidden" name="teilnehmer_id" value="<?php echo $r->id; ?>">
+                                <button type="submit" name="jc_teilnehmer_move_down" class="button button-small" title="Nach unten">↓</button>
+                            </form>
+                        </td>
                         <td>
                             <a href="?page=jc-teilnehmer&edit=<?php echo $r->id; ?>" class="button button-small">Edit</a>
                             <form method="post" style="display:inline; margin-left:4px;" onsubmit="return confirm('Löschen?');">
