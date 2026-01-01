@@ -648,9 +648,9 @@ function jc_mods_render_shortcode() {
 	<div class="jc-wrap">
 		<section class="jc-hero">
 			<div class="jc-hero-left">
-				<div class="jc-kicker">Multi-Loader Support · MC <?php echo esc_html( $mc_version ); ?></div>
+				<div class="jc-kicker">Erlaubte Mods · MC <?php echo esc_html( $mc_version ); ?></div>
 				<h1 class="jc-hero-title">JustCreators Mod Hub</h1>
-				<p class="jc-hero-sub">Kuratiertes Mod-Paket im JustCreators Look. Filtere nach Fabric, Forge oder NeoForge - unverfügbare Mods werden automatisch markiert.</p>
+				<p class="jc-hero-sub">Alle erlaubten Mods auf JustCreators. Filtere nach Fabric, Forge oder NeoForge.</p>
 				<div class="jc-hero-actions">
 					<div class="jc-pill">MC Version: <strong><?php echo esc_html( $mc_version ); ?></strong></div>
 					<div class="jc-pill jc-pill-ghost">Fabric · Forge · NeoForge</div>
@@ -665,7 +665,7 @@ function jc_mods_render_shortcode() {
 		<section class="jc-toolbar">
 			<div class="jc-search">
 				<span class="jc-search-icon">🔍</span>
-				<input id="jc-mods-search" type="search" placeholder="Mods oder Autoren suchen..." aria-label="Mods suchen" />
+				<input id="jc-mods-search" type="search" placeholder="Mods suchen..." aria-label="Mods suchen" />
 			</div>
 			<div class="jc-loader-filters">
 				<button class="jc-filter-btn active" data-loader="fabric">Fabric</button>
@@ -722,14 +722,14 @@ function jc_mods_render_shortcode() {
 		<section class="jc-callout">
 			<div>
 				<h3>Neue Mod vorschlagen</h3>
-				<p>Schreib im Teilnehmer-Discord, welche Fabric-Mod du brauchst. Unser Team prüft und fügt sie bei Freigabe hinzu.</p>
+				<p>Schreib im Teilnehmer-Discord, welche Mod du brauchst. Unser Team prüft und fügt sie bei Freigabe hinzu.</p>
 			</div>
 		</section>
 
 		<section class="jc-callout jc-modpack">
 			<div>
 				<h3>JustCreators Modpack auf Modrinth</h3>
-				<p>Alle freigegebenen Mods gesammelt als Modpack. Perfekt zum Komplett-Download.</p>
+				<p>Dieses Modpack ist nicht verpflichtend für die Teilnahme bei JustCreators.</p>
 			</div>
 			<div>
 				<a class="jc-btn" href="<?php echo esc_url( JC_MODS_MODPACK_URL ); ?>" target="_blank" rel="noopener noreferrer">Modpack ansehen</a>
