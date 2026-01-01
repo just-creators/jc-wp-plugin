@@ -279,11 +279,19 @@ function jc_teilnehmer_parse_channels( $input ) {
     if ( is_array( $decoded ) ) return $decoded;
 
     // Sonst Zeile für Zeile
+    // Format: [image_only] URL
     $lines = explode( "\n", $input );
     $channels = array();
     foreach ( $lines as $line ) {
         $line = trim( $line );
         if ( empty( $line ) ) continue;
+        
+        $image_only = false;
+        // Prüfe auf [image_only] Marker am Anfang
+        if ( strpos( $line, '[image_only]' ) === 0 ) {
+            $image_only = true;
+            $line = trim( substr( $line, strlen( '[image_only]' ) ) );
+        }
         
         $platform = 'unknown';
         if ( stripos( $line, 'youtube' ) !== false || stripos( $line, 'youtu.be' ) !== false ) $platform = 'youtube';
@@ -292,7 +300,7 @@ function jc_teilnehmer_parse_channels( $input ) {
         elseif ( stripos( $line, 'instagram' ) !== false ) $platform = 'instagram';
         elseif ( stripos( $line, 'twitter' ) !== false || stripos( $line, 'x.com' ) !== false ) $platform = 'twitter';
 
-        $channels[] = array( 'platform' => $platform, 'url' => $line );
+        $channels[] = array( 'platform' => $platform, 'url' => $line, 'image_only' => $image_only );
     }
     return $channels;
 }
@@ -644,7 +652,15 @@ function jc_teilnehmer_render_admin_page() {
         if ( $row ) {
             $chs = json_decode( $row->social_channels, true );
             $txt = '';
-            if ( is_array( $chs ) ) foreach( $chs as $c ) $txt .= $c['url'] . "\n";
+            if ( is_array( $chs ) ) {
+                foreach( $chs as $c ) {
+                    if ( isset( $c['image_only'] ) && $c['image_only'] ) {
+                        $txt .= '[image_only] ' . $c['url'] . "\n";
+                    } else {
+                        $txt .= $c['url'] . "\n";
+                    }
+                }
+            }
             ?>
             <div class="wrap">
                 <h1>Bearbeiten: <?php echo esc_html( $row->display_name ); ?></h1>
@@ -655,7 +671,10 @@ function jc_teilnehmer_render_admin_page() {
                         <tr><th>Name</th><td><input name="display_name" value="<?php echo esc_attr( $row->display_name ); ?>" class="regular-text"></td></tr>
                         <tr><th>Titel</th><td><input name="title" value="<?php echo esc_attr( $row->title ); ?>" class="regular-text"></td></tr>
                         <tr><th>Farbe der Rolle</th><td><input type="color" name="title_color" value="<?php echo esc_attr( $row->title_color ?? '#6c7bff' ); ?>" style="width:50px;height:40px;cursor:pointer;"></td></tr>
-                        <tr><th>Links</th><td><textarea name="social_channels" rows="5" class="large-text code"><?php echo esc_textarea( $txt ); ?></textarea></td></tr>
+                        <tr><th>Links</th><td>
+                            <textarea name="social_channels" rows="5" class="large-text code" placeholder="Pro Zeile ein Link. Mit [image_only] markieren um nur für Profilbild zu nutzen."><?php echo esc_textarea( $txt ); ?></textarea>
+                            <p style="font-size:12px;color:#999;">Beispiel: <code>[image_only] https://youtube.com/@mychannel</code> - Link wird nur für Profilbild verwendet</p>
+                        </td></tr>
                         <tr><th>Aktiv</th><td><input type="checkbox" name="is_active" value="1" <?php checked( $row->is_active, 1 ); ?>></td></tr>
                     </table>
                     <p class="submit"><button type="submit" name="jc_teilnehmer_edit" class="button button-primary">Speichern</button> <a href="?page=jc-teilnehmer" class="button">Zurück</a></p>
@@ -675,12 +694,15 @@ function jc_teilnehmer_render_admin_page() {
             <h3>Neu hinzufügen</h3>
             <form method="post">
                 <?php wp_nonce_field( 'jc_teilnehmer_add' ); ?>
-                <p><input name="display_name" placeholder="Name *" required class="regular-text"> <input name="title" placeholder="Titel / Rolle" class="regular-text"></p>
+                <p><input name="display_name" placeholder="Name *" required class="regular-text"> <input name="title" placeholder="Titel / Rolle (optional)" class="regular-text"></p>
                 <p style="display:flex;gap:10px;align-items:center;">
                     <label>Farbe der Rolle:</label>
                     <input type="color" name="title_color" value="#6c7bff" style="width:50px;height:40px;cursor:pointer;">
                 </p>
-                <p><textarea name="social_channels" rows="3" class="large-text code" placeholder="Links (YouTube, Twitch...)"></textarea></p>
+                <p>
+                    <textarea name="social_channels" rows="3" class="large-text code" placeholder="Links (optional) - Pro Zeile ein Link. Mit [image_only] nur für Profilbild.&#10;Beispiel: [image_only] https://youtube.com/@mychannel"></textarea>
+                    <p style="font-size:12px;color:#999;">Kanäle sind optional. Mit <code>[image_only]</code> vor einem Link wird dieser nur für das Profilbild verwendet und nicht im Frontend angezeigt.</p>
+                </p>
                 <button type="submit" name="jc_teilnehmer_add" class="button button-primary">Hinzufügen</button>
             </form>
         </div>
@@ -813,6 +835,9 @@ function jc_teilnehmer_render_shortcode( $atts ) {
                 </div>
                 <div class="jc-socials">
                     <?php foreach ( $chs as $c ) : 
+                        // Überspringe Kanäle, die nur für das Profilbild sind
+                        if ( isset( $c['image_only'] ) && $c['image_only'] ) continue;
+                        
                         $plat = $c['platform'] ?? 'web';
                         $url = $c['url'] ?? '#';
                         $label = ucfirst($plat);
