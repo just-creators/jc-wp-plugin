@@ -55,6 +55,7 @@ function jc_teilnehmer_install() {
         title varchar(255) DEFAULT '',
         title_color varchar(7) DEFAULT '#6c7bff',
         notes text DEFAULT NULL,
+        `group` varchar(100) DEFAULT NULL,
         social_channels longtext DEFAULT NULL,
         profile_image_url varchar(500) DEFAULT '',
         sort_order int(11) DEFAULT 0,
@@ -64,7 +65,8 @@ function jc_teilnehmer_install() {
         PRIMARY KEY (id),
         UNIQUE KEY application_id (application_id),
         KEY sort_order (sort_order),
-        KEY is_active (is_active)
+        KEY is_active (is_active),
+        KEY `group` (`group`)
     ) $charset_collate;";
 
     require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
@@ -95,6 +97,13 @@ add_action( 'admin_init', function() {
     $has_notes = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", 'notes' ) );
     if ( ! $has_notes ) {
         $wpdb->query( "ALTER TABLE $table_name ADD COLUMN notes text DEFAULT NULL" );
+    }
+    
+    // group Spalte
+    $has_group = $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", 'group' ) );
+    if ( ! $has_group ) {
+        $wpdb->query( "ALTER TABLE $table_name ADD COLUMN `group` varchar(100) DEFAULT NULL" );
+        $wpdb->query( "ALTER TABLE $table_name ADD KEY `group` (`group`)" );
     }
 });
 
@@ -157,6 +166,7 @@ function jc_teilnehmer_handle_actions() {
                 'title' => sanitize_text_field( $_POST['title'] ?? '' ),
                 'title_color' => sanitize_hex_color( $_POST['title_color'] ?? '#6c7bff' ),
                 'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
+                '`group`' => sanitize_text_field( $_POST['group'] ?? '' ) ?: NULL,
                 'social_channels' => wp_json_encode( $channels ),
                 'profile_image_url' => jc_teilnehmer_get_profile_image( $channels ),
                 'is_active' => 1,
@@ -177,6 +187,7 @@ function jc_teilnehmer_handle_actions() {
             'title' => sanitize_text_field( $_POST['title'] ),
             'title_color' => sanitize_hex_color( $_POST['title_color'] ?? '#6c7bff' ),
             'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
+            '`group`' => sanitize_text_field( $_POST['group'] ?? '' ) ?: NULL,
             'social_channels' => wp_json_encode( $channels ),
             'profile_image_url' => jc_teilnehmer_get_profile_image( $channels ), // Bild aktualisieren
             'is_active' => isset( $_POST['is_active'] ) ? 1 : 0
@@ -727,6 +738,10 @@ function jc_teilnehmer_render_admin_page() {
                             <textarea name="notes" rows="2" class="large-text" placeholder="Kurze Notiz für die Kachel"><?php echo esc_textarea( $row->notes ?? '' ); ?></textarea>
                             <p style="font-size:12px;color:#999;">Wird klein unter dem Namen und Titel angezeigt</p>
                         </td></tr>
+                        <tr><th>Gruppe</th><td>
+                            <input name="group" value="<?php echo esc_attr( $row->group ?? '' ); ?>" class="regular-text" placeholder="z.B. Team (optional)">
+                            <p style="font-size:12px;color:#999;">Teilnehmer mit gleicher Gruppe werden oben angezeigt</p>
+                        </td></tr>
                         <tr><th>Links</th><td>
                             <textarea name="social_channels" rows="5" class="large-text code" placeholder="Pro Zeile ein Link. Mit [image_only] markieren um nur für Profilbild zu nutzen."><?php echo esc_textarea( $txt ); ?></textarea>
                             <p style="font-size:12px;color:#999;">Beispiel: <code>[image_only] https://youtube.com/@mychannel</code> - Link wird nur für Profilbild verwendet</p>
@@ -758,6 +773,10 @@ function jc_teilnehmer_render_admin_page() {
                 </p>
                 <p>
                     <textarea name="notes" rows="2" class="large-text" placeholder="Kurze Notiz (optional) - z.B. 'Spielt hauptsächlich Minecraft'"></textarea>
+                </p>
+                <p>
+                    <input name="group" placeholder="Gruppe (optional) - z.B. Team" class="regular-text">
+                    <p style="font-size:12px;color:#999;">Teilnehmer mit gleicher Gruppe werden oben angezeigt</p>
                 </p>
                 <p>
                     <textarea name="social_channels" rows="3" class="large-text code" placeholder="Links (optional) - Pro Zeile ein Link. Mit [image_only] nur für Profilbild.&#10;Beispiel: [image_only] https://youtube.com/@mychannel"></textarea>
@@ -792,11 +811,11 @@ function jc_teilnehmer_render_admin_page() {
         <form method="post">
             <?php wp_nonce_field( 'jc_teilnehmer_order' ); ?>
             <table class="wp-list-table widefat fixed striped">
-                <thead><tr><th width="50">Bild</th><th>Name</th><th>Titel</th><th>Kanäle</th><th width="100">Reihenfolge</th><th width="180">Aktionen</th></tr></thead>
+                <thead><tr><th width="50">Bild</th><th>Name</th><th>Titel</th><th width="80">Gruppe</th><th>Kanäle</th><th width="100">Reihenfolge</th><th width="180">Aktionen</th></tr></thead>
                 <tbody>
                     <?php 
-                    $rows = $wpdb->get_results( "SELECT * FROM $table ORDER BY sort_order ASC, display_name ASC" );
-                    if ( empty( $rows ) ) echo '<tr><td colspan="7">Keine Teilnehmer.</td></tr>';
+                    $rows = $wpdb->get_results( "SELECT * FROM $table ORDER BY (`group` IS NULL OR `group` = ''), `group` ASC, sort_order ASC, display_name ASC" );
+                    if ( empty( $rows ) ) echo '<tr><td colspan="8">Keine Teilnehmer.</td></tr>';
                     foreach ( $rows as $r ) : 
                         $cc = count( json_decode( $r->social_channels, true ) ?: [] );
                     ?>
@@ -814,6 +833,7 @@ function jc_teilnehmer_render_admin_page() {
                                 </span>
                             <?php endforeach; endif; ?>
                         </td>
+                        <td><?php echo $r->group ? '<span style="background:#888;color:white;padding:3px 8px;border-radius:3px;font-size:11px;">' . esc_html($r->group) . '</span>' : '—'; ?></td>
                         <td><?php echo $cc; ?></td>
                         <td>
                             <form method="post" style="display:inline;">
@@ -856,7 +876,7 @@ function jc_teilnehmer_render_shortcode( $atts ) {
 
     $sql = "SELECT * FROM $table WHERE 1=1";
     if ( ! $atts['show_inactive'] ) $sql .= " AND is_active = 1";
-    $sql .= " ORDER BY sort_order ASC, display_name ASC";
+    $sql .= " ORDER BY (`group` IS NULL OR `group` = ''), `group` ASC, sort_order ASC, display_name ASC";
     if ( $atts['limit'] > 0 ) $sql .= " LIMIT " . intval( $atts['limit'] );
 
     $rows = $wpdb->get_results( $sql );
