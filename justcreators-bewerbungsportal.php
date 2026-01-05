@@ -3185,8 +3185,7 @@ function jc_application_countdown_shortcode() {
     
     <?php
     return ob_get_clean();
-}
-);
+} );
 
 // ========================================
 // KONTAKT-SEITE / CONTACT FORM
