@@ -143,6 +143,21 @@ function jc_mods_handle_actions() {
 			update_option( JC_MODS_MC_VERSION_OPTION, $version );
 			add_settings_error( 'jc_mods', 'jc_mods_version_saved', 'Minecraft-Version gespeichert.', 'updated' );
 		}
+
+		// Save fallback icon URL
+		if ( isset( $_POST['jc_mods_save_fallback_icon'] ) ) {
+			check_admin_referer( 'jc_mods_fallback_icon' );
+			$fallback = isset( $_POST['jc_mods_fallback_icon_url'] ) ? esc_url_raw( wp_unslash( $_POST['jc_mods_fallback_icon_url'] ) ) : '';
+			if ( $fallback ) {
+				update_option( 'jc_mods_fallback_icon', $fallback );
+				// Clear cached icon transients so change is visible immediately
+				global $wpdb;
+				$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_jc_mod_icon_%'" );
+				add_settings_error( 'jc_mods', 'jc_mods_fallback_saved', 'Fallback-Icon gespeichert.', 'updated' );
+			} else {
+				add_settings_error( 'jc_mods', 'jc_mods_fallback_empty', 'Ungültige URL.', 'error' );
+			}
+		}
 	}
 
 	if ( isset( $_POST['jc_mods_import_config'] ) ) {
@@ -247,6 +262,7 @@ function jc_mods_render_admin_page() {
 
 	$mods       = jc_mods_get_list();
 	$mc_version = get_option( JC_MODS_MC_VERSION_OPTION, '1.21.1' );
+	$fallback_icon = get_option( 'jc_mods_fallback_icon', 'https://avatars.githubusercontent.com/u/105741850?v=4' );
 
 	settings_errors( 'jc_mods' );
 	?>
@@ -284,6 +300,17 @@ function jc_mods_render_admin_page() {
 			</div>
 		</div>
 
+		<div class="jc-admin-card" style="background:#0f1220;padding:20px;border-radius:14px;border:1px solid #1f2740;box-shadow:0 16px 40px rgba(0,0,0,0.35);margin-top:12px;">
+			<h2 style="margin:0 0 8px;color:#f8f9ff;">Fallback Icon</h2>
+			<p style="margin:0 0 14px;color:#9eb3d5;">Wenn das Modrinth-Icon das Default-Logo ist oder nicht geladen werden kann, wird dieses Bild verwendet.</p>
+			<form method="post" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+				<?php wp_nonce_field( 'jc_mods_fallback_icon' ); ?>
+				<input type="text" name="jc_mods_fallback_icon_url" value="<?php echo esc_attr( $fallback_icon ); ?>" class="regular-text" placeholder="https://example.com/fallback.png" style="flex:1;min-width:220px;">
+				<button type="submit" name="jc_mods_save_fallback_icon" class="button">Speichern</button>
+			</form>
+			<p style="margin-top:8px;color:#9eb3d5;">Standard: <code>https://avatars.githubusercontent.com/u/105741850?v=4</code></p>
+		</div>
+
 		<h2 style="margin:26px 0 12px;">Aktive Mods</h2>
 		<?php if ( empty( $mods ) ) : ?>
 			<p>Keine Mods hinterlegt. Füge die erste Mod oben hinzu.</p>
@@ -291,7 +318,7 @@ function jc_mods_render_admin_page() {
 			<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
 				<?php foreach ( $mods as $mod ) : ?>
 					<div style="background:#0f1220;border:1px solid #1f2740;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;box-shadow:0 12px 32px rgba(0,0,0,0.3);">
-						<img src="<?php echo esc_url( $mod['icon_url'] ); ?>" alt="<?php echo esc_attr( $mod['title'] ); ?>" style="width:52px;height:52px;border-radius:12px;object-fit:cover;background:#0a0c16;">
+						<img src="<?php echo esc_url( jc_mods_validate_icon_url( $mod['icon_url'] ) ); ?>" alt="<?php echo esc_attr( $mod['title'] ); ?>" style="width:52px;height:52px;border-radius:12px;object-fit:cover;background:#0a0c16;">
 						<div style="flex:1;">
 							<strong style="display:block;color:#f4f6ff;"><?php echo esc_html( $mod['title'] ); ?></strong>
 							<span style="color:#9eb3d5;font-size:12px;display:block;margin-top:2px;">von <?php echo esc_html( $mod['author'] ); ?></span>
@@ -314,6 +341,56 @@ function jc_mods_render_admin_page() {
 function jc_mods_get_list() {
 	$mods = get_option( JC_MODS_OPTION_KEY, array() );
 	return is_array( $mods ) ? $mods : array();
+}
+
+/**
+ * Validate an icon URL and return a usable image URL.
+ * If the URL points to a Modrinth default icon or is unreachable/not an image,
+ * the configured fallback option is returned.
+ */
+function jc_mods_validate_icon_url( $url ) {
+	if ( empty( $url ) ) {
+		return get_option( 'jc_mods_fallback_icon', 'https://avatars.githubusercontent.com/u/105741850?v=4' );
+	}
+
+	$key = 'jc_mod_icon_' . md5( $url );
+	if ( $cached = get_transient( $key ) ) {
+		return $cached;
+	}
+
+	$fallback = get_option( 'jc_mods_fallback_icon', 'https://avatars.githubusercontent.com/u/105741850?v=4' );
+
+	// Quick heuristics for Modrinth default icons
+	$lower = strtolower( $url );
+	if ( stripos( $lower, 'modrinth' ) !== false && ( stripos( $lower, 'default' ) !== false || stripos( $lower, 'avatar' ) !== false || stripos( $lower, 'mod-default' ) !== false ) ) {
+		set_transient( $key, $fallback, DAY_IN_SECONDS );
+		return $fallback;
+	}
+
+	// Try HEAD first
+	$res = false;
+	if ( function_exists( 'wp_remote_head' ) ) {
+		$res = wp_remote_head( $url, array( 'timeout' => 8 ) );
+	}
+	if ( ! $res || is_wp_error( $res ) ) {
+		$res = wp_remote_get( $url, array( 'timeout' => 8 ) );
+	}
+
+	if ( is_wp_error( $res ) ) {
+		set_transient( $key, $fallback, DAY_IN_SECONDS );
+		return $fallback;
+	}
+
+	$code = intval( wp_remote_retrieve_response_code( $res ) );
+	$ctype = wp_remote_retrieve_header( $res, 'content-type' ) ?: '';
+	if ( $code !== 200 || stripos( $ctype, 'image/' ) === false ) {
+		set_transient( $key, $fallback, DAY_IN_SECONDS );
+		return $fallback;
+	}
+
+	// OK - use original URL
+	set_transient( $key, $url, DAY_IN_SECONDS );
+	return $url;
 }
 
 function jc_mods_parse_slug( $input ) {
@@ -648,9 +725,9 @@ function jc_mods_render_shortcode() {
 	<div class="jc-wrap">
 		<section class="jc-hero">
 			<div class="jc-hero-left">
-				<div class="jc-kicker">Multi-Loader Support · MC <?php echo esc_html( $mc_version ); ?></div>
+				<div class="jc-kicker">Erlaubte Mods · MC <?php echo esc_html( $mc_version ); ?></div>
 				<h1 class="jc-hero-title">JustCreators Mod Hub</h1>
-				<p class="jc-hero-sub">Kuratiertes Mod-Paket im JustCreators Look. Filtere nach Fabric, Forge oder NeoForge - unverfügbare Mods werden automatisch markiert.</p>
+				<p class="jc-hero-sub">Alle erlaubten Mods auf JustCreators. Filtere nach Fabric, Forge oder NeoForge.</p>
 				<div class="jc-hero-actions">
 					<div class="jc-pill">MC Version: <strong><?php echo esc_html( $mc_version ); ?></strong></div>
 					<div class="jc-pill jc-pill-ghost">Fabric · Forge · NeoForge</div>
@@ -665,7 +742,7 @@ function jc_mods_render_shortcode() {
 		<section class="jc-toolbar">
 			<div class="jc-search">
 				<span class="jc-search-icon">🔍</span>
-				<input id="jc-mods-search" type="search" placeholder="Mods oder Autoren suchen..." aria-label="Mods suchen" />
+				<input id="jc-mods-search" type="search" placeholder="Mods suchen..." aria-label="Mods suchen" />
 			</div>
 			<div class="jc-loader-filters">
 				<button class="jc-filter-btn active" data-loader="fabric">Fabric</button>
@@ -697,7 +774,7 @@ function jc_mods_render_shortcode() {
 				data-forge-url="<?php echo esc_attr( $forge_url ); ?>"
 				data-neoforge-url="<?php echo esc_attr( $neoforge_url ); ?>">
 				<div class="jc-mod-thumb">
-					<img src="<?php echo esc_url( $mod['icon_url'] ); ?>" alt="<?php echo esc_attr( $mod['title'] ); ?>">
+					<img src="<?php echo esc_url( jc_mods_validate_icon_url( $mod['icon_url'] ) ); ?>" alt="<?php echo esc_attr( $mod['title'] ); ?>">
 				</div>
 				<div class="jc-mod-body">
 					<div class="jc-mod-top">
@@ -722,14 +799,14 @@ function jc_mods_render_shortcode() {
 		<section class="jc-callout">
 			<div>
 				<h3>Neue Mod vorschlagen</h3>
-				<p>Schreib im Teilnehmer-Discord, welche Fabric-Mod du brauchst. Unser Team prüft und fügt sie bei Freigabe hinzu.</p>
+				<p>Schreib im Teilnehmer-Discord, welche Mod du brauchst. Unser Team prüft und fügt sie bei Freigabe hinzu.</p>
 			</div>
 		</section>
 
 		<section class="jc-callout jc-modpack">
 			<div>
 				<h3>JustCreators Modpack auf Modrinth</h3>
-				<p>Alle freigegebenen Mods gesammelt als Modpack. Perfekt zum Komplett-Download.</p>
+				<p>Dieses Modpack ist nicht verpflichtend für die Teilnahme bei JustCreators.</p>
 			</div>
 			<div>
 				<a class="jc-btn" href="<?php echo esc_url( JC_MODS_MODPACK_URL ); ?>" target="_blank" rel="noopener noreferrer">Modpack ansehen</a>
