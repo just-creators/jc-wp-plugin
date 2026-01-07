@@ -76,15 +76,26 @@ add_shortcode( 'jc-contact-form', function() {
                 isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( $_SERVER['REMOTE_ADDR'] ) : 'N/A'
             );
             
-            // Header für E-Mail
+            // Header für E-Mail (Reply-To bleibt, From steuern wir über Filter)
             $headers = [
                 'Content-Type: text/plain; charset=UTF-8',
-                'From: ' . $name . ' <' . $email . '>',
                 'Reply-To: ' . $email
             ];
+
+            // Absender dynamisch setzen, damit nicht "WordPress" angezeigt wird
+            $from_email = is_email( $email ) ? $email : 'support@just-creators.de';
+            $from_name  = ! empty( $name ) ? $name : 'JustCreators Support';
+            $from_filter = function() use ( $from_email ) { return $from_email; };
+            $from_name_filter = function() use ( $from_name ) { return $from_name; };
+            add_filter( 'wp_mail_from', $from_filter );
+            add_filter( 'wp_mail_from_name', $from_name_filter );
             
             // E-Mail an Support versenden
             $mail_sent = wp_mail( $to, $email_subject, $email_body, $headers );
+            
+            // Filter entfernen, damit andere Mails nicht beeinflusst werden
+            remove_filter( 'wp_mail_from', $from_filter );
+            remove_filter( 'wp_mail_from_name', $from_name_filter );
             
             if ( $mail_sent ) {
                 $form_submitted = true;
@@ -104,11 +115,21 @@ add_shortcode( 'jc-contact-form', function() {
                 );
                 
                 $user_headers = [
-                    'Content-Type: text/plain; charset=UTF-8',
-                    'From: support@just-creators.de'
+                    'Content-Type: text/plain; charset=UTF-8'
                 ];
-                
+
+                // Absender für Bestätigungs-Mail
+                $confirm_from_email = 'support@just-creators.de';
+                $confirm_from_name  = 'JustCreators Support';
+                $confirm_from_filter = function() use ( $confirm_from_email ) { return $confirm_from_email; };
+                $confirm_name_filter = function() use ( $confirm_from_name ) { return $confirm_from_name; };
+                add_filter( 'wp_mail_from', $confirm_from_filter );
+                add_filter( 'wp_mail_from_name', $confirm_name_filter );
+
                 wp_mail( $email, $user_subject, $user_body, $user_headers );
+
+                remove_filter( 'wp_mail_from', $confirm_from_filter );
+                remove_filter( 'wp_mail_from_name', $confirm_name_filter );
             } else {
                 $validation_errors[] = 'Fehler beim Versenden der E-Mail. Bitte versuche es später erneut.';
             }
