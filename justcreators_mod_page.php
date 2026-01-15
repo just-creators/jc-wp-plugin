@@ -39,6 +39,7 @@ define( 'JC_MODS_MODPACK_URL', 'https://modrinth.com/modpack/justcreators' );
 add_action( 'wp_enqueue_scripts', 'jc_mods_enqueue_styles' );
 add_action( 'admin_menu', 'jc_mods_register_menu' );
 add_action( 'admin_init', 'jc_mods_handle_actions' );
+add_action( 'wp_ajax_jc_mods_toggle_modpack', 'jc_mods_toggle_modpack_status' );
 add_shortcode( 'jc_mods', 'jc_mods_render_shortcode' );
 
 function jc_mods_enqueue_styles() {
@@ -240,6 +241,36 @@ function jc_mods_handle_actions() {
 	}
 }
 
+function jc_mods_toggle_modpack_status() {
+	if ( ! current_user_can( 'manage_options' ) || ! isset( $_POST['nonce'] ) ) {
+		wp_send_json_error( 'Unauthorized' );
+	}
+
+	if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'jc_mods_nonce' ) ) {
+		wp_send_json_error( 'Nonce verification failed' );
+	}
+
+	$slug = isset( $_POST['slug'] ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : '';
+	if ( ! $slug ) {
+		wp_send_json_error( 'Invalid slug' );
+	}
+
+	$mods = jc_mods_get_list();
+	if ( ! isset( $mods[ $slug ] ) ) {
+		wp_send_json_error( 'Mod not found' );
+	}
+
+	// Toggle the modpack status
+	$current_status = $mods[ $slug ]['added_to_modpack'] ?? false;
+	$mods[ $slug ]['added_to_modpack'] = ! $current_status;
+
+	update_option( JC_MODS_OPTION_KEY, $mods );
+
+	wp_send_json_success( array(
+		'status' => $mods[ $slug ]['added_to_modpack'],
+	) );
+}
+
 function jc_mods_render_admin_page() {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		return;
@@ -247,6 +278,17 @@ function jc_mods_render_admin_page() {
 
 	$mods       = jc_mods_get_list();
 	$mc_version = get_option( JC_MODS_MC_VERSION_OPTION, '1.21.1' );
+
+	// Check if showing only "not added" filter
+	$show_not_added = isset( $_GET['jc_mods_filter'] ) && $_GET['jc_mods_filter'] === 'not_added';
+
+	// Filter mods if needed
+	$display_mods = $mods;
+	if ( $show_not_added ) {
+		$display_mods = array_filter( $mods, function( $mod ) {
+			return empty( $mod['added_to_modpack'] );
+		});
+	}
 
 	settings_errors( 'jc_mods' );
 	?>
@@ -284,19 +326,45 @@ function jc_mods_render_admin_page() {
 			</div>
 		</div>
 
-		<h2 style="margin:26px 0 12px;">Aktive Mods</h2>
+		<h2 style="margin:26px 0 12px;">
+			Aktive Mods 
+			<span style="font-size:14px;color:#9eb3d5;">
+				<?php 
+					$not_added_count = count( array_filter( $mods, function( $mod ) {
+						return empty( $mod['added_to_modpack'] );
+					}));
+					echo "(" . count( $mods ) . " insgesamt, " . $not_added_count . " noch nicht hinzugefügt)";
+				?>
+			</span>
+		</h2>
+
+		<div style="margin-bottom:16px;">
+			<a href="<?php echo esc_url( admin_url( 'admin.php?page=jc-mods' ) ); ?>" class="button <?php echo ! $show_not_added ? 'button-primary' : ''; ?>">Alle zeigen</a>
+			<a href="<?php echo esc_url( admin_url( 'admin.php?page=jc-mods&jc_mods_filter=not_added' ) ); ?>" class="button <?php echo $show_not_added ? 'button-primary' : ''; ?>">Nur noch nicht hinzugefügt</a>
+		</div>
+
 		<?php if ( empty( $mods ) ) : ?>
 			<p>Keine Mods hinterlegt. Füge die erste Mod oben hinzu.</p>
+		<?php elseif ( empty( $display_mods ) ) : ?>
+			<p>Alle Mods wurden zum Modpack hinzugefügt!</p>
 		<?php else : ?>
-			<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;">
-				<?php foreach ( $mods as $mod ) : ?>
-					<div style="background:#0f1220;border:1px solid #1f2740;border-radius:12px;padding:14px;display:flex;gap:12px;align-items:center;box-shadow:0 12px 32px rgba(0,0,0,0.3);">
-						<img src="<?php echo esc_url( $mod['icon_url'] ); ?>" alt="<?php echo esc_attr( $mod['title'] ); ?>" style="width:52px;height:52px;border-radius:12px;object-fit:cover;background:#0a0c16;">
-						<div style="flex:1;">
-							<strong style="display:block;color:#f4f6ff;"><?php echo esc_html( $mod['title'] ); ?></strong>
-							<span style="color:#9eb3d5;font-size:12px;display:block;margin-top:2px;">von <?php echo esc_html( $mod['author'] ); ?></span>
+			<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;">
+				<?php foreach ( $display_mods as $mod ) : ?>
+					<div style="background:#0f1220;border:1px solid #1f2740;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:0 12px 32px rgba(0,0,0,0.3);" class="jc-admin-mod-item" data-slug="<?php echo esc_attr( $mod['slug'] ); ?>">
+						<div style="display:flex;gap:12px;align-items:flex-start;">
+							<img src="<?php echo esc_url( $mod['icon_url'] ); ?>" alt="<?php echo esc_attr( $mod['title'] ); ?>" style="width:52px;height:52px;border-radius:12px;object-fit:cover;background:#0a0c16;flex-shrink:0;">
+							<div style="flex:1;">
+								<strong style="display:block;color:#f4f6ff;"><?php echo esc_html( $mod['title'] ); ?></strong>
+								<span style="color:#9eb3d5;font-size:12px;display:block;margin-top:2px;">von <?php echo esc_html( $mod['author'] ); ?></span>
+								<?php if ( $mod['added_to_modpack'] ?? false ) : ?>
+									<span style="color:#56d8ff;font-size:11px;display:block;margin-top:4px;font-weight:700;">✓ Zum Modpack hinzugefügt</span>
+								<?php endif; ?>
+							</div>
 						</div>
-						<div>
+						<div style="display:flex;gap:8px;flex-wrap:wrap;">
+							<button class="button jc-modpack-toggle" data-slug="<?php echo esc_attr( $mod['slug'] ); ?>" style="<?php echo ( $mod['added_to_modpack'] ?? false ) ? 'background:#56d8ff;color:#050712;border-color:#56d8ff;' : ''; ?>">
+								<?php echo ( $mod['added_to_modpack'] ?? false ) ? '✓ Im Modpack' : '➕ Zu Modpack hinzufügen'; ?>
+							</button>
 							<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=jc-mods&jc_remove_mod=' . rawurlencode( $mod['slug'] ) ), 'jc_mods_remove_' . $mod['slug'] ) ); ?>">Entfernen</a>
 						</div>
 					</div>
@@ -308,6 +376,54 @@ function jc_mods_render_admin_page() {
 			<p><strong>Shortcode:</strong> <code>[jc_mods]</code> auf einer Seite einfügen, um die Mods-Liste im Frontend anzuzeigen.</p>
 		</div>
 	</div>
+
+	<script>
+	(function() {
+		const buttons = document.querySelectorAll('.jc-modpack-toggle');
+		buttons.forEach(btn => {
+			btn.addEventListener('click', function(e) {
+				e.preventDefault();
+				const slug = this.dataset.slug;
+				const button = this;
+
+				fetch(ajaxurl, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded',
+					},
+					body: new URLSearchParams({
+						action: 'jc_mods_toggle_modpack',
+						nonce: '<?php echo esc_js( wp_create_nonce( 'jc_mods_nonce' ) ); ?>',
+						slug: slug
+					})
+				})
+				.then(response => response.json())
+				.then(data => {
+					if (data.success) {
+						const status = data.data.status;
+						if (status) {
+							button.textContent = '✓ Im Modpack';
+							button.style.background = '#56d8ff';
+							button.style.color = '#050712';
+							button.style.borderColor = '#56d8ff';
+						} else {
+							button.textContent = '➕ Zu Modpack hinzufügen';
+							button.style.background = '';
+							button.style.color = '';
+							button.style.borderColor = '';
+						}
+					} else {
+						alert('Fehler: ' + data.data);
+					}
+				})
+				.catch(error => {
+					console.error('Error:', error);
+					alert('Ein Fehler ist aufgetreten.');
+				});
+			});
+		});
+	})();
+	</script>
 	<?php
 }
 
