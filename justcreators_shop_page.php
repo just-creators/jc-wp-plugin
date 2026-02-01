@@ -1,17 +1,60 @@
 <?php
 /**
- * Plugin Name: JustCreators Shop Claim
- * Description: Claim-Shops Seite im Mods-Look mit Discord Login, Teilnehmer-Check und Item-Auswahl.
+ * JustCreators Shopping District
  * Version: 1.0.0
+ * Beschreibung: Shop-Verwaltung für Season 2 Shopping District mit Discord OAuth
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-// Konstanten
-define( 'JC_SHOP_TABLE', 'jc_shops' );
-define( 'JC_SHOP_REDIRECT_SLUG', 'shops' ); // Passe den Slug an die Seite mit dem Shortcode an
+// ========================================
+// DISCORD OAUTH KONFIGURATION
+// ========================================
+define( 'JC_SHOP_CLIENT_ID', '1436449319849824480' );
+define( 'JC_SHOP_CLIENT_SECRET', 'KTPe1JrmSRzvyKV_jbvmacQCLTwunDla' );
+define( 'JC_SHOP_REDIRECT_URI', 'https://just-creators.de/shopping-district' ); // WICHTIG: Anpassen!
+define( 'JC_SHOP_WEBHOOK_URL', 'https://discord.com/api/webhooks/1467539825304404225/u8X6wrVdVBCGFqQpriuCjsilmFMAiUHpukiECf0nzPPuMpYxSgAzP7iyo3i9FB5p-WPC' );
 
-// Gemeinsamer Admin-Parent für alle JustCreators Screens
+// ========================================
+// SESSION & INSTALLATION
+// ========================================
+
+function jc_shop_ensure_session() {
+    if ( ! session_id() && ! headers_sent() ) {
+        session_start();
+    }
+}
+add_action( 'wp', 'jc_shop_ensure_session', 1 );
+
+register_activation_hook( __FILE__, 'jc_shop_install' );
+
+function jc_shop_install() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_shops';
+    $charset = $wpdb->get_charset_collate();
+
+    $sql = "CREATE TABLE IF NOT EXISTS {$table} (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        discord_id varchar(100) NOT NULL,
+        discord_name varchar(255) NOT NULL,
+        shop_name varchar(255) NOT NULL,
+        items text NOT NULL,
+        status varchar(50) DEFAULT 'draft',
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY discord_id (discord_id),
+        KEY status (status)
+    ) {$charset};";
+
+    require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    dbDelta( $sql );
+}
+
+// ========================================
+// ADMIN MENU
+// ========================================
+
 if ( ! defined( 'JC_ADMIN_PARENT_SLUG' ) ) {
     define( 'JC_ADMIN_PARENT_SLUG', 'justcreators-hub' );
 }
@@ -33,860 +76,580 @@ if ( ! function_exists( 'jc_register_parent_menu' ) ) {
     add_action( 'admin_menu', 'jc_register_parent_menu', 0 );
 }
 
-// OAuth: nutze Werte aus wp-config (JC_DISCORD_CLIENT_ID/SECRET) wie die anderen Pages, fallback auf Regeln-Constants
-if ( ! defined( 'JC_SHOP_CLIENT_ID' ) ) {
-    if ( defined( 'JC_DISCORD_CLIENT_ID' ) ) {
-        define( 'JC_SHOP_CLIENT_ID', JC_DISCORD_CLIENT_ID );
-    } elseif ( defined( 'JC_RULES_CLIENT_ID' ) ) {
-        define( 'JC_SHOP_CLIENT_ID', JC_RULES_CLIENT_ID );
-    }
-}
-if ( ! defined( 'JC_SHOP_CLIENT_SECRET' ) ) {
-    if ( defined( 'JC_DISCORD_CLIENT_SECRET' ) ) {
-        define( 'JC_SHOP_CLIENT_SECRET', JC_DISCORD_CLIENT_SECRET );
-    } elseif ( defined( 'JC_RULES_CLIENT_SECRET' ) ) {
-        define( 'JC_SHOP_CLIENT_SECRET', JC_RULES_CLIENT_SECRET );
-    }
+add_action( 'admin_menu', 'jc_shop_register_menu' );
+
+function jc_shop_register_menu() {
+    add_submenu_page(
+        JC_ADMIN_PARENT_SLUG,
+        'Shopping District',
+        'Shopping District',
+        'manage_options',
+        'jc-shopping-district',
+        'jc_shop_render_admin_page'
+    );
 }
 
-// Hooks
-register_activation_hook( __FILE__, 'jc_shop_install' );
-add_action( 'wp', 'jc_shop_ensure_session', 1 );
-add_action( 'template_redirect', 'jc_shop_handle_oauth', 5 );
-add_shortcode( 'jc_shop_claim', 'jc_shop_render_shortcode' );
-add_action( 'admin_menu', 'jc_shop_admin_menu' );
-add_action( 'admin_init', 'jc_shop_maybe_migrate_columns' );
+// ========================================
+// DISCORD OAUTH CALLBACK
+// ========================================
 
-function jc_shop_get_redirect_uri() {
-    return home_url( '/' . JC_SHOP_REDIRECT_SLUG );
-}
+add_action( 'template_redirect', function() {
+    jc_shop_ensure_session();
 
-function jc_shop_ensure_session() {
-    if ( session_status() === PHP_SESSION_NONE && ! headers_sent() ) {
-        session_start();
-    }
-}
-
-function jc_shop_install() {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-    $charset = $wpdb->get_charset_collate();
-
-    $sql = "CREATE TABLE IF NOT EXISTS {$table} (
-        id bigint(20) NOT NULL AUTO_INCREMENT,
-        discord_id varchar(100) NOT NULL,
-        discord_name varchar(255) NOT NULL,
-        creator_name varchar(255) DEFAULT '',
-        minecraft_name varchar(50) DEFAULT NULL,
-        item_name varchar(120) DEFAULT '',
-        item_icon varchar(255) DEFAULT '',
-        item_key varchar(160) DEFAULT NULL,
-        social_channels longtext DEFAULT NULL,
-        claimed_at datetime DEFAULT CURRENT_TIMESTAMP,
-        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY discord_id (discord_id),
-        UNIQUE KEY item_key (item_key)
-    ) {$charset};";
-
-    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-    dbDelta( $sql );
-}
-
-// Migration: item_icon needs space for full URLs
-function jc_shop_maybe_migrate_columns() {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-    $col = $wpdb->get_row( $wpdb->prepare( "SHOW COLUMNS FROM {$table} LIKE %s", 'item_icon' ) );
-    if ( $col && isset( $col->Type ) && stripos( $col->Type, 'varchar(20)' ) !== false ) {
-        $wpdb->query( "ALTER TABLE {$table} MODIFY item_icon varchar(255) DEFAULT ''" );
-    }
-}
-
-function jc_shop_handle_oauth() {
-    if ( ! is_page( JC_SHOP_REDIRECT_SLUG ) ) {
+    if ( ! is_page( 'shopping-district' ) ) {
         return;
     }
 
-    jc_shop_ensure_session();
-
+    // OAuth Callback verarbeiten
     if ( isset( $_GET['code'] ) ) {
         $code = sanitize_text_field( $_GET['code'] );
 
+        // Token holen
         $token_response = wp_remote_post( 'https://discord.com/api/oauth2/token', array(
             'body' => array(
                 'client_id' => JC_SHOP_CLIENT_ID,
                 'client_secret' => JC_SHOP_CLIENT_SECRET,
                 'grant_type' => 'authorization_code',
                 'code' => $code,
-                'redirect_uri' => jc_shop_get_redirect_uri(),
+                'redirect_uri' => JC_SHOP_REDIRECT_URI
             ),
-            'timeout' => 15,
+            'timeout' => 15
         ) );
 
         if ( is_wp_error( $token_response ) ) {
-            wp_redirect( jc_shop_get_redirect_uri() . '?error=token' );
+            wp_redirect( home_url( '/shopping-district?error=token' ) );
             exit;
         }
 
         $token_data = json_decode( wp_remote_retrieve_body( $token_response ), true );
-        if ( empty( $token_data['access_token'] ) ) {
-            wp_redirect( jc_shop_get_redirect_uri() . '?error=token' );
+
+        if ( ! isset( $token_data['access_token'] ) ) {
+            wp_redirect( home_url( '/shopping-district?error=invalid' ) );
             exit;
         }
 
+        // User Daten holen
         $user_response = wp_remote_get( 'https://discord.com/api/users/@me', array(
-            'headers' => array( 'Authorization' => 'Bearer ' . $token_data['access_token'] ),
-            'timeout' => 15,
+            'headers' => array(
+                'Authorization' => 'Bearer ' . $token_data['access_token']
+            ),
+            'timeout' => 15
         ) );
 
         if ( is_wp_error( $user_response ) ) {
-            wp_redirect( jc_shop_get_redirect_uri() . '?error=user' );
+            wp_redirect( home_url( '/shopping-district?error=user' ) );
             exit;
         }
 
         $user_data = json_decode( wp_remote_retrieve_body( $user_response ), true );
-        if ( empty( $user_data['id'] ) ) {
-            wp_redirect( jc_shop_get_redirect_uri() . '?error=user' );
+
+        if ( ! isset( $user_data['id'] ) ) {
+            wp_redirect( home_url( '/shopping-district?error=invalid' ) );
             exit;
         }
 
+        // In Session UND Cookie speichern
         $_SESSION['jc_shop_discord_user'] = $user_data;
-        setcookie( 'jc_shop_discord_id', $user_data['id'], time() + 3600, '/', '', true, true );
-        setcookie( 'jc_shop_discord_name', $user_data['username'], time() + 3600, '/', '', true, true );
 
-        wp_redirect( jc_shop_get_redirect_uri() );
+        setcookie(
+            'jc_shop_discord_id',
+            $user_data['id'],
+            time() + 3600,
+            '/',
+            '',
+            true,
+            true
+        );
+        setcookie(
+            'jc_shop_discord_name',
+            $user_data['username'],
+            time() + 3600,
+            '/',
+            '',
+            true,
+            true
+        );
+
+        // Redirect zurück (ohne ?code)
+        wp_redirect( home_url( '/shopping-district' ) );
         exit;
     }
-}
+}, 5 );
 
-function jc_shop_get_current_user() {
-    jc_shop_ensure_session();
+// ========================================
+// SHORTCODE
+// ========================================
 
-    if ( isset( $_SESSION['jc_shop_discord_user'] ) ) {
-        return $_SESSION['jc_shop_discord_user'];
-    }
+add_shortcode( 'jc_shopping_district', 'jc_shop_render_page' );
 
-    if ( isset( $_COOKIE['jc_shop_discord_id'], $_COOKIE['jc_shop_discord_name'] ) ) {
-        $_SESSION['jc_shop_discord_user'] = array(
-            'id' => sanitize_text_field( $_COOKIE['jc_shop_discord_id'] ),
-            'username' => sanitize_text_field( $_COOKIE['jc_shop_discord_name'] ),
-        );
-        return $_SESSION['jc_shop_discord_user'];
-    }
-
-    return null;
-}
-
-function jc_shop_fetch_application( $discord_id ) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_discord_applications';
-
-    if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) !== $table ) {
-        return null;
-    }
-
-    return $wpdb->get_row( $wpdb->prepare(
-        "SELECT * FROM {$table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-}
-
-function jc_shop_fetch_member( $discord_id ) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'jc_members';
-
-    if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) !== $table ) {
-        return null;
-    }
-
-    return $wpdb->get_row( $wpdb->prepare(
-        "SELECT * FROM {$table} WHERE discord_id = %s",
-        $discord_id
-    ) );
-}
-
-function jc_shop_texture_url( $item_key, $fast = false ) {
-    // Primary source: InventivetalentDev/minecraft-assets (stable, raw GitHub)
-    $version = '1.20.4';
-    $path = "https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/{$version}/assets/minecraft/textures/item/{$item_key}.png";
-
-    // In fast mode, skip HEAD checks (used for large option lists)
-    if ( $fast ) {
-        return $path;
-    }
-
-    // Fallback: mc-heads 50px if main fails; lightweight HEAD check cached in transient
-    $cache_key = 'jc_shop_tex_' . md5( $path );
-    $ok = get_transient( $cache_key );
-    if ( $ok === false ) {
-        $resp = wp_remote_head( $path, array( 'timeout' => 5 ) );
-        $ok = ! is_wp_error( $resp ) && wp_remote_retrieve_response_code( $resp ) === 200 ? '1' : '0';
-        // cache 12h; if failed, retry sooner
-        set_transient( $cache_key, $ok, $ok === '1' ? 12 * HOUR_IN_SECONDS : 2 * HOUR_IN_SECONDS );
-    }
-
-    if ( $ok === '1' ) return $path;
-
-    return 'https://mc-heads.net/minecraft-item/' . rawurlencode( $item_key ) . '/50.png';
-}
-
-function jc_shop_get_available_items() {
-    // Full catalog from PrismarineJS minecraft-data (PC 1.20)
-    $cache_key = 'jc_shop_items_catalog_120';
-    $items = get_transient( $cache_key );
-
-    if ( $items === false ) {
-        $url = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20/items.json';
-        $resp = wp_remote_get( $url, array( 'timeout' => 12 ) );
-        if ( ! is_wp_error( $resp ) && wp_remote_retrieve_response_code( $resp ) === 200 ) {
-            $data = json_decode( wp_remote_retrieve_body( $resp ), true );
-            if ( is_array( $data ) ) {
-                $items = array();
-                foreach ( $data as $row ) {
-                    if ( empty( $row['name'] ) || empty( $row['displayName'] ) ) continue;
-                    $items[] = array(
-                        'key'  => $row['name'],
-                        'name' => $row['displayName'],
-                    );
-                }
-                // Sort alphabetically by display name for UX
-                usort( $items, function( $a, $b ) {
-                    return strcasecmp( $a['name'], $b['name'] );
-                } );
-            }
-        }
-
-        // Fallback to a small curated set if fetch fails
-        if ( empty( $items ) ) {
-            $items = array(
-                array( 'key' => 'netherite_ingot',   'name' => 'Netherit-Barren' ),
-                array( 'key' => 'elytra',             'name' => 'Elytra' ),
-                array( 'key' => 'firework_rocket',    'name' => 'Raketen' ),
-                array( 'key' => 'beacon',             'name' => 'Beacon' ),
-                array( 'key' => 'totem_of_undying',   'name' => 'Totem' ),
-                array( 'key' => 'diamond_block',      'name' => 'Diamantblock' ),
-                array( 'key' => 'enchanted_book',     'name' => 'Verzauberung: Mending' ),
-                array( 'key' => 'golden_carrot',      'name' => 'Goldene Karotten' ),
-                array( 'key' => 'potion',             'name' => 'Tränke' ),
-                array( 'key' => 'wheat',              'name' => 'Farm-Kits' ),
-            );
-        }
-
-        set_transient( $cache_key, $items, 12 * HOUR_IN_SECONDS );
-    }
-
-    // Attach icon URLs using fast mode to avoid 500+ HEAD requests
-    foreach ( $items as &$item ) {
-        $item['icon'] = jc_shop_texture_url( $item['key'], true );
-    }
-    unset( $item );
-
-    return $items;
-}
-
-function jc_shop_item_is_taken( $item_key, $shop_id = 0 ) {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-
-    $sql = "SELECT id FROM {$table} WHERE item_key = %s";
-    $params = array( $item_key );
-    if ( $shop_id ) {
-        $sql .= " AND id != %d";
-        $params[] = $shop_id;
-    }
-
-    $existing = $wpdb->get_var( $wpdb->prepare( $sql, ...$params ) );
-
-    return ! empty( $existing );
-}
-
-function jc_shop_get_taken_item_keys( $exclude_shop_id = 0 ) {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-    $sql = "SELECT item_key FROM {$table} WHERE item_key IS NOT NULL AND item_key != ''";
-    if ( $exclude_shop_id ) {
-        $sql .= $wpdb->prepare( " AND id != %d", $exclude_shop_id );
-    }
-    $rows = $wpdb->get_col( $sql );
-    return array_filter( array_unique( $rows ?: array() ) );
-}
-
-function jc_shop_save_claim( $user, $application, $member ) {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-
-    $existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE discord_id = %s", $user['id'] ) );
-    if ( $existing ) {
-        return $existing;
-    }
-
-    $social = $member && isset( $member->social_channels ) ? maybe_unserialize( $member->social_channels ) : null;
-
-    $discriminator = isset( $user['discriminator'] ) && $user['discriminator'] !== '0' ? '#' . $user['discriminator'] : '';
-
-    $wpdb->insert(
-        $table,
-        [
-            'discord_id'      => $user['id'],
-            'discord_name'    => $user['username'] . $discriminator,
-            'creator_name'    => $application->creator_name ?? $user['username'],
-            'minecraft_name'  => $member ? ( $member->minecraft_name ?? null ) : null,
-            'social_channels' => is_array( $social ) ? serialize( $social ) : null,
-        ],
-        [ '%s', '%s', '%s', '%s', '%s' ]
-    );
-
-    return $wpdb->insert_id;
-}
-
-function jc_shop_update_item( $shop_id, $item_key ) {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-    $items = jc_shop_get_available_items();
-
-    $selected = null;
-    foreach ( $items as $it ) {
-        if ( $it['key'] === $item_key ) {
-            $selected = $it;
-            break;
-        }
-    }
-
-    if ( ! $selected ) {
-        return [ 'error' => 'Ungültiges Item.' ];
-    }
-
-    if ( jc_shop_item_is_taken( $item_key, $shop_id ) ) {
-        return [ 'error' => 'Item bereits vergeben.' ];
-    }
-
-    $updated = $wpdb->update(
-        $table,
-        [
-            'item_key'  => $selected['key'],
-            'item_name' => $selected['name'],
-            'item_icon' => jc_shop_texture_url( $selected['key'] ),
-        ],
-        [ 'id' => $shop_id ],
-        [ '%s', '%s', '%s' ],
-        [ '%d' ]
-    );
-
-    if ( $updated === false ) {
-        return [ 'error' => 'Speichern fehlgeschlagen.' ];
-    }
-
-    return [ 'message' => 'Item gespeichert!' ];
-}
-
-function jc_shop_get_social_names( $channels ) {
-    $names = [];
-
-    if ( ! is_array( $channels ) ) {
-        return $names;
-    }
-
-    foreach ( $channels as $ch ) {
-        $platform = $ch['platform'] ?? '';
-        $url = $ch['url'] ?? '';
-        if ( ! $platform || ! $url ) continue;
-
-        if ( function_exists( 'jc_teilnehmer_fetch_channel_meta' ) ) {
-            $meta = jc_teilnehmer_fetch_channel_meta( $platform, $url );
-            if ( ! empty( $meta['title'] ) ) {
-                $names[$platform] = $meta['title'];
-                continue;
-            }
-        }
-
-        if ( preg_match( '#/([A-Za-z0-9_\.-]+)/?$#', $url, $m ) ) {
-            $names[$platform] = $m[1];
-        }
-    }
-
-    return $names;
-}
-
-function jc_shop_render_shortcode() {
+function jc_shop_render_page() {
     ob_start();
 
-    $user = jc_shop_get_current_user();
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_shops';
+    $member_table = $wpdb->prefix . 'jc_members';
 
-    // Login Screen
-    if ( ! $user ) {
-        jc_shop_render_login();
-        jc_shop_inline_styles();
-        return ob_get_clean();
+    // Session/Cookie Check
+    $discord_user = null;
+    $is_logged_in = false;
+
+    if ( isset( $_SESSION['jc_shop_discord_user'] ) ) {
+        $discord_user = $_SESSION['jc_shop_discord_user'];
+        $is_logged_in = true;
+    } elseif ( isset( $_COOKIE['jc_shop_discord_id'] ) && isset( $_COOKIE['jc_shop_discord_name'] ) ) {
+        $_SESSION['jc_shop_discord_user'] = array(
+            'id' => sanitize_text_field( $_COOKIE['jc_shop_discord_id'] ),
+            'username' => sanitize_text_field( $_COOKIE['jc_shop_discord_name'] )
+        );
+        $discord_user = $_SESSION['jc_shop_discord_user'];
+        $is_logged_in = true;
     }
 
-    $discord_id = sanitize_text_field( $user['id'] );
-    $application = jc_shop_fetch_application( $discord_id );
-    $member = jc_shop_fetch_member( $discord_id );
-
-    if ( ! $application || $application->status !== 'accepted' ) {
-        jc_shop_render_denied( $user['username'] );
-        jc_shop_inline_styles();
-        return ob_get_clean();
-    }
-
-    // Claim-Handling
-    $message = '';
-    $error = '';
-
-    if ( isset( $_POST['jc_shop_claim'] ) && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( $_POST['_wpnonce'], 'jc_shop_claim' ) ) {
-        $shop_id = jc_shop_save_claim( $user, $application, $member );
-        if ( $shop_id ) {
-                $message = 'Shop wurde für dich reserviert.';
-        }
-    }
-
-    $current_shop = jc_shop_get_user_shop( $discord_id );
-
-    if ( isset( $_POST['jc_shop_item'] ) && $current_shop && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( $_POST['_wpnonce'], 'jc_shop_item' ) ) {
-        $item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
-        $result = jc_shop_update_item( $current_shop->id, $item_key );
-        if ( isset( $result['error'] ) ) {
-            $error = $result['error'];
+    // Formular verarbeiten (Shop erstellen)
+    if ( $is_logged_in && isset( $_POST['jc_shop_create'] ) ) {
+        if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'jc_shop_create' ) ) {
+            echo '<div class="jc-msg jc-error">❌ Sicherheitsprüfung fehlgeschlagen</div>';
         } else {
-            $message = $result['message'] ?? 'Item gespeichert.';
-            $current_shop = jc_shop_get_user_shop( $discord_id );
+            $discord_id = sanitize_text_field( $discord_user['id'] );
+            $discord_name = sanitize_text_field( $discord_user['username'] );
+            $shop_name = sanitize_text_field( $_POST['shop_name'] ?? '' );
+            $items = sanitize_textarea_field( $_POST['items'] ?? '' );
+
+            if ( empty( $shop_name ) || empty( $items ) ) {
+                echo '<div class="jc-msg jc-error">❌ Shop Name und Items sind erforderlich</div>';
+            } else {
+                // Prüfe ob User Member ist
+                $is_member = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$member_table} WHERE discord_id = %s AND rules_accepted = 1",
+                    $discord_id
+                ) );
+
+                if ( ! $is_member ) {
+                    echo '<div class="jc-msg jc-error">❌ Du musst erst die Regeln akzeptieren um einen Shop zu erstellen</div>';
+                } else {
+                    // Shop erstellen
+                    $wpdb->insert( $table, array(
+                        'discord_id' => $discord_id,
+                        'discord_name' => $discord_name,
+                        'shop_name' => $shop_name,
+                        'items' => $items,
+                        'status' => 'draft'
+                    ), array( '%s', '%s', '%s', '%s', '%s' ) );
+
+                    // Discord Webhook senden
+                    jc_shop_send_webhook_notification( $discord_name, $shop_name, $items );
+
+                    echo '<div class="jc-msg jc-success">✅ Shop eingereicht! Ein Admin wird ihn bald überprüfen.</div>';
+                }
+            }
         }
     }
 
-    jc_shop_render_page( $user, $application, $member, $current_shop, $message, $error );
-    jc_shop_inline_styles();
+    // Logout Handler
+    if ( isset( $_GET['logout'] ) ) {
+        unset( $_SESSION['jc_shop_discord_user'] );
+        setcookie( 'jc_shop_discord_id', '', time() - 3600, '/', '', true, true );
+        setcookie( 'jc_shop_discord_name', '', time() - 3600, '/', '', true, true );
+        wp_redirect( home_url( '/shopping-district' ) );
+        exit;
+    }
 
+    // Alle akzeptierten Shops laden
+    $accepted_shops = $wpdb->get_results(
+        "SELECT * FROM {$table} WHERE status = 'accepted' ORDER BY created_at DESC"
+    );
+
+    // User's eigenen Shop laden (falls angemeldet)
+    $user_shop = null;
+    if ( $is_logged_in ) {
+        $user_shop = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM {$table} WHERE discord_id = %s ORDER BY created_at DESC LIMIT 1",
+            $discord_user['id']
+        ) );
+    }
+
+    ?>
+    <div class="jc-wrap">
+        <!-- Header mit Login Button -->
+        <div class="jc-hero">
+            <div class="jc-hero-left">
+                <div class="jc-kicker"><span>🏪</span><span>Season 2</span></div>
+                <h1 class="jc-hero-title">Shopping District</h1>
+                <p class="jc-hero-sub">Entdecke die Shops der Creator und erstelle deinen eigenen.</p>
+            </div>
+            <div class="jc-hero-right">
+                <?php if ( $is_logged_in ) : ?>
+                    <div style="text-align: right;">
+                        <div style="color: #dcddde; margin-bottom: 8px; font-size: 14px;">
+                            👋 <?php echo esc_html( $discord_user['username'] ); ?>
+                        </div>
+                        <a href="?logout=1" class="jc-btn-small" style="background: rgba(244, 67, 54, 0.2) !important; border: 1px solid #f44336 !important;">
+                            Abmelden
+                        </a>
+                    </div>
+                <?php else : ?>
+                    <?php
+                    $params = array(
+                        'client_id' => JC_SHOP_CLIENT_ID,
+                        'redirect_uri' => JC_SHOP_REDIRECT_URI,
+                        'response_type' => 'code',
+                        'scope' => 'identify'
+                    );
+                    $auth_url = 'https://discord.com/api/oauth2/authorize?' . http_build_query( $params );
+                    ?>
+                    <a class="jc-btn" href="<?php echo esc_url( $auth_url ); ?>" style="font-size: 14px !important; padding: 10px 20px !important;">
+                        <svg style="width: 20px; height: 20px; fill: #fff;" viewBox="0 0 71 55" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M60.1045 4.8978C55.5792 2.8214 50.7265 1.2916 45.6527 0.41542C45.5603 0.39851 45.468 0.440769 45.4204 0.525289C44.7963 1.6353 44.105 3.0834 43.6209 4.2216C38.1637 3.4046 32.7345 3.4046 27.3892 4.2216C26.905 3.0581 26.1886 1.6353 25.5617 0.525289C25.5141 0.443589 25.4218 0.40133 25.3294 0.41542C20.2584 1.2888 15.4057 2.8186 10.8776 4.8978C10.8384 4.9147 10.8048 4.9429 10.7825 4.9795C1.57795 18.7309 -0.943561 32.1443 0.293408 45.3914C0.299005 45.4562 0.335386 45.5182 0.385761 45.5576C6.45866 50.0174 12.3413 52.7249 18.1147 54.5195C18.2071 54.5477 18.305 54.5139 18.3638 54.4378C19.7295 52.5728 20.9469 50.6063 21.9907 48.5383C22.0523 48.4172 21.9935 48.2735 21.8676 48.2256C19.9366 47.4931 18.0979 46.6 16.3292 45.5858C16.1893 45.5041 16.1781 45.304 16.3068 45.2082C16.679 44.9293 17.0513 44.6391 17.4067 44.3461C17.471 44.2926 17.5606 44.2813 17.6362 44.3151C29.2558 49.6202 41.8354 49.6202 53.3179 44.3151C53.3935 44.2785 53.4831 44.2898 53.5502 44.3433C53.9057 44.6363 54.2779 44.9293 54.6529 45.2082C54.7816 45.304 54.7732 45.5041 54.6333 45.5858C52.8646 46.6197 51.0259 47.4931 49.0921 48.2228C48.9662 48.2707 48.9102 48.4172 48.9718 48.5383C50.038 50.6034 51.2554 52.5699 52.5959 54.435C52.6519 54.5139 52.7526 54.5477 52.845 54.5195C58.6464 52.7249 64.529 50.0174 70.6019 45.5576C70.6551 45.5182 70.6887 45.459 70.6943 45.3942C72.1747 30.0791 68.2147 16.7757 60.1968 4.9823C60.1772 4.9429 60.1437 4.9147 60.1045 4.8978ZM23.7259 37.3253C20.2276 37.3253 17.3451 34.1136 17.3451 30.1693C17.3451 26.225 20.1717 23.0133 23.7259 23.0133C27.308 23.0133 30.1626 26.2532 30.1066 30.1693C30.1066 34.1136 27.28 37.3253 23.7259 37.3253ZM47.3178 37.3253C43.8196 37.3253 40.9371 34.1136 40.9371 30.1693C40.9371 26.225 43.7636 23.0133 47.3178 23.0133C50.9 23.0133 53.7545 26.2532 53.6986 30.1693C53.6986 34.1136 50.9 37.3253 47.3178 37.3253Z"/>
+                        </svg>
+                        Anmelden
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'draft' ) : ?>
+            <!-- User hat bereits einen Shop eingereicht (Draft) -->
+            <div class="jc-card" style="margin-top: 30px; background: rgba(255, 193, 7, 0.1) !important; border: 1px solid rgba(255, 193, 7, 0.3) !important;">
+                <div style="text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">⏳</div>
+                    <h2 class="jc-h" style="justify-content: center; margin-bottom: 10px;">Shop wird geprüft</h2>
+                    <p style="color: #dcddde; font-size: 15px; line-height: 1.8;">
+                        Dein Shop <strong style="color: #ffc107;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde eingereicht.<br>
+                        Ein Admin wird ihn bald überprüfen und freischalten.
+                    </p>
+                    <p style="color: #a0a8b8; font-size: 14px; margin-top: 15px;">
+                        💡 <strong>Weitere Shops?</strong> Erstelle ein Ticket im Discord!
+                    </p>
+                </div>
+            </div>
+        <?php elseif ( $is_logged_in && $user_shop && $user_shop->status === 'rejected' ) : ?>
+            <!-- User's Shop wurde abgelehnt -->
+            <div class="jc-card" style="margin-top: 30px; background: rgba(244, 67, 54, 0.1) !important; border: 1px solid rgba(244, 67, 54, 0.3) !important;">
+                <div style="text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
+                    <h2 class="jc-h" style="justify-content: center; margin-bottom: 10px;">Shop abgelehnt</h2>
+                    <p style="color: #dcddde; font-size: 15px; line-height: 1.8;">
+                        Dein Shop <strong style="color: #f44336;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde leider abgelehnt.<br>
+                        Bitte erstelle ein Ticket im Discord für weitere Informationen.
+                    </p>
+                </div>
+            </div>
+        <?php elseif ( $is_logged_in && ( ! $user_shop || $user_shop->status === 'rejected' ) ) : ?>
+            <!-- Shop Erstellungsformular -->
+            <div class="jc-card" style="margin-top: 30px;">
+                <h2 class="jc-h">🏪 Erstelle deinen Shop</h2>
+                <p style="color: #a0a8b8; margin-bottom: 25px; line-height: 1.6;">
+                    Fülle das Formular aus, um deinen Shop für den Shopping District einzureichen.
+                </p>
+
+                <form method="POST" style="margin-top: 20px;">
+                    <?php wp_nonce_field( 'jc_shop_create' ); ?>
+
+                    <div style="margin-bottom: 20px;">
+                        <label class="jc-label">Shop Name *</label>
+                        <input
+                            class="jc-input"
+                            type="text"
+                            name="shop_name"
+                            required
+                            placeholder="z.B. Meine Redstone Werkstatt"
+                            maxlength="100"
+                        />
+                    </div>
+
+                    <div style="margin-bottom: 25px;">
+                        <label class="jc-label">Was verkaufst du? *</label>
+                        <textarea
+                            class="jc-input"
+                            name="items"
+                            required
+                            rows="4"
+                            placeholder="z.B. Redstone-Komponenten, Schaltungen, Farmen-Designs"
+                            style="resize: vertical;"
+                        ></textarea>
+                        <small style="color: #a0a8b8; display: block; margin-top: 8px; font-size: 13px;">
+                            Beschreibe deine Items oder Gruppen von Items
+                        </small>
+                    </div>
+
+                    <div style="background: rgba(74, 222, 128, 0.08); padding: 18px; border-radius: 10px; border-left: 4px solid #4ade80; margin-bottom: 25px;">
+                        <p style="color: #dcddde; margin: 0; font-size: 14px; line-height: 1.7;">
+                            💡 <strong>Hinweis:</strong> Weitere Shops können später über ein Ticket im Discord erstellt werden.
+                        </p>
+                    </div>
+
+                    <button type="submit" name="jc_shop_create" class="jc-btn" style="width: 100%; font-size: 16px; padding: 14px;">
+                        🚀 Shop einreichen
+                    </button>
+                </form>
+            </div>
+        <?php endif; ?>
+
+        <!-- Alle akzeptierten Shops anzeigen -->
+        <div style="margin-top: 40px;">
+            <h2 class="jc-h" style="font-size: 28px; margin-bottom: 20px;">
+                🛒 Aktive Shops
+                <span style="background: rgba(88, 101, 242, 0.2); color: #5865F2; padding: 4px 12px; border-radius: 20px; font-size: 14px; margin-left: 12px;">
+                    <?php echo count( $accepted_shops ); ?>
+                </span>
+            </h2>
+
+            <?php if ( empty( $accepted_shops ) ) : ?>
+                <div class="jc-card" style="text-align: center; padding: 50px 30px !important;">
+                    <div style="font-size: 64px; margin-bottom: 15px; opacity: 0.5;">🏪</div>
+                    <p style="color: #a0a8b8; font-size: 16px;">
+                        Noch keine Shops vorhanden.<br>
+                        Sei der Erste und erstelle einen!
+                    </p>
+                </div>
+            <?php else : ?>
+                <div class="jc-grid">
+                    <?php foreach ( $accepted_shops as $shop ) :
+                        // Hole Profilbild vom Teilnehmer
+                        $teilnehmer_table = $wpdb->prefix . 'jc_teilnehmer';
+                        $teilnehmer = $wpdb->get_row( $wpdb->prepare(
+                            "SELECT profile_image_url, display_name FROM {$teilnehmer_table}
+                             WHERE application_id IN (
+                                 SELECT id FROM {$wpdb->prefix}jc_discord_applications
+                                 WHERE discord_id = %s
+                             ) LIMIT 1",
+                            $shop->discord_id
+                        ) );
+
+                        $creator_name = $teilnehmer ? $teilnehmer->display_name : $shop->discord_name;
+                        $profile_image = $teilnehmer && $teilnehmer->profile_image_url
+                            ? $teilnehmer->profile_image_url
+                            : 'https://via.placeholder.com/300x300/1e2740/6c7bff?text=' . urlencode( substr( $creator_name, 0, 2 ) );
+                    ?>
+                    <div class="jc-shop-card">
+                        <div class="jc-shop-header">
+                            <img src="<?php echo esc_url( $profile_image ); ?>" class="jc-shop-avatar" alt="">
+                            <div class="jc-shop-meta">
+                                <h3 class="jc-shop-name"><?php echo esc_html( $shop->shop_name ); ?></h3>
+                                <p class="jc-shop-owner">von <?php echo esc_html( $creator_name ); ?></p>
+                            </div>
+                        </div>
+                        <div class="jc-shop-items">
+                            <div class="jc-shop-items-label">📦 Verkauft:</div>
+                            <p class="jc-shop-items-text"><?php echo nl2br( esc_html( $shop->items ) ); ?></p>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <?php
+    jc_shop_styles();
     return ob_get_clean();
 }
 
-function jc_shop_get_user_shop( $discord_id ) {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-    jc_shop_install();
+// ========================================
+// DISCORD WEBHOOK
+// ========================================
 
-    return $wpdb->get_row( $wpdb->prepare(
-        "SELECT * FROM {$table} WHERE discord_id = %s",
-        $discord_id
+function jc_shop_send_webhook_notification( $discord_name, $shop_name, $items ) {
+    $webhook_url = JC_SHOP_WEBHOOK_URL;
+
+    $embed = array(
+        'title' => '🏪 Neuer Shop eingereicht!',
+        'description' => "**Shop:** {$shop_name}\n**Creator:** {$discord_name}\n\n**Verkauft:**\n{$items}",
+        'color' => hexdec( '5865F2' ),
+        'timestamp' => date( 'c' ),
+        'footer' => array(
+            'text' => 'JustCreators Shopping District'
+        )
+    );
+
+    $payload = array(
+        'embeds' => array( $embed )
+    );
+
+    wp_remote_post( $webhook_url, array(
+        'headers' => array( 'Content-Type' => 'application/json' ),
+        'body' => wp_json_encode( $payload ),
+        'timeout' => 10
     ) );
 }
 
-function jc_shop_render_login() {
-    // Check if constants are defined
-    if ( ! defined( 'JC_SHOP_CLIENT_ID' ) || ! defined( 'JC_SHOP_CLIENT_SECRET' ) ) {
-        ?>
-        <div class="jc-wrap">
-            <div class="jc-hero">
-                <div class="jc-hero-left">
-                    <div class="jc-kicker">⚠️ Konfigurationsfehler</div>
-                    <h1 class="jc-hero-title">Discord OAuth nicht konfiguriert</h1>
-                    <p class="jc-hero-sub">Bitte füge in wp-config.php folgende Zeilen hinzu:</p>
-                    <pre style="background:#0b0f1d;padding:12px;border-radius:8px;overflow-x:auto;color:#e9ecf7;">define('JC_DISCORD_CLIENT_ID', 'DEINE_CLIENT_ID');
-define('JC_DISCORD_CLIENT_SECRET', 'DEIN_CLIENT_SECRET');</pre>
-                    <p class="jc-hero-sub">Redirect URI: <strong><?php echo esc_html( jc_shop_get_redirect_uri() ); ?></strong></p>
-                </div>
-            </div>
-        </div>
-        <?php
-        return;
+// ========================================
+// ADMIN PAGE
+// ========================================
+
+add_action( 'admin_init', 'jc_shop_handle_admin_actions' );
+
+function jc_shop_handle_admin_actions() {
+    if ( ! current_user_can( 'manage_options' ) ) return;
+
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_shops';
+
+    // Shop annehmen
+    if ( isset( $_POST['jc_shop_accept'] ) && isset( $_POST['shop_id'] ) ) {
+        $id = intval( $_POST['shop_id'] );
+        check_admin_referer( 'jc_shop_accept_' . $id );
+
+        $wpdb->update( $table, array( 'status' => 'accepted' ), array( 'id' => $id ), array( '%s' ), array( '%d' ) );
+        add_settings_error( 'jc_shop', 'accepted', 'Shop akzeptiert!', 'updated' );
     }
 
-    $auth_url = 'https://discord.com/api/oauth2/authorize?' . http_build_query( array(
-        'client_id' => JC_SHOP_CLIENT_ID,
-        'redirect_uri' => jc_shop_get_redirect_uri(),
-        'response_type' => 'code',
-        'scope' => 'identify',
-    ) );
-    ?>
-    <div class="jc-wrap">
-        <div class="jc-hero">
-            <div class="jc-hero-left">
-                <div class="jc-kicker">🛍️ Shop Claim</div>
-                <h1 class="jc-hero-title">Claim deinen Shop</h1>
-                <p class="jc-hero-sub">Melde dich mit Discord an, um deinen Shop im Shopping District zu reservieren.</p>
-                <a class="jc-btn" href="<?php echo esc_url( $auth_url ); ?>">Mit Discord anmelden</a>
-            </div>
-            <div class="jc-hero-right">
-                <div class="jc-hero-badge">Login benötigt</div>
-            </div>
-        </div>
-    </div>
-    <?php
+    // Shop ablehnen
+    if ( isset( $_POST['jc_shop_reject'] ) && isset( $_POST['shop_id'] ) ) {
+        $id = intval( $_POST['shop_id'] );
+        check_admin_referer( 'jc_shop_reject_' . $id );
+
+        $wpdb->update( $table, array( 'status' => 'rejected' ), array( 'id' => $id ), array( '%s' ), array( '%d' ) );
+        add_settings_error( 'jc_shop', 'rejected', 'Shop abgelehnt.', 'updated' );
+    }
+
+    // Shop löschen
+    if ( isset( $_POST['jc_shop_delete'] ) && isset( $_POST['shop_id'] ) ) {
+        $id = intval( $_POST['shop_id'] );
+        check_admin_referer( 'jc_shop_delete_' . $id );
+
+        $wpdb->delete( $table, array( 'id' => $id ), array( '%d' ) );
+        add_settings_error( 'jc_shop', 'deleted', 'Shop gelöscht.', 'updated' );
+    }
+
+    // Shop bearbeiten
+    if ( isset( $_POST['jc_shop_edit_save'] ) && isset( $_POST['shop_id'] ) ) {
+        $id = intval( $_POST['shop_id'] );
+        check_admin_referer( 'jc_shop_edit_' . $id );
+
+        $wpdb->update( $table, array(
+            'shop_name' => sanitize_text_field( $_POST['shop_name'] ),
+            'items' => sanitize_textarea_field( $_POST['items'] ),
+            'status' => sanitize_text_field( $_POST['status'] )
+        ), array( 'id' => $id ), array( '%s', '%s', '%s' ), array( '%d' ) );
+
+        add_settings_error( 'jc_shop', 'updated', 'Shop aktualisiert!', 'updated' );
+    }
 }
 
-function jc_shop_render_denied( $discord_name ) {
-    ?>
-    <div class="jc-wrap">
-        <div class="jc-card">
-            <h2 class="jc-hero-title">Kein Zugriff</h2>
-            <p class="jc-hero-sub">Hallo <?php echo esc_html( $discord_name ); ?>, du musst ein akzeptierter Teilnehmer sein, um einen Shop zu claimen.</p>
-            <a class="jc-btn jc-btn-ghost" href="<?php echo esc_url( home_url( '/regeln' ) ); ?>">Status prüfen</a>
-        </div>
-    </div>
-    <?php
-}
+function jc_shop_render_admin_page() {
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_die( 'Keine Berechtigung' );
+    }
 
-function jc_shop_render_page( $user, $application, $member, $shop, $message, $error ) {
-    $items = jc_shop_get_available_items();
-    $social_channels = $application && isset( $application->social_channels ) ? maybe_unserialize( $application->social_channels ) : [];
-    $social_names = jc_shop_get_social_names( $social_channels );
-    ?>
-    <div class="jc-wrap">
-        <div class="jc-hero">
-            <div class="jc-hero-left">
-                <div class="jc-kicker">🛍️ Shops</div>
-                <h1 class="jc-hero-title">Claim deinen Shopplatz</h1>
-                <p class="jc-hero-sub">Du bist verifiziert! Sichere dir deinen Slot und wähle das Item, das exklusiv in deinem Shop verkauft wird.</p>
-                <div class="jc-hero-actions">
-                    <span class="jc-pill">Angemeldet als <?php echo esc_html( $user['username'] ); ?></span>
-                    <?php if ( $member && $member->minecraft_name ) : ?>
-                        <span class="jc-pill jc-pill-ghost">MC: <?php echo esc_html( $member->minecraft_name ); ?></span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <div class="jc-hero-right">
-                <div class="jc-hero-badge">Only 1 Item / Shop</div>
-            </div>
-        </div>
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_shops';
 
-        <?php if ( $message ) : ?><div class="jc-msg jc-success">✅ <?php echo esc_html( $message ); ?></div><?php endif; ?>
-        <?php if ( $error ) : ?><div class="jc-msg jc-error">❌ <?php echo esc_html( $error ); ?></div><?php endif; ?>
+    settings_errors( 'jc_shop' );
 
-        <?php if ( ! $shop ) : ?>
-            <div class="jc-card">
-                <h3 class="jc-section-title">Schritt 1: Shop claimen</h3>
-                <p class="jc-hero-sub">Reserviere deinen Shop-Platz im Shopping District.</p>
-                <form method="post" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:14px;">
-                    <?php wp_nonce_field( 'jc_shop_claim' ); ?>
-                    <button type="submit" name="jc_shop_claim" class="jc-btn">🛍️ Shop claimen</button>
+    // Edit Mode
+    if ( isset( $_GET['edit'] ) ) {
+        $shop = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $_GET['edit'] ) );
+        if ( $shop ) {
+            ?>
+            <div class="wrap">
+                <h1>Shop bearbeiten</h1>
+                <form method="post">
+                    <?php wp_nonce_field( 'jc_shop_edit_' . $shop->id ); ?>
+                    <input type="hidden" name="shop_id" value="<?php echo $shop->id; ?>">
+                    <table class="form-table">
+                        <tr>
+                            <th>Shop Name</th>
+                            <td><input name="shop_name" value="<?php echo esc_attr( $shop->shop_name ); ?>" class="regular-text"></td>
+                        </tr>
+                        <tr>
+                            <th>Items</th>
+                            <td><textarea name="items" rows="4" class="large-text"><?php echo esc_textarea( $shop->items ); ?></textarea></td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td>
+                                <select name="status">
+                                    <option value="draft" <?php selected( $shop->status, 'draft' ); ?>>Entwurf</option>
+                                    <option value="accepted" <?php selected( $shop->status, 'accepted' ); ?>>Akzeptiert</option>
+                                    <option value="rejected" <?php selected( $shop->status, 'rejected' ); ?>>Abgelehnt</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Creator</th>
+                            <td><?php echo esc_html( $shop->discord_name ); ?> (<?php echo esc_html( $shop->discord_id ); ?>)</td>
+                        </tr>
+                        <tr>
+                            <th>Erstellt am</th>
+                            <td><?php echo esc_html( $shop->created_at ); ?></td>
+                        </tr>
+                    </table>
+                    <p class="submit">
+                        <button type="submit" name="jc_shop_edit_save" class="button button-primary">Speichern</button>
+                        <a href="?page=jc-shopping-district" class="button">Zurück</a>
+                    </p>
                 </form>
             </div>
-        <?php else : ?>
-            <div class="jc-card">
-                <div class="jc-claim-row">
-                    <div>
-                        <div class="jc-label">Dein Shop</div>
-                        <div class="jc-shop-title"><?php echo esc_html( $shop->creator_name ); ?></div>
-                        <?php if ( $member && $member->minecraft_name ) : ?>
-                            <div class="jc-shop-sub">Skin: <?php echo esc_html( $member->minecraft_name ); ?></div>
-                        <?php endif; ?>
-                        <?php if ( ! empty( $social_names ) ) : ?>
-                            <div class="jc-social-names">
-                                <?php foreach ( $social_names as $plat => $name ) : ?>
-                                    <span class="jc-pill jc-pill-ghost"><?php echo esc_html( ucfirst( $plat ) . ': ' . $name ); ?></span>
-                                <?php endforeach; ?>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    <div class="jc-claim-actions">
-                            <?php if ( $shop->item_key ) : ?>
-                                <div class="jc-label">Dein Item</div>
-                                <div class="jc-item-chip">
-                                    <img src="<?php echo esc_url( $shop->item_icon ?: jc_shop_texture_url( $shop->item_key ) ); ?>" alt="Item" class="jc-mc-texture-small"> 
-                                    <?php echo esc_html( $shop->item_name ); ?>
-                                </div>
-                            <?php else : ?>
-                                <div class="jc-label">Schritt 2</div>
-                                <button type="button" class="jc-btn" onclick="document.getElementById('jc-item-modal').classList.add('open');">📦 Item hinzufügen</button>
-                            <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
-
-        <div class="jc-section">
-            <div class="jc-section-head">
-                <div>
-                    <div class="jc-label">Öffentliche Übersicht</div>
-                    <h3 class="jc-section-title">Shops im Shopping District</h3>
-                </div>
-                <div class="jc-pill jc-pill-ghost">1 Item pro Shop</div>
-            </div>
-            <div class="jc-shops-grid">
-                <?php jc_shop_render_public_grid(); ?>
-            </div>
-        </div>
-    </div>
-
-    <?php if ( $shop && ! $shop->item_key ) : ?>
-    <?php $taken_keys = jc_shop_get_taken_item_keys( $shop->id ); ?>
-    <div id="jc-item-modal" class="jc-modal">
-        <div class="jc-modal-content">
-            <div class="jc-modal-head">
-                <h4>📦 Item hinzufügen</h4>
-                <button type="button" class="jc-close" onclick="document.getElementById('jc-item-modal').classList.remove('open');">×</button>
-            </div>
-            <div style="margin-bottom:10px;"><input type="text" id="jc-item-search" placeholder="Suchen..." style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--jc-border);background:var(--jc-panel);color:var(--jc-text);"></div>
-            <form method="post" class="jc-items-grid" id="jc-items-grid">
-                <?php wp_nonce_field( 'jc_shop_item' ); ?>
-                <input type="hidden" name="jc_shop_item" value="1">
-                <?php foreach ( $items as $item ) : ?>
-                    <?php $taken = in_array( $item['key'], $taken_keys, true ); ?>
-                    <label class="jc-item-card <?php echo $taken ? 'disabled' : ''; ?>" data-name="<?php echo esc_attr( strtolower( $item['name'] ) ); ?>" data-key="<?php echo esc_attr( strtolower( $item['key'] ) ); ?>">
-                        <input type="radio" name="item_key" value="<?php echo esc_attr( $item['key'] ); ?>" <?php disabled( $taken ); ?> required>
-                        <div class="jc-item-icon"><img src="<?php echo esc_url( $item['icon'] ); ?>" alt="<?php echo esc_attr( $item['name'] ); ?>" class="jc-mc-texture"></div>
-                        <div class="jc-item-name"><?php echo esc_html( $item['name'] ); ?></div>
-                        <?php if ( $taken ) : ?><span class="jc-tag">vergeben</span><?php endif; ?>
-                    </label>
-                <?php endforeach; ?>
-                <div style="grid-column:1/-1;display:flex;justify-content:flex-end;gap:10px;margin-top:12px;">
-                    <button type="button" class="jc-btn jc-btn-ghost" onclick="document.getElementById('jc-item-modal').classList.remove('open');">Abbrechen</button>
-                    <button type="submit" class="jc-btn">Speichern</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <script>
-    document.addEventListener('keydown',function(e){if(e.key==='Escape'){var m=document.getElementById('jc-item-modal');if(m)m.classList.remove('open');}});
-    (function(){
-        var search = document.getElementById('jc-item-search');
-        var grid = document.getElementById('jc-items-grid');
-        if(!search || !grid) return;
-        var cards = grid.querySelectorAll('.jc-item-card');
-        search.addEventListener('input', function(){
-            var q = this.value.toLowerCase();
-            cards.forEach(function(card){
-                var text = card.dataset.name + ' ' + card.dataset.key;
-                card.style.display = text.indexOf(q) !== -1 ? '' : 'none';
-            });
-        });
-    })();
-    </script>
-    <?php endif; ?>
-    <?php
-}
-
-function jc_shop_render_public_grid() {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-    jc_shop_install();
-
-    $rows = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY claimed_at ASC" );
-
-    if ( empty( $rows ) ) {
-        echo '<div class="jc-hero-sub">Noch keine Shops vergeben.</div>';
-        return;
-    }
-
-    foreach ( $rows as $row ) {
-        $skin = $row->minecraft_name ? 'https://mc-heads.net/head/' . rawurlencode( $row->minecraft_name ) . '/200.png' : 'https://via.placeholder.com/200x200/0b0f1d/6c7bff?text=?';
-        echo '<div class="jc-shop-card">';
-        echo '<div class="jc-shop-skin"><img src="' . esc_url( $skin ) . '" alt="Skin"></div>';
-        echo '<div class="jc-shop-body">';
-        echo '<div class="jc-shop-name">' . esc_html( $row->creator_name ) . '</div>';
-        if ( $row->item_key ) {
-            $icon = $row->item_icon ?: jc_shop_texture_url( $row->item_key );
-            echo '<div class="jc-shop-item"><img src="' . esc_url( $icon ) . '" alt="Item" class="jc-mc-texture-small"> ' . esc_html( $row->item_name ) . '</div>';
-        } else {
-            echo '<div class="jc-shop-item" style="opacity:0.5;">Noch kein Item</div>';
-        }
-        echo '</div>';
-        echo '</div>';
-    }
-}
-
-function jc_shop_inline_styles() {
-    ?>
-    <style>
-        :root { --jc-bg:#050712; --jc-panel:#0b0f1d; --jc-border:#1e2740; --jc-text:#e9ecf7; --jc-muted:#9eb3d5; --jc-accent:#6c7bff; --jc-accent-2:#56d8ff; }
-        .jc-wrap { max-width: 1220px; margin: 26px auto; padding: 0 18px 40px; color: var(--jc-text); font-family: "Space Grotesk", "Inter", system-ui, -apple-system, sans-serif; }
-        .jc-hero { display:grid; grid-template-columns:2fr 1fr; gap:22px; background: radial-gradient(120% 140% at 10% 10%, rgba(108,123,255,0.12), transparent 50%), radial-gradient(110% 120% at 90% 20%, rgba(86,216,255,0.1), transparent 45%), var(--jc-panel); border:1px solid var(--jc-border); border-radius:20px; padding:28px; position:relative; overflow:hidden; box-shadow:0 22px 60px rgba(0,0,0,0.45); }
-        .jc-hero-left { position:relative; z-index:1; }
-        .jc-kicker { display:inline-flex; align-items:center; gap:8px; padding:6px 12px; background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); border-radius:999px; color:var(--jc-text); font-size:13px; letter-spacing:0.04em; text-transform:uppercase; }
-        .jc-hero-title { margin:10px 0 6px; font-size:32px; line-height:1.2; color:var(--jc-text); }
-        .jc-hero-sub { margin:0 0 14px; color:var(--jc-muted); line-height:1.6; max-width:780px; }
-        .jc-hero-actions { display:flex; gap:10px; flex-wrap:wrap; }
-        .jc-pill { background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); color:var(--jc-text); padding:8px 12px; border-radius:999px; font-weight:700; }
-        .jc-pill-ghost { background:transparent; border-color:var(--jc-border); color:var(--jc-muted); }
-        .jc-hero-right { position:relative; min-height:120px; display:flex; align-items:center; justify-content:flex-end; }
-        .jc-hero-badge { position:relative; z-index:1; padding:12px 18px; border-radius:14px; background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#040510; font-weight:800; letter-spacing:0.08em; box-shadow:0 18px 40px rgba(108,123,255,0.45); }
-        .jc-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; padding:22px; box-shadow:0 20px 54px rgba(0,0,0,0.4); margin-top:20px; }
-        .jc-section { margin-top:28px; }
-        .jc-section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-        .jc-section-title { margin:4px 0 0; font-size:22px; color:var(--jc-text); }
-        .jc-label { color:var(--jc-muted); font-size:13px; letter-spacing:0.05em; text-transform:uppercase; }
-        .jc-msg { margin-top:16px; padding:12px 14px; border-radius:12px; font-weight:700; border:1px solid var(--jc-border); }
-        .jc-success { background:rgba(86,216,255,0.08); border-color:rgba(86,216,255,0.4); color:#d1f2ff; }
-        .jc-error { background:rgba(255,105,105,0.12); border-color:rgba(255,105,105,0.35); color:#ffb3b3; }
-        .jc-btn { display:inline-flex; align-items:center; gap:8px; justify-content:center; padding:12px 16px; border-radius:12px; background:linear-gradient(135deg,var(--jc-accent),var(--jc-accent-2)); color:#050712; text-decoration:none; font-weight:800; letter-spacing:0.01em; box-shadow:0 14px 34px rgba(108,123,255,0.45); transition:transform .2s, box-shadow .2s; border:none; cursor:pointer; }
-        .jc-btn:hover { transform:translateY(-2px); box-shadow:0 16px 40px rgba(86,216,255,0.5); color:#050712; }
-        .jc-btn-ghost { background:transparent; color:var(--jc-text); border:1px solid var(--jc-border); box-shadow:none; }
-        .jc-claim-row { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
-        .jc-shop-title { font-size:24px; font-weight:800; color:var(--jc-text); }
-        .jc-shop-sub { color:var(--jc-muted); margin-top:6px; }
-        .jc-claim-actions { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
-        .jc-item-chip { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; background:rgba(108,123,255,0.15); border:1px solid rgba(108,123,255,0.35); border-radius:12px; font-weight:700; }
-        .jc-shops-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-top:14px; }
-        .jc-shop-card { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:16px; overflow:hidden; box-shadow:0 16px 40px rgba(0,0,0,0.35); display:flex; flex-direction:column; }
-        .jc-shop-skin { padding:16px; display:flex; justify-content:center; background:linear-gradient(135deg, rgba(108,123,255,0.05), rgba(86,216,255,0.05)); }
-        .jc-shop-skin img { width:120px; height:120px; display:block; background:#050712; border-radius:12px; image-rendering: pixelated; box-shadow:0 8px 20px rgba(0,0,0,0.3); }
-        .jc-shop-body { padding:14px 16px 18px; display:flex; flex-direction:column; gap:6px; }
-        .jc-shop-name { font-weight:800; font-size:18px; color:var(--jc-text); }
-        .jc-shop-item { color:var(--jc-muted); font-weight:700; display:flex; align-items:center; gap:8px; }
-        .jc-social-names { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
-        .jc-modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .2s; z-index:999; }
-        .jc-modal.open { opacity:1; pointer-events:auto; }
-        .jc-modal-content { background:var(--jc-panel); border:1px solid var(--jc-border); border-radius:18px; padding:18px; max-width:720px; width:calc(100% - 40px); box-shadow:0 24px 60px rgba(0,0,0,0.6); }
-        .jc-modal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-        .jc-close { background:transparent; border:none; color:var(--jc-text); font-size:22px; cursor:pointer; }
-        .jc-items-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; max-height:60vh; overflow-y:auto; padding-right:6px; }
-        .jc-item-card { border:1px solid var(--jc-border); border-radius:14px; padding:12px; display:flex; flex-direction:column; align-items:flex-start; gap:8px; cursor:pointer; position:relative; background:rgba(255,255,255,0.02); }
-        .jc-item-card input { display:none; }
-        .jc-item-card:hover { border-color:rgba(108,123,255,0.6); }
-        .jc-item-card input:checked + .jc-item-icon, .jc-item-card input:checked ~ .jc-item-name { color:var(--jc-text); }
-        .jc-item-icon { font-size:24px; display:flex; align-items:center; justify-content:center; }
-        .jc-mc-texture { width:40px; height:40px; image-rendering: pixelated; image-rendering: crisp-edges; }
-        .jc-mc-texture-small { width:24px; height:24px; image-rendering: pixelated; image-rendering: crisp-edges; vertical-align:middle; display:inline-block; }
-        .jc-item-name { font-weight:700; color:var(--jc-text); }
-        .jc-tag { position:absolute; top:10px; right:10px; background:rgba(255,105,105,0.15); color:#ffb3b3; padding:4px 8px; border-radius:999px; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; }
-        .jc-item-card.disabled { opacity:0.5; cursor:not-allowed; }
-        .jc-item-card.disabled:hover { border-color:var(--jc-border); }
-        @media (max-width: 900px) { .jc-hero { grid-template-columns:1fr; } .jc-hero-right { justify-content:flex-start; min-height:120px; } }
-        @media (max-width: 640px) { .jc-claim-row { align-items:flex-start; } }
-    </style>
-    <?php
-}
-
-// ============================================
-// ADMIN PAGE
-// ============================================
-
-function jc_shop_admin_menu() {
-    add_submenu_page(
-        JC_ADMIN_PARENT_SLUG,
-        'Shop Verwaltung',
-        'Shops',
-        'manage_options',
-        'jc-shops',
-        'jc_shop_admin_page'
-    );
-}
-
-function jc_shop_admin_page() {
-    global $wpdb;
-    $table = $wpdb->prefix . JC_SHOP_TABLE;
-    jc_shop_install();
-
-    // Handle Delete - MUSS VOR HTML OUTPUT erfolgen!
-    $delete_message = '';
-    if ( isset( $_POST['jc_shop_delete'] ) && isset( $_POST['delete_shop_id'] ) ) {
-        if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'jc_shop_delete_nonce' ) ) {
-            $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Sicherheitsprüfung fehlgeschlagen!</p></div>';
-        } else {
-            $id = intval( $_POST['delete_shop_id'] );
-            $deleted = $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
-            
-            if ( $deleted ) {
-                error_log( "JC Shop: Shop ID {$id} gelöscht" );
-                $delete_message = '<div class="notice notice-success is-dismissible"><p>✅ Shop erfolgreich gelöscht!</p></div>';
-            } else {
-                $delete_message = '<div class="notice notice-error is-dismissible"><p>❌ Fehler beim Löschen!</p></div>';
-            }
+            <?php
+            return;
         }
     }
 
-    // Handle Edit
-    $edit_message = '';
-    if ( isset( $_POST['jc_shop_edit'] ) && isset( $_POST['_wpnonce'] ) && wp_verify_nonce( $_POST['_wpnonce'], 'jc_shop_edit' ) ) {
-        $id = intval( $_POST['shop_id'] );
-        $item_key = sanitize_text_field( $_POST['item_key'] ?? '' );
-        $creator_name = sanitize_text_field( $_POST['creator_name'] );
-        $minecraft_name = sanitize_text_field( $_POST['minecraft_name'] );
-
-        $items = jc_shop_get_available_items();
-        $selected = null;
-        
-        if ( ! empty( $item_key ) ) {
-            foreach ( $items as $it ) {
-                if ( $it['key'] === $item_key ) {
-                    $selected = $it;
-                    break;
-                }
-            }
-        }
-
-        $update_data = [
-            'creator_name' => $creator_name,
-            'minecraft_name' => $minecraft_name ?: null,
-        ];
-        $update_format = [ '%s', '%s' ];
-        
-        if ( $selected ) {
-            $update_data['item_key'] = $selected['key'];
-            $update_data['item_name'] = $selected['name'];
-            $update_data['item_icon'] = $selected['icon'];
-            $update_format = [ '%s', '%s', '%s', '%s', '%s' ];
-        }
-
-        $wpdb->update(
-            $table,
-            $update_data,
-            [ 'id' => $id ],
-            $update_format,
-            [ '%d' ]
-        );
-        $edit_message = 'Shop aktualisiert.';
-    }
-
-    // Get all shops
-    $shops = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY claimed_at DESC" );
-    $items = jc_shop_get_available_items();
+    // List Mode
+    $shops = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" );
 
     ?>
     <div class="wrap">
-        <h1>🛍️ Shop Verwaltung</h1>
-        <p>Verwalte alle geclaimten Shops im Shopping District.</p>
+        <h1>🏪 Shopping District Verwaltung</h1>
 
-        <?php if ( ! empty( $delete_message ) ) : ?>
-            <?php echo $delete_message; ?>
-        <?php endif; ?>
+        <div class="notice notice-info" style="margin-top: 20px;">
+            <p><strong>Redirect URL für Discord OAuth:</strong> <code><?php echo JC_SHOP_REDIRECT_URI; ?></code></p>
+            <p style="margin-top: 10px;"><strong>Webhook URL:</strong> <code><?php echo substr( JC_SHOP_WEBHOOK_URL, 0, 50 ); ?>...</code></p>
+        </div>
 
-        <?php if ( $edit_message ) : ?>
-            <div class="notice notice-success is-dismissible"><p><?php echo esc_html( $edit_message ); ?></p></div>
-        <?php endif; ?>
-
-        <table class="wp-list-table widefat fixed striped">
+        <table class="wp-list-table widefat fixed striped" style="margin-top: 20px;">
             <thead>
                 <tr>
-                    <th style="width:60px;">ID</th>
-                    <th>Creator Name</th>
-                    <th>Minecraft Name</th>
-                    <th>Discord</th>
-                    <th>Item</th>
-                    <th style="width:100px;">Datum</th>
-                    <th style="width:150px;">Aktionen</th>
+                    <th>Shop Name</th>
+                    <th>Creator</th>
+                    <th>Items</th>
+                    <th>Status</th>
+                    <th>Erstellt</th>
+                    <th>Aktionen</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if ( empty( $shops ) ) : ?>
-                    <tr><td colspan="7">Keine Shops vorhanden.</td></tr>
+                    <tr><td colspan="6" style="text-align: center; padding: 30px;">Keine Shops vorhanden</td></tr>
                 <?php else : ?>
                     <?php foreach ( $shops as $shop ) : ?>
                         <tr>
-                            <td><?php echo esc_html( $shop->id ); ?></td>
-                            <td><strong><?php echo esc_html( $shop->creator_name ); ?></strong></td>
-                            <td><?php echo esc_html( $shop->minecraft_name ?: '—' ); ?></td>
+                            <td><strong><?php echo esc_html( $shop->shop_name ); ?></strong></td>
                             <td><?php echo esc_html( $shop->discord_name ); ?></td>
+                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <?php echo esc_html( substr( $shop->items, 0, 100 ) ); ?>...
+                            </td>
                             <td>
-                                <?php if ( $shop->item_key && strpos( $shop->item_icon, 'http' ) === 0 ) : ?>
-                                    <div style="display:flex;align-items:center;gap:6px;">
-                                        <img src="<?php echo esc_url( $shop->item_icon ); ?>" alt="Item" style="width:20px;height:20px;image-rendering:pixelated;">
-                                        <span><?php echo esc_html( $shop->item_name ); ?></span>
-                                    </div>
-                                <?php elseif ( $shop->item_key ) : ?>
-                                    <span><?php echo esc_html( $shop->item_name ); ?></span>
+                                <?php if ( $shop->status === 'draft' ) : ?>
+                                    <span style="background: #ffc107; color: #000; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">⏳ Entwurf</span>
+                                <?php elseif ( $shop->status === 'accepted' ) : ?>
+                                    <span style="background: #4ade80; color: #000; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">✅ Akzeptiert</span>
                                 <?php else : ?>
-                                    <span style="color:#999;">Kein Item</span>
+                                    <span style="background: #f44336; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">❌ Abgelehnt</span>
                                 <?php endif; ?>
                             </td>
-                            <td><?php echo esc_html( date( 'd.m.Y', strtotime( $shop->claimed_at ) ) ); ?></td>
+                            <td><?php echo esc_html( date( 'd.m.Y H:i', strtotime( $shop->created_at ) ) ); ?></td>
                             <td>
-                                <button class="button button-small" onclick="jcEditShop(<?php echo esc_js( json_encode( $shop ) ); ?>)">Bearbeiten</button>
-                                <form method="POST" style="display:inline;" onsubmit="return confirm('Shop wirklich löschen?');">
-                                    <?php wp_nonce_field( 'jc_shop_delete_nonce' ); ?>
-                                    <input type="hidden" name="jc_shop_delete" value="1">
-                                    <input type="hidden" name="delete_shop_id" value="<?php echo esc_attr( $shop->id ); ?>">
-                                    <button type="submit" class="button button-small" style="color:#b32d2e;">Löschen</button>
+                                <a href="?page=jc-shopping-district&edit=<?php echo $shop->id; ?>" class="button button-small">Bearbeiten</a>
+
+                                <?php if ( $shop->status === 'draft' ) : ?>
+                                    <form method="post" style="display: inline; margin-left: 4px;">
+                                        <?php wp_nonce_field( 'jc_shop_accept_' . $shop->id ); ?>
+                                        <input type="hidden" name="shop_id" value="<?php echo $shop->id; ?>">
+                                        <button type="submit" name="jc_shop_accept" class="button button-small button-primary">✅ Annehmen</button>
+                                    </form>
+                                    <form method="post" style="display: inline; margin-left: 4px;">
+                                        <?php wp_nonce_field( 'jc_shop_reject_' . $shop->id ); ?>
+                                        <input type="hidden" name="shop_id" value="<?php echo $shop->id; ?>">
+                                        <button type="submit" name="jc_shop_reject" class="button button-small" style="color: #f44336;">❌ Ablehnen</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <form method="post" style="display: inline; margin-left: 4px;" onsubmit="return confirm('Wirklich löschen?');">
+                                    <?php wp_nonce_field( 'jc_shop_delete_' . $shop->id ); ?>
+                                    <input type="hidden" name="shop_id" value="<?php echo $shop->id; ?>">
+                                    <button type="submit" name="jc_shop_delete" class="button button-small" style="color: red;">🗑️ Löschen</button>
                                 </form>
                             </td>
                         </tr>
@@ -894,61 +657,328 @@ function jc_shop_admin_page() {
                 <?php endif; ?>
             </tbody>
         </table>
-    </div>
 
-    <!-- Edit Modal -->
-    <div id="jc-edit-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:100000;align-items:center;justify-content:center;">
-        <div style="background:#fff;padding:24px;border-radius:8px;max-width:500px;width:calc(100% - 40px);box-shadow:0 8px 24px rgba(0,0,0,0.3);">
-            <h2 style="margin-top:0;">Shop bearbeiten</h2>
-            <form method="post">
-                <?php wp_nonce_field( 'jc_shop_edit' ); ?>
-                <input type="hidden" name="jc_shop_edit" value="1">
-                <input type="hidden" name="shop_id" id="edit-shop-id">
-                
-                <p>
-                    <label><strong>Creator Name:</strong></label><br>
-                    <input type="text" name="creator_name" id="edit-creator-name" class="regular-text" required>
-                </p>
-                
-                <p>
-                    <label><strong>Minecraft Name:</strong></label><br>
-                    <input type="text" name="minecraft_name" id="edit-minecraft-name" class="regular-text">
-                </p>
-                
-                <p>
-                    <label><strong>Item:</strong></label><br>
-                    <select name="item_key" id="edit-item-key" class="regular-text">
-                        <option value="">Kein Item</option>
-                        <?php foreach ( $items as $item ) : ?>
-                            <option value="<?php echo esc_attr( $item['key'] ); ?>">
-                                <?php echo esc_html( $item['name'] ); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </p>
-                
-                <p style="display:flex;gap:10px;">
-                    <button type="submit" class="button button-primary">Speichern</button>
-                    <button type="button" class="button" onclick="jcCloseEdit()">Abbrechen</button>
-                </p>
-            </form>
-        </div>
+        <p style="margin-top: 20px;">
+            <strong>Shortcode für die Seite:</strong> <code>[jc_shopping_district]</code>
+        </p>
     </div>
-
-    <script>
-    function jcEditShop(shop) {
-        document.getElementById('edit-shop-id').value = shop.id;
-        document.getElementById('edit-creator-name').value = shop.creator_name;
-        document.getElementById('edit-minecraft-name').value = shop.minecraft_name || '';
-        document.getElementById('edit-item-key').value = shop.item_key || '';
-        document.getElementById('jc-edit-modal').style.display = 'flex';
-    }
-    function jcCloseEdit() {
-        document.getElementById('jc-edit-modal').style.display = 'none';
-    }
-    </script>
     <?php
 }
 
-// END
-                                                          
+// ========================================
+// STYLES
+// ========================================
+
+function jc_shop_styles() {
+    ?>
+    <style>
+        @keyframes jc-fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes jc-slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes jc-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .jc-wrap {
+            background: linear-gradient(135deg, #1e1f26 0%, #2a2c36 100%);
+            max-width: 1200px;
+            width: min(1200px, calc(100% - 40px));
+            margin: 50px auto;
+            padding: 50px;
+            border-radius: 16px;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, Helvetica, sans-serif;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+
+        .jc-hero {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 22px;
+            background: radial-gradient(120% 140% at 10% 10%, rgba(108, 123, 255, 0.12), transparent 50%), #2a2c36;
+            border: 1px solid #1e2740;
+            border-radius: 20px;
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 22px 60px rgba(0,0,0,0.45);
+            margin-bottom: 30px;
+        }
+
+        .jc-hero-left {
+            position: relative;
+            z-index: 1;
+        }
+
+        .jc-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(108, 123, 255, 0.15);
+            border: 1px solid rgba(108, 123, 255, 0.35);
+            border-radius: 99px;
+            font-size: 13px;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: #dcddde;
+        }
+
+        .jc-hero-title {
+            margin: 10px 0 6px;
+            font-size: 32px;
+            color: #f0f0f0;
+            font-weight: 700;
+        }
+
+        .jc-hero-sub {
+            color: #9eb3d5;
+            line-height: 1.6;
+            max-width: 680px;
+            font-size: 15px;
+        }
+
+        .jc-hero-right {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .jc-card {
+            background: #2a2c36 !important;
+            padding: 35px !important;
+            border-radius: 14px !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+            animation: jc-fadeIn 0.8s ease-out 0.2s both !important;
+            border: 1px solid #1e2740 !important;
+        }
+
+        .jc-h {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f0f0f0;
+            margin: 0 0 15px 0;
+            line-height: 1.3;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .jc-label {
+            display: block !important;
+            color: #f0f0f0 !important;
+            font-weight: 600 !important;
+            margin: 0 0 8px !important;
+            font-size: 15px !important;
+        }
+
+        .jc-input {
+            width: 100% !important;
+            padding: 12px !important;
+            background: #3a3c4a !important;
+            border: 2px solid #4a4c5a !important;
+            border-radius: 10px !important;
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            font-family: inherit !important;
+            font-size: 15px !important;
+            transition: all 0.3s ease !important;
+            box-sizing: border-box !important;
+        }
+
+        .jc-input::placeholder {
+            color: #a0a8b8 !important;
+        }
+
+        .jc-input:focus {
+            outline: none !important;
+            border-color: #5865F2 !important;
+            box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.2) !important;
+            transform: translateY(-1px);
+        }
+
+        .jc-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 10px !important;
+            padding: 14px 28px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, #5865F2 0%, #4752c4 100%) !important;
+            color: #fff !important;
+            text-decoration: none !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            border: none !important;
+            cursor: pointer !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4) !important;
+        }
+
+        .jc-btn:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 20px rgba(88, 101, 242, 0.6) !important;
+            background: linear-gradient(135deg, #6470f3 0%, #5865F2 100%) !important;
+            color: #fff !important;
+            text-decoration: none !important;
+        }
+
+        .jc-btn-small {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            padding: 8px 16px !important;
+            border-radius: 8px !important;
+            background: rgba(88, 101, 242, 0.2) !important;
+            color: #dcddde !important;
+            text-decoration: none !important;
+            font-weight: 600 !important;
+            font-size: 13px !important;
+            border: 1px solid rgba(88, 101, 242, 0.3) !important;
+            cursor: pointer !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .jc-btn-small:hover {
+            background: rgba(88, 101, 242, 0.3) !important;
+            text-decoration: none !important;
+        }
+
+        .jc-msg {
+            padding: 16px 20px !important;
+            border-radius: 10px !important;
+            margin: 20px 0 !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            animation: jc-fadeIn 0.4s ease-out;
+        }
+
+        .jc-success {
+            background: rgba(74, 222, 128, 0.12) !important;
+            color: #4ade80 !important;
+            border-left: 4px solid #4ade80 !important;
+        }
+
+        .jc-error {
+            background: rgba(244, 67, 54, 0.12) !important;
+            color: #f44336 !important;
+            border-left: 4px solid #f44336 !important;
+        }
+
+        .jc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .jc-shop-card {
+            background: #2a2c36;
+            border: 1px solid #1e2740;
+            border-radius: 14px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+
+        .jc-shop-card:hover {
+            transform: translateY(-4px);
+            border-color: #5865F2;
+            box-shadow: 0 8px 24px rgba(88, 101, 242, 0.2);
+        }
+
+        .jc-shop-header {
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #1e2740;
+        }
+
+        .jc-shop-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #1e2740;
+        }
+
+        .jc-shop-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .jc-shop-name {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #f0f0f0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .jc-shop-owner {
+            margin: 4px 0 0;
+            font-size: 13px;
+            color: #9eb3d5;
+        }
+
+        .jc-shop-items {
+            background: rgba(108, 123, 255, 0.06);
+            padding: 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(108, 123, 255, 0.15);
+        }
+
+        .jc-shop-items-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #5865F2;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .jc-shop-items-text {
+            margin: 0;
+            color: #dcddde;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 768px) {
+            .jc-wrap {
+                padding: 30px 20px !important;
+                margin: 20px auto !important;
+            }
+
+            .jc-hero {
+                grid-template-columns: 1fr;
+            }
+
+            .jc-hero-right {
+                justify-content: flex-start;
+            }
+
+            .jc-card {
+                padding: 25px 20px !important;
+            }
+
+            .jc-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <?php
+}
+?>
