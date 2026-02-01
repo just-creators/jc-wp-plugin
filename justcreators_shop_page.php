@@ -218,28 +218,38 @@ function jc_shop_render_page() {
             if ( empty( $shop_name ) || empty( $items ) ) {
                 echo '<div class="jc-msg jc-error">❌ Shop Name und Items sind erforderlich</div>';
             } else {
-                // Prüfe ob User Member ist
-                $is_member = $wpdb->get_var( $wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$member_table} WHERE discord_id = %s AND rules_accepted = 1",
+                // Prüfe ob User bereits einen Shop hat
+                $existing_shop = $wpdb->get_var( $wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
                     $discord_id
                 ) );
 
-                if ( ! $is_member ) {
-                    echo '<div class="jc-msg jc-error">❌ Du musst erst die Regeln akzeptieren um einen Shop zu erstellen</div>';
+                if ( $existing_shop > 0 ) {
+                    echo '<div class="jc-msg jc-error">❌ Du hast bereits einen Shop eingereicht. Bei Fragen öffne ein Ticket im Discord!</div>';
                 } else {
-                    // Shop erstellen
-                    $wpdb->insert( $table, array(
-                        'discord_id' => $discord_id,
-                        'discord_name' => $discord_name,
-                        'shop_name' => $shop_name,
-                        'items' => $items,
-                        'status' => 'draft'
-                    ), array( '%s', '%s', '%s', '%s', '%s' ) );
+                    // Prüfe ob User Member ist
+                    $is_member = $wpdb->get_var( $wpdb->prepare(
+                        "SELECT COUNT(*) FROM {$member_table} WHERE discord_id = %s AND rules_accepted = 1",
+                        $discord_id
+                    ) );
 
-                    // Discord Webhook senden
-                    jc_shop_send_webhook_notification( $discord_name, $shop_name, $items );
+                    if ( ! $is_member ) {
+                        echo '<div class="jc-msg jc-error">❌ Du musst erst die Regeln akzeptieren um einen Shop zu erstellen</div>';
+                    } else {
+                        // Shop erstellen
+                        $wpdb->insert( $table, array(
+                            'discord_id' => $discord_id,
+                            'discord_name' => $discord_name,
+                            'shop_name' => $shop_name,
+                            'items' => $items,
+                            'status' => 'draft'
+                        ), array( '%s', '%s', '%s', '%s', '%s' ) );
 
-                    echo '<div class="jc-msg jc-success">✅ Shop eingereicht! Ein Admin wird ihn bald überprüfen.</div>';
+                        // Discord Webhook senden
+                        jc_shop_send_webhook_notification( $discord_name, $shop_name, $items );
+
+                        echo '<div class="jc-msg jc-success">✅ Shop eingereicht! Ein Admin wird ihn bald überprüfen.</div>';
+                    }
                 }
             }
         }
@@ -535,6 +545,9 @@ function jc_shop_render_admin_page() {
     global $wpdb;
     $table = $wpdb->prefix . 'jc_shops';
 
+    // Sicherstellen, dass die Tabelle existiert
+    jc_shop_install();
+
     settings_errors( 'jc_shop' );
 
     // Edit Mode
@@ -589,6 +602,9 @@ function jc_shop_render_admin_page() {
     // List Mode
     $shops = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" );
 
+    // Debug: Prüfe ob Tabelle existiert
+    $table_exists = $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) === $table;
+
     ?>
     <div class="wrap">
         <h1>🏪 Shopping District Verwaltung</h1>
@@ -596,6 +612,7 @@ function jc_shop_render_admin_page() {
         <div class="notice notice-info" style="margin-top: 20px;">
             <p><strong>Redirect URL für Discord OAuth:</strong> <code><?php echo JC_SHOP_REDIRECT_URI; ?></code></p>
             <p style="margin-top: 10px;"><strong>Webhook URL:</strong> <code><?php echo substr( JC_SHOP_WEBHOOK_URL, 0, 50 ); ?>...</code></p>
+            <p style="margin-top: 10px;"><strong>Debug:</strong> Tabelle existiert: <?php echo $table_exists ? '✅ Ja' : '❌ Nein'; ?> | Shops gefunden: <?php echo count( $shops ); ?> | Tabelle: <code><?php echo $table; ?></code></p>
         </div>
 
         <table class="wp-list-table widefat fixed striped" style="margin-top: 20px;">
