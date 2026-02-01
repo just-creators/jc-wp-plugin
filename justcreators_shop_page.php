@@ -40,6 +40,14 @@ function jc_shop_maybe_install() {
     
     if ( ! $table_exists ) {
         jc_shop_install();
+    } else {
+        // Prüfe ob shop_name Spalte existiert
+        $column_exists = $wpdb->get_var( "SHOW COLUMNS FROM {$table} LIKE 'shop_name'" );
+        if ( ! $column_exists ) {
+            // Tabelle hat falsche Struktur - neu erstellen
+            $wpdb->query( "DROP TABLE IF EXISTS {$table}" );
+            jc_shop_install();
+        }
     }
 }
 
