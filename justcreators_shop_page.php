@@ -276,6 +276,11 @@ function jc_shop_render_page() {
             "SELECT * FROM {$table} WHERE discord_id = %s ORDER BY created_at DESC LIMIT 1",
             $discord_user['id']
         ) );
+
+        // DEBUG: Zeige Shop-Status
+        if ( current_user_can( 'manage_options' ) ) {
+            error_log( "JC Shop DEBUG - User: " . $discord_user['id'] . " | Shop gefunden: " . ( $user_shop ? 'JA' : 'NEIN' ) . " | Status: " . ( $user_shop ? $user_shop->status : 'N/A' ) );
+        }
     }
 
     ?>
@@ -316,6 +321,23 @@ function jc_shop_render_page() {
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ( $is_logged_in ) : ?>
+            <!-- DEBUG INFO (nur für eingeloggte User) -->
+            <div class="jc-card" style="margin-top: 20px; background: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important;">
+                <h3 style="color: #ffc107; margin: 0 0 10px 0;">🔍 DEBUG INFO</h3>
+                <p style="color: #dcddde; font-size: 13px; font-family: monospace; line-height: 1.6;">
+                    <strong>Discord ID:</strong> <?php echo esc_html( $discord_user['id'] ); ?><br>
+                    <strong>Discord Name:</strong> <?php echo esc_html( $discord_user['username'] ); ?><br>
+                    <strong>Shop gefunden:</strong> <?php echo $user_shop ? '✅ JA' : '❌ NEIN'; ?><br>
+                    <?php if ( $user_shop ) : ?>
+                        <strong>Shop Name:</strong> <?php echo esc_html( $user_shop->shop_name ); ?><br>
+                        <strong>Shop Status:</strong> <?php echo esc_html( $user_shop->status ); ?><br>
+                        <strong>Erstellt am:</strong> <?php echo esc_html( $user_shop->created_at ); ?><br>
+                    <?php endif; ?>
+                </p>
+            </div>
+        <?php endif; ?>
 
         <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'draft' ) : ?>
             <!-- User hat bereits einen Shop eingereicht (Draft) -->
@@ -632,6 +654,13 @@ function jc_shop_render_admin_page() {
             <p style="margin-top: 10px;"><strong>Webhook URL:</strong> <code><?php echo substr( JC_SHOP_WEBHOOK_URL, 0, 50 ); ?>...</code></p>
             <p style="margin-top: 10px;"><strong>Debug:</strong> Tabelle existiert: <?php echo $table_exists ? '✅ Ja' : '❌ Nein'; ?> | Shops gefunden: <?php echo count( $shops ); ?> | Tabelle: <code><?php echo $table; ?></code></p>
         </div>
+
+        <?php if ( count( $shops ) > 0 ) : ?>
+            <div class="notice notice-warning" style="margin-top: 20px;">
+                <h4 style="margin: 0 0 10px 0;">🔍 RAW DATEN (Debug):</h4>
+                <pre style="background: #f0f0f0; padding: 10px; border-radius: 5px; overflow-x: auto; font-size: 11px;"><?php echo esc_html( print_r( $shops, true ) ); ?></pre>
+            </div>
+        <?php endif; ?>
 
         <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ccc; border-radius: 5px;">
             <h3 style="margin-top: 0;">🔧 Shop-Verwaltung</h3>
