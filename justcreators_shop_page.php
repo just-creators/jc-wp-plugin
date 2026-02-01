@@ -28,6 +28,21 @@ add_action( 'wp', 'jc_shop_ensure_session', 1 );
 
 register_activation_hook( __FILE__, 'jc_shop_install' );
 
+// Auch beim Init ausführen, falls Tabelle noch nicht existiert
+add_action( 'init', 'jc_shop_maybe_install' );
+
+function jc_shop_maybe_install() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'jc_shops';
+    
+    // Prüfe ob Tabelle existiert
+    $table_exists = $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) === $table;
+    
+    if ( ! $table_exists ) {
+        jc_shop_install();
+    }
+}
+
 function jc_shop_install() {
     global $wpdb;
     $table = $wpdb->prefix . 'jc_shops';
@@ -43,7 +58,7 @@ function jc_shop_install() {
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
-        KEY discord_id (discord_id),
+        UNIQUE KEY unique_discord_shop (discord_id),
         KEY status (status)
     ) {$charset};";
 
@@ -237,7 +252,7 @@ function jc_shop_render_page() {
                         echo '<div class="jc-msg jc-error">❌ Du musst erst die Regeln akzeptieren um einen Shop zu erstellen</div>';
                     } else {
                         // Shop erstellen
-                        $wpdb->insert( $table, array(
+                        $result = $wpdb->insert( $table, array(
                             'discord_id' => $discord_id,
                             'discord_name' => $discord_name,
                             'shop_name' => $shop_name,
@@ -245,10 +260,18 @@ function jc_shop_render_page() {
                             'status' => 'draft'
                         ), array( '%s', '%s', '%s', '%s', '%s' ) );
 
-                        // Discord Webhook senden
-                        jc_shop_send_webhook_notification( $discord_name, $shop_name, $items );
+                        if ( $result === false ) {
+                            // Datenbank-Fehler
+                            error_log( 'JC Shop Insert Error: ' . $wpdb->last_error );
+                            echo '<div class="jc-msg jc-error">❌ Fehler beim Speichern. Bitte versuche es erneut oder kontaktiere einen Admin.</div>';
+                        } else {
+                            // Erfolg - Discord Webhook senden
+                            jc_shop_send_webhook_notification( $discord_name, $shop_name, $items );
 
-                        echo '<div class="jc-msg jc-success">✅ Shop eingereicht! Ein Admin wird ihn bald überprüfen.</div>';
+                            // Seite neu laden um den Status anzuzeigen
+                            echo '<script>window.location.href = window.location.pathname;</script>';
+                            echo '<div class="jc-msg jc-success">✅ Shop erfolgreich eingereicht! Ein Admin wird ihn bald überprüfen.</div>';
+                        }
                     }
                 }
             }
@@ -322,63 +345,73 @@ function jc_shop_render_page() {
             </div>
         </div>
 
-        <?php if ( $is_logged_in ) : ?>
-            <!-- DEBUG INFO (nur für eingeloggte User) -->
-            <div class="jc-card" style="margin-top: 20px; background: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important;">
-                <h3 style="color: #ffc107; margin: 0 0 10px 0;">🔍 DEBUG INFO</h3>
-                <p style="color: #dcddde; font-size: 13px; font-family: monospace; line-height: 1.6;">
-                    <strong>Discord ID:</strong> <?php echo esc_html( $discord_user['id'] ); ?><br>
-                    <strong>Discord Name:</strong> <?php echo esc_html( $discord_user['username'] ); ?><br>
-                    <strong>Shop gefunden:</strong> <?php echo $user_shop ? '✅ JA' : '❌ NEIN'; ?><br>
-                    <?php if ( $user_shop ) : ?>
-                        <strong>Shop Name:</strong> <?php echo esc_html( $user_shop->shop_name ); ?><br>
-                        <strong>Shop Status:</strong> <?php echo esc_html( $user_shop->status ); ?><br>
-                        <strong>Erstellt am:</strong> <?php echo esc_html( $user_shop->created_at ); ?><br>
-                    <?php endif; ?>
-                </p>
+        <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'accepted' ) : ?>
+            <!-- User's Shop ist aktiv -->
+            <div class="jc-status-card jc-status-success" style="margin-top: 30px;">
+                <div class="jc-status-icon">✅</div>
+                <div class="jc-status-content">
+                    <h2 class="jc-status-title">Dein Shop ist aktiv!</h2>
+                    <p class="jc-status-text">
+                        <strong style="color: #4ade80;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> ist jetzt im Shopping District sichtbar.
+                    </p>
+                    <div class="jc-status-hint">
+                        💡 Möchtest du deinen Shop ändern oder einen weiteren erstellen? Erstelle ein Ticket im Discord!
+                    </div>
+                </div>
             </div>
         <?php endif; ?>
 
         <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'draft' ) : ?>
             <!-- User hat bereits einen Shop eingereicht (Draft) -->
-            <div class="jc-card" style="margin-top: 30px; background: rgba(255, 193, 7, 0.1) !important; border: 1px solid rgba(255, 193, 7, 0.3) !important;">
-                <div style="text-align: center;">
-                    <div style="font-size: 48px; margin-bottom: 15px;">⏳</div>
-                    <h2 class="jc-h" style="justify-content: center; margin-bottom: 10px;">Shop wird geprüft</h2>
-                    <p style="color: #dcddde; font-size: 15px; line-height: 1.8;">
-                        Dein Shop <strong style="color: #ffc107;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde eingereicht.<br>
-                        Ein Admin wird ihn bald überprüfen und freischalten.
+            <div class="jc-status-card jc-status-pending" style="margin-top: 30px;">
+                <div class="jc-status-icon">⏳</div>
+                <div class="jc-status-content">
+                    <h2 class="jc-status-title">Shop wird geprüft</h2>
+                    <p class="jc-status-text">
+                        Dein Shop <strong style="color: #ffc107;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde erfolgreich eingereicht und wartet auf Freigabe durch einen Admin.
                     </p>
-                    <p style="color: #a0a8b8; font-size: 14px; margin-top: 15px;">
-                        💡 <strong>Weitere Shops?</strong> Erstelle ein Ticket im Discord!
-                    </p>
+                    <div class="jc-status-meta">
+                        <span>📅 Eingereicht: <?php echo date('d.m.Y \u\m H:i', strtotime($user_shop->created_at)); ?> Uhr</span>
+                    </div>
+                    <div class="jc-status-hint">
+                        💡 Weitere Shops oder Änderungen? Erstelle ein Ticket im Discord!
+                    </div>
                 </div>
             </div>
         <?php elseif ( $is_logged_in && $user_shop && $user_shop->status === 'rejected' ) : ?>
             <!-- User's Shop wurde abgelehnt -->
-            <div class="jc-card" style="margin-top: 30px; background: rgba(244, 67, 54, 0.1) !important; border: 1px solid rgba(244, 67, 54, 0.3) !important;">
-                <div style="text-align: center;">
-                    <div style="font-size: 48px; margin-bottom: 15px;">❌</div>
-                    <h2 class="jc-h" style="justify-content: center; margin-bottom: 10px;">Shop abgelehnt</h2>
-                    <p style="color: #dcddde; font-size: 15px; line-height: 1.8;">
-                        Dein Shop <strong style="color: #f44336;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde leider abgelehnt.<br>
-                        Bitte erstelle ein Ticket im Discord für weitere Informationen.
+            <div class="jc-status-card jc-status-rejected" style="margin-top: 30px;">
+                <div class="jc-status-icon">❌</div>
+                <div class="jc-status-content">
+                    <h2 class="jc-status-title">Shop abgelehnt</h2>
+                    <p class="jc-status-text">
+                        Dein Shop <strong style="color: #f44336;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde leider abgelehnt.
                     </p>
+                    <div class="jc-status-hint">
+                        💬 Bitte erstelle ein Ticket im Discord für weitere Informationen und um den Grund zu erfahren.
+                    </div>
                 </div>
             </div>
-        <?php elseif ( $is_logged_in && ( ! $user_shop || $user_shop->status === 'rejected' ) ) : ?>
+        <?php elseif ( $is_logged_in && ! $user_shop ) : ?>
             <!-- Shop Erstellungsformular -->
-            <div class="jc-card" style="margin-top: 30px;">
-                <h2 class="jc-h">🏪 Erstelle deinen Shop</h2>
-                <p style="color: #a0a8b8; margin-bottom: 25px; line-height: 1.6;">
-                    Fülle das Formular aus, um deinen Shop für den Shopping District einzureichen.
+            <div class="jc-card jc-form-card" style="margin-top: 30px;">
+                <div class="jc-form-header">
+                    <div class="jc-form-icon">🏪</div>
+                    <h2 class="jc-h">Erstelle deinen Shop</h2>
+                </div>
+                <p class="jc-form-desc">
+                    Reiche deinen Shop für den Shopping District ein. Pro Spieler ist <strong>ein Shop</strong> erlaubt.
                 </p>
 
-                <form method="POST" style="margin-top: 20px;">
+                <form method="POST" class="jc-shop-form">
                     <?php wp_nonce_field( 'jc_shop_create' ); ?>
 
-                    <div style="margin-bottom: 20px;">
-                        <label class="jc-label">Shop Name *</label>
+                    <div class="jc-form-group">
+                        <label class="jc-label">
+                            <span class="jc-label-icon">🏷️</span>
+                            Shop Name
+                            <span class="jc-required">*</span>
+                        </label>
                         <input
                             class="jc-input"
                             type="text"
@@ -389,49 +422,57 @@ function jc_shop_render_page() {
                         />
                     </div>
 
-                    <div style="margin-bottom: 25px;">
-                        <label class="jc-label">Was verkaufst du? *</label>
+                    <div class="jc-form-group">
+                        <label class="jc-label">
+                            <span class="jc-label-icon">📦</span>
+                            Was verkaufst du?
+                            <span class="jc-required">*</span>
+                        </label>
                         <textarea
-                            class="jc-input"
+                            class="jc-input jc-textarea"
                             name="items"
                             required
                             rows="4"
-                            placeholder="z.B. Redstone-Komponenten, Schaltungen, Farmen-Designs"
-                            style="resize: vertical;"
+                            placeholder="z.B. Redstone-Komponenten, Schaltungen, Farmen-Designs..."
                         ></textarea>
-                        <small style="color: #a0a8b8; display: block; margin-top: 8px; font-size: 13px;">
-                            Beschreibe deine Items oder Gruppen von Items
+                        <small class="jc-form-hint">
+                            Beschreibe kurz, welche Items oder Dienstleistungen du anbietest
                         </small>
                     </div>
 
-                    <div style="background: rgba(74, 222, 128, 0.08); padding: 18px; border-radius: 10px; border-left: 4px solid #4ade80; margin-bottom: 25px;">
-                        <p style="color: #dcddde; margin: 0; font-size: 14px; line-height: 1.7;">
-                            💡 <strong>Hinweis:</strong> Weitere Shops können später über ein Ticket im Discord erstellt werden.
-                        </p>
+                    <div class="jc-info-box">
+                        <div class="jc-info-icon">💡</div>
+                        <div class="jc-info-text">
+                            <strong>Hinweis:</strong> Du kannst nur einen Shop einreichen. Für weitere Shops oder Änderungen erstelle bitte ein Ticket im Discord.
+                        </div>
                     </div>
 
-                    <button type="submit" name="jc_shop_create" class="jc-btn" style="width: 100%; font-size: 16px; padding: 14px;">
-                        🚀 Shop einreichen
+                    <button type="submit" name="jc_shop_create" class="jc-btn jc-btn-submit">
+                        <span class="jc-btn-icon">🚀</span>
+                        Shop einreichen
                     </button>
                 </form>
             </div>
         <?php endif; ?>
 
         <!-- Alle akzeptierten Shops anzeigen -->
-        <div style="margin-top: 40px;">
-            <h2 class="jc-h" style="font-size: 28px; margin-bottom: 20px;">
-                🛒 Aktive Shops
-                <span style="background: rgba(88, 101, 242, 0.2); color: #5865F2; padding: 4px 12px; border-radius: 20px; font-size: 14px; margin-left: 12px;">
-                    <?php echo count( $accepted_shops ); ?>
+        <div class="jc-shops-section">
+            <div class="jc-section-header">
+                <h2 class="jc-section-title">
+                    <span class="jc-section-icon">🛒</span>
+                    Aktive Shops
+                </h2>
+                <span class="jc-shop-count">
+                    <?php echo count( $accepted_shops ); ?> Shop<?php echo count( $accepted_shops ) !== 1 ? 's' : ''; ?>
                 </span>
-            </h2>
+            </div>
 
             <?php if ( empty( $accepted_shops ) ) : ?>
-                <div class="jc-card" style="text-align: center; padding: 50px 30px !important;">
-                    <div style="font-size: 64px; margin-bottom: 15px; opacity: 0.5;">🏪</div>
-                    <p style="color: #a0a8b8; font-size: 16px;">
-                        Noch keine Shops vorhanden.<br>
-                        Sei der Erste und erstelle einen!
+                <div class="jc-empty-state">
+                    <div class="jc-empty-icon">🏪</div>
+                    <h3 class="jc-empty-title">Noch keine Shops vorhanden</h3>
+                    <p class="jc-empty-text">
+                        Sei der Erste und erstelle deinen eigenen Shop im Shopping District!
                     </p>
                 </div>
             <?php else : ?>
@@ -1042,6 +1083,237 @@ function jc_shop_styles() {
             line-height: 1.6;
         }
 
+        /* Status Cards */
+        .jc-status-card {
+            display: flex;
+            gap: 20px;
+            padding: 28px !important;
+            border-radius: 16px;
+            animation: jc-fadeIn 0.6s ease-out;
+        }
+
+        .jc-status-pending {
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.08) 0%, rgba(255, 152, 0, 0.04) 100%);
+            border: 1px solid rgba(255, 193, 7, 0.25);
+        }
+
+        .jc-status-rejected {
+            background: linear-gradient(135deg, rgba(244, 67, 54, 0.08) 0%, rgba(229, 57, 53, 0.04) 100%);
+            border: 1px solid rgba(244, 67, 54, 0.25);
+        }
+
+        .jc-status-success {
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.08) 0%, rgba(34, 197, 94, 0.04) 100%);
+            border: 1px solid rgba(74, 222, 128, 0.25);
+        }
+
+        .jc-status-icon {
+            font-size: 42px;
+            flex-shrink: 0;
+        }
+
+        .jc-status-content {
+            flex: 1;
+        }
+
+        .jc-status-title {
+            margin: 0 0 8px 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: #f0f0f0;
+        }
+
+        .jc-status-text {
+            color: #dcddde;
+            font-size: 15px;
+            line-height: 1.7;
+            margin: 0 0 12px 0;
+        }
+
+        .jc-status-meta {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #9eb3d5;
+        }
+
+        .jc-status-hint {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #a0a8b8;
+            line-height: 1.6;
+        }
+
+        /* Form Card */
+        .jc-form-card {
+            background: linear-gradient(145deg, #2d2f3a 0%, #2a2c36 100%) !important;
+        }
+
+        .jc-form-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
+
+        .jc-form-icon {
+            font-size: 36px;
+        }
+
+        .jc-form-header .jc-h {
+            margin: 0;
+        }
+
+        .jc-form-desc {
+            color: #9eb3d5;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 28px 0;
+        }
+
+        .jc-shop-form {
+            display: flex;
+            flex-direction: column;
+            gap: 22px;
+        }
+
+        .jc-form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .jc-label {
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            color: #f0f0f0 !important;
+            font-weight: 600 !important;
+            font-size: 15px !important;
+            margin: 0 !important;
+        }
+
+        .jc-label-icon {
+            font-size: 16px;
+        }
+
+        .jc-required {
+            color: #f44336;
+            font-weight: 700;
+        }
+
+        .jc-textarea {
+            resize: vertical !important;
+            min-height: 100px;
+        }
+
+        .jc-form-hint {
+            color: #7a8599;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .jc-info-box {
+            display: flex;
+            gap: 14px;
+            padding: 16px 18px;
+            background: rgba(88, 101, 242, 0.08);
+            border: 1px solid rgba(88, 101, 242, 0.2);
+            border-radius: 10px;
+        }
+
+        .jc-info-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .jc-info-text {
+            color: #dcddde;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .jc-btn-submit {
+            width: 100%;
+            padding: 16px !important;
+            font-size: 16px !important;
+            gap: 10px !important;
+        }
+
+        .jc-btn-icon {
+            font-size: 18px;
+        }
+
+        /* Shops Section */
+        .jc-shops-section {
+            margin-top: 50px;
+        }
+
+        .jc-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(108, 123, 255, 0.15);
+        }
+
+        .jc-section-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+            font-size: 26px;
+            font-weight: 700;
+            color: #f0f0f0;
+        }
+
+        .jc-section-icon {
+            font-size: 28px;
+        }
+
+        .jc-shop-count {
+            background: linear-gradient(135deg, rgba(88, 101, 242, 0.2) 0%, rgba(88, 101, 242, 0.1) 100%);
+            color: #8b9dff;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 1px solid rgba(88, 101, 242, 0.25);
+        }
+
+        /* Empty State */
+        .jc-empty-state {
+            text-align: center;
+            padding: 60px 30px;
+            background: #2a2c36;
+            border: 1px dashed rgba(108, 123, 255, 0.25);
+            border-radius: 16px;
+        }
+
+        .jc-empty-icon {
+            font-size: 72px;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+
+        .jc-empty-title {
+            margin: 0 0 8px 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #9eb3d5;
+        }
+
+        .jc-empty-text {
+            margin: 0;
+            color: #7a8599;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
         @media (max-width: 768px) {
             .jc-wrap {
                 padding: 30px 20px !important;
@@ -1062,6 +1334,36 @@ function jc_shop_styles() {
 
             .jc-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .jc-status-card {
+                flex-direction: column;
+                text-align: center;
+                gap: 16px;
+            }
+
+            .jc-status-hint {
+                text-align: left;
+            }
+
+            .jc-section-header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+
+            .jc-section-title {
+                font-size: 22px;
+            }
+
+            .jc-form-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 10px;
+            }
+
+            .jc-form-icon {
+                font-size: 42px;
             }
         }
     </style>
