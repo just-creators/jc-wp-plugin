@@ -58,7 +58,7 @@ function jc_shop_install() {
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
-        UNIQUE KEY unique_discord_shop (discord_id),
+        KEY discord_id (discord_id),
         KEY status (status)
     ) {$charset};";
 
