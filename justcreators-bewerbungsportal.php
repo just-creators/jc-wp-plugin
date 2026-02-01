@@ -3001,6 +3001,11 @@ function jc_admin_bewerbungen_page() {
 require_once plugin_dir_path( __FILE__ ) . 'justcreators_rules_page.php';
 
 // ========================================
+// SHOPPING DISTRICT LADEN
+// ========================================
+require_once plugin_dir_path( __FILE__ ) . 'justcreators_shop_page.php';
+
+// ========================================
 // COUNTDOWN SHORTCODE
 // ========================================
 add_shortcode( 'jc_countdown', 'jc_application_countdown_shortcode' );
