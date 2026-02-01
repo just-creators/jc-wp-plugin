@@ -535,6 +535,24 @@ function jc_shop_handle_admin_actions() {
 
         add_settings_error( 'jc_shop', 'updated', 'Shop aktualisiert!', 'updated' );
     }
+
+    // Alle Shops zurücksetzen (komplett leeren)
+    if ( isset( $_POST['jc_shop_reset_all'] ) ) {
+        check_admin_referer( 'jc_shop_reset_all' );
+
+        $count = $wpdb->query( "DELETE FROM {$table}" );
+        add_settings_error( 'jc_shop', 'reset', "✅ Alle Shops gelöscht ({$count} Einträge)!", 'updated' );
+    }
+
+    // Shops eines bestimmten Users zurücksetzen
+    if ( isset( $_POST['jc_shop_reset_user'] ) && isset( $_POST['discord_id'] ) ) {
+        check_admin_referer( 'jc_shop_reset_user' );
+
+        $discord_id = sanitize_text_field( $_POST['discord_id'] );
+        $count = $wpdb->delete( $table, array( 'discord_id' => $discord_id ), array( '%s' ) );
+
+        add_settings_error( 'jc_shop', 'reset_user', "✅ Shops von User {$discord_id} gelöscht ({$count} Einträge)!", 'updated' );
+    }
 }
 
 function jc_shop_render_admin_page() {
@@ -613,6 +631,28 @@ function jc_shop_render_admin_page() {
             <p><strong>Redirect URL für Discord OAuth:</strong> <code><?php echo JC_SHOP_REDIRECT_URI; ?></code></p>
             <p style="margin-top: 10px;"><strong>Webhook URL:</strong> <code><?php echo substr( JC_SHOP_WEBHOOK_URL, 0, 50 ); ?>...</code></p>
             <p style="margin-top: 10px;"><strong>Debug:</strong> Tabelle existiert: <?php echo $table_exists ? '✅ Ja' : '❌ Nein'; ?> | Shops gefunden: <?php echo count( $shops ); ?> | Tabelle: <code><?php echo $table; ?></code></p>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ccc; border-radius: 5px;">
+            <h3 style="margin-top: 0;">🔧 Shop-Verwaltung</h3>
+
+            <!-- User-spezifischer Reset -->
+            <form method="post" style="display: inline-block; margin-right: 10px;">
+                <?php wp_nonce_field( 'jc_shop_reset_user' ); ?>
+                <label for="discord_id_reset" style="margin-right: 10px;">Shop von User löschen:</label>
+                <input type="text" id="discord_id_reset" name="discord_id" placeholder="Discord ID" required style="width: 200px;">
+                <button type="submit" name="jc_shop_reset_user" class="button" onclick="return confirm('Alle Shops dieses Users wirklich löschen?');">
+                    🗑️ User-Shops löschen
+                </button>
+            </form>
+
+            <!-- Kompletter Reset -->
+            <form method="post" style="display: inline-block;">
+                <?php wp_nonce_field( 'jc_shop_reset_all' ); ?>
+                <button type="submit" name="jc_shop_reset_all" class="button button-secondary" onclick="return confirm('⚠️ ACHTUNG: Wirklich ALLE Shops unwiderruflich löschen?');" style="color: #d63638;">
+                    ⚠️ ALLE Shops löschen
+                </button>
+            </form>
         </div>
 
         <table class="wp-list-table widefat fixed striped" style="margin-top: 20px;">
