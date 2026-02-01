@@ -252,18 +252,22 @@ function jc_shop_render_page() {
                         echo '<div class="jc-msg jc-error">❌ Du musst erst die Regeln akzeptieren um einen Shop zu erstellen</div>';
                     } else {
                         // Shop erstellen
-                        $result = $wpdb->insert( $table, array(
+                        $insert_data = array(
                             'discord_id' => $discord_id,
                             'discord_name' => $discord_name,
                             'shop_name' => $shop_name,
                             'items' => $items,
                             'status' => 'draft'
-                        ), array( '%s', '%s', '%s', '%s', '%s' ) );
+                        );
+                        
+                        $result = $wpdb->insert( $table, $insert_data, array( '%s', '%s', '%s', '%s', '%s' ) );
 
                         if ( $result === false ) {
                             // Datenbank-Fehler
                             error_log( 'JC Shop Insert Error: ' . $wpdb->last_error );
-                            echo '<div class="jc-msg jc-error">❌ Fehler beim Speichern. Bitte versuche es erneut oder kontaktiere einen Admin.</div>';
+                            error_log( 'JC Shop Insert Data: ' . print_r( $insert_data, true ) );
+                            error_log( 'JC Shop Table: ' . $table );
+                            echo '<div class="jc-msg jc-error">❌ Fehler beim Speichern: ' . esc_html( $wpdb->last_error ) . '</div>';
                         } else {
                             // Erfolg - Discord Webhook senden
                             jc_shop_send_webhook_notification( $discord_name, $shop_name, $items );
