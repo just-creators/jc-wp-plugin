@@ -13,7 +13,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'JC_SHOP_CLIENT_ID', '1436449319849824480' );
 define( 'JC_SHOP_CLIENT_SECRET', 'KTPe1JrmSRzvyKV_jbvmacQCLTwunDla' );
 define( 'JC_SHOP_REDIRECT_URI', 'https://just-creators.de/shopping-district' ); // WICHTIG: Anpassen!
-define( 'JC_SHOP_WEBHOOK_URL', 'https://discord.com/api/webhooks/1467539825304404225/u8X6wrVdVBCGFqQpriuCjsilmFMAiUHpukiECf0nzPPuMpYxSgAzP7iyo3i9FB5p-WPC' );
+
+// Webhook URL aus wp-config.php laden (JC_SHOP_WEBHOOK_URL muss dort definiert sein)
+if ( ! defined( 'JC_SHOP_WEBHOOK_URL' ) ) {
+    define( 'JC_SHOP_WEBHOOK_URL', '' );
+}
 
 // ========================================
 // SESSION & INSTALLATION
@@ -357,8 +361,16 @@ function jc_shop_render_page() {
             </div>
         </div>
 
-        <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'accepted' ) : ?>
-            <!-- User's Shop ist aktiv -->
+        <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'accepted' ) : 
+            // Prüfe ob die Erfolgsmeldung bereits angezeigt wurde
+            $cookie_name = 'jc_shop_accepted_seen_' . $user_shop->id;
+            $already_seen = isset( $_COOKIE[$cookie_name] );
+            
+            if ( ! $already_seen ) :
+                // Cookie setzen, damit die Meldung nur einmal erscheint
+                setcookie( $cookie_name, '1', time() + (365 * 24 * 60 * 60), '/', '', true, true );
+        ?>
+            <!-- User's Shop wurde gerade akzeptiert - einmalige Meldung -->
             <div class="jc-status-card jc-status-success" style="margin-top: 30px;">
                 <div class="jc-status-icon">✅</div>
                 <div class="jc-status-content">
@@ -371,7 +383,7 @@ function jc_shop_render_page() {
                     </div>
                 </div>
             </div>
-        <?php endif; ?>
+        <?php endif; endif; ?>
 
         <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'draft' ) : ?>
             <!-- User hat bereits einen Shop eingereicht (Draft) -->
@@ -997,19 +1009,20 @@ function jc_shop_styles() {
             margin: 20px 0 !important;
             font-weight: 600 !important;
             font-size: 15px !important;
+            text-align: center !important;
             animation: jc-fadeIn 0.4s ease-out;
         }
 
         .jc-success {
             background: rgba(74, 222, 128, 0.12) !important;
             color: #4ade80 !important;
-            border-left: 4px solid #4ade80 !important;
+            border: 1px solid rgba(74, 222, 128, 0.3) !important;
         }
 
         .jc-error {
             background: rgba(244, 67, 54, 0.12) !important;
             color: #f44336 !important;
-            border-left: 4px solid #f44336 !important;
+            border: 1px solid rgba(244, 67, 54, 0.3) !important;
         }
 
         .jc-grid {
