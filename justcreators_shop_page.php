@@ -246,13 +246,17 @@ function jc_shop_render_page() {
                 echo '<div class="jc-msg jc-error">❌ Shop Name und Items sind erforderlich</div>';
             } else {
                 // Prüfe ob User bereits einen Shop hat
-                $existing_shop = $wpdb->get_var( $wpdb->prepare(
+                $existing_shops_count = $wpdb->get_var( $wpdb->prepare(
                     "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
                     $discord_id
                 ) );
 
-                if ( $existing_shop > 0 ) {
-                    echo '<div class="jc-msg jc-error">❌ Du hast bereits einen Shop eingereicht. Bei Fragen öffne ein Ticket im Discord!</div>';
+                // Hole das Limit für diesen User (Standard: 1 Shop)
+                $user_limits = get_option( 'jc_shop_user_limits', array() );
+                $max_shops = isset( $user_limits[$discord_id] ) ? intval( $user_limits[$discord_id] ) : 1;
+
+                if ( $existing_shops_count >= $max_shops ) {
+                    echo '<div class="jc-msg jc-error">❌ Du hast bereits ' . $existing_shops_count . ' Shop(s) eingereicht (Limit: ' . $max_shops . '). Bei Fragen öffne ein Ticket im Discord!</div>';
                 } else {
                     // Prüfe ob User Member ist
                     $is_member = $wpdb->get_var( $wpdb->prepare(
@@ -320,17 +324,25 @@ function jc_shop_render_page() {
         "SELECT * FROM {$table} WHERE status = 'accepted' ORDER BY created_at DESC"
     );
 
-    // User's eigenen Shop laden (falls angemeldet)
-    $user_shop = null;
+    // User's eigene Shops laden (falls angemeldet)
+    $user_shops = array();
+    $user_limits_data = get_option( 'jc_shop_user_limits', array() );
+    $user_max_shops = 1;
+    $can_create_shop = false;
+
     if ( $is_logged_in ) {
-        $user_shop = $wpdb->get_row( $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE discord_id = %s ORDER BY created_at DESC LIMIT 1",
+        $user_shops = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM {$table} WHERE discord_id = %s ORDER BY created_at DESC",
             $discord_user['id']
         ) );
 
+        // Hole das Limit für diesen User
+        $user_max_shops = isset( $user_limits_data[$discord_user['id']] ) ? intval( $user_limits_data[$discord_user['id']] ) : 1;
+        $can_create_shop = count( $user_shops ) < $user_max_shops;
+
         // DEBUG: Zeige Shop-Status
         if ( current_user_can( 'manage_options' ) ) {
-            error_log( "JC Shop DEBUG - User: " . $discord_user['id'] . " | Shop gefunden: " . ( $user_shop ? 'JA' : 'NEIN' ) . " | Status: " . ( $user_shop ? $user_shop->status : 'N/A' ) );
+            error_log( "JC Shop DEBUG - User: " . $discord_user['id'] . " | Shops: " . count( $user_shops ) . " | Limit: " . $user_max_shops );
         }
     }
 
@@ -373,14 +385,18 @@ function jc_shop_render_page() {
             </div>
         </div>
 
-        <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'accepted' ) : 
-            // Prüfe ob die Erfolgsmeldung bereits angezeigt wurde
-            $cookie_name = 'jc_shop_accepted_seen_' . $user_shop->id;
-            $already_seen = isset( $_COOKIE[$cookie_name] );
-            
-            if ( ! $already_seen ) :
-                // Cookie setzen, damit die Meldung nur einmal erscheint
-                setcookie( $cookie_name, '1', time() + (365 * 24 * 60 * 60), '/', '', true, true );
+        <?php
+        // Zeige alle Shops des Users an
+        if ( $is_logged_in && ! empty( $user_shops ) ) :
+            foreach ( $user_shops as $shop ) :
+                if ( $shop->status === 'accepted' ) :
+                    // Prüfe ob die Erfolgsmeldung bereits angezeigt wurde
+                    $cookie_name = 'jc_shop_accepted_seen_' . $shop->id;
+                    $already_seen = isset( $_COOKIE[$cookie_name] );
+
+                    if ( ! $already_seen ) :
+                        // Cookie setzen, damit die Meldung nur einmal erscheint
+                        setcookie( $cookie_name, '1', time() + (365 * 24 * 60 * 60), '/', '', true, true );
         ?>
             <!-- User's Shop wurde gerade akzeptiert - einmalige Meldung -->
             <div class="jc-status-card jc-status-success" style="margin-top: 30px;">
@@ -388,47 +404,68 @@ function jc_shop_render_page() {
                 <div class="jc-status-content">
                     <h2 class="jc-status-title">Dein Shop ist aktiv!</h2>
                     <p class="jc-status-text">
-                        <strong style="color: #4ade80;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> ist jetzt im Shopping District sichtbar.
+                        <strong style="color: #4ade80;">"<?php echo esc_html( $shop->shop_name ); ?>"</strong> ist jetzt im Shopping District sichtbar.
                     </p>
                     <div class="jc-status-hint">
-                        💡 Möchtest du deinen Shop ändern oder einen weiteren erstellen? Erstelle ein Ticket im Discord!
+                        <?php if ( $can_create_shop ) : ?>
+                            💡 Du kannst noch <?php echo $user_max_shops - count( $user_shops ); ?> weitere Shop(s) erstellen! Scrolle nach unten zum Formular.
+                        <?php else : ?>
+                            💡 Möchtest du deinen Shop ändern? Erstelle ein Ticket im Discord!
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-        <?php endif; endif; ?>
-
-        <?php if ( $is_logged_in && $user_shop && $user_shop->status === 'draft' ) : ?>
-            <!-- User hat bereits einen Shop eingereicht (Draft) -->
+        <?php
+                    endif;
+                elseif ( $shop->status === 'draft' ) :
+        ?>
+            <!-- User hat einen Shop eingereicht (Draft) -->
             <div class="jc-status-card jc-status-pending" style="margin-top: 30px;">
                 <div class="jc-status-icon">⏳</div>
                 <div class="jc-status-content">
                     <h2 class="jc-status-title">Shop wird geprüft</h2>
                     <p class="jc-status-text">
-                        Dein Shop <strong style="color: #ffc107;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde erfolgreich eingereicht und wartet auf Freigabe durch einen Admin.
+                        Dein Shop <strong style="color: #ffc107;">"<?php echo esc_html( $shop->shop_name ); ?>"</strong> wurde erfolgreich eingereicht und wartet auf Freigabe durch einen Admin.
                     </p>
                     <div class="jc-status-meta">
-                        <span>📅 Eingereicht: <?php echo date('d.m.Y \u\m H:i', strtotime($user_shop->created_at)); ?> Uhr</span>
+                        <span>📅 Eingereicht: <?php echo date('d.m.Y \u\m H:i', strtotime($shop->created_at)); ?> Uhr</span>
                     </div>
                     <div class="jc-status-hint">
-                        💡 Weitere Shops oder Änderungen? Erstelle ein Ticket im Discord!
+                        <?php if ( $can_create_shop ) : ?>
+                            💡 Du kannst noch <?php echo $user_max_shops - count( $user_shops ); ?> weitere Shop(s) erstellen! Scrolle nach unten zum Formular.
+                        <?php else : ?>
+                            💡 Weitere Shops oder Änderungen? Erstelle ein Ticket im Discord!
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-        <?php elseif ( $is_logged_in && $user_shop && $user_shop->status === 'rejected' ) : ?>
+        <?php
+                elseif ( $shop->status === 'rejected' ) :
+        ?>
             <!-- User's Shop wurde abgelehnt -->
             <div class="jc-status-card jc-status-rejected" style="margin-top: 30px;">
                 <div class="jc-status-icon">❌</div>
                 <div class="jc-status-content">
                     <h2 class="jc-status-title">Shop abgelehnt</h2>
                     <p class="jc-status-text">
-                        Dein Shop <strong style="color: #f44336;">"<?php echo esc_html( $user_shop->shop_name ); ?>"</strong> wurde leider abgelehnt.
+                        Dein Shop <strong style="color: #f44336;">"<?php echo esc_html( $shop->shop_name ); ?>"</strong> wurde leider abgelehnt.
                     </p>
                     <div class="jc-status-hint">
-                        💬 Bitte erstelle ein Ticket im Discord für weitere Informationen und um den Grund zu erfahren.
+                        <?php if ( $can_create_shop ) : ?>
+                            💬 Bitte erstelle ein Ticket im Discord für Informationen zum Ablehnungsgrund. Du kannst noch <?php echo $user_max_shops - count( $user_shops ); ?> weitere Shop(s) erstellen.
+                        <?php else : ?>
+                            💬 Bitte erstelle ein Ticket im Discord für weitere Informationen und um den Grund zu erfahren.
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-        <?php elseif ( $is_logged_in && ! $user_shop ) : ?>
+        <?php
+                endif;
+            endforeach;
+        endif;
+        ?>
+
+        <?php if ( $is_logged_in && $can_create_shop ) : ?>
             <!-- Shop Erstellungsformular -->
             <div class="jc-card jc-form-card" style="margin-top: 30px;">
                 <div class="jc-form-header">
@@ -436,7 +473,11 @@ function jc_shop_render_page() {
                     <h2 class="jc-h">Erstelle deinen Shop</h2>
                 </div>
                 <p class="jc-form-desc">
-                    Reiche deinen Shop für den Shopping District ein. Pro Spieler ist <strong>ein Shop</strong> erlaubt.
+                    <?php if ( count( $user_shops ) > 0 ) : ?>
+                        Erstelle einen weiteren Shop für den Shopping District. Du hast bereits <strong><?php echo count( $user_shops ); ?></strong> von <strong><?php echo $user_max_shops; ?></strong> Shops erstellt.
+                    <?php else : ?>
+                        Reiche deinen Shop für den Shopping District ein. <?php echo $user_max_shops > 1 ? "Du kannst bis zu <strong>{$user_max_shops} Shops</strong> erstellen." : "Pro Spieler ist <strong>ein Shop</strong> erlaubt."; ?>
+                    <?php endif; ?>
                 </p>
 
                 <form method="POST" class="jc-shop-form">
@@ -479,7 +520,7 @@ function jc_shop_render_page() {
                     <div class="jc-info-box">
                         <div class="jc-info-icon">💡</div>
                         <div class="jc-info-text">
-                            <strong>Hinweis:</strong> Du kannst nur einen Shop einreichen. Für weitere Shops oder Änderungen erstelle bitte ein Ticket im Discord.
+                            <strong>Hinweis:</strong> <?php echo $user_max_shops > 1 ? "Du kannst bis zu {$user_max_shops} Shops einreichen." : "Du kannst nur einen Shop einreichen."; ?> Für Änderungen erstelle bitte ein Ticket im Discord.
                         </div>
                     </div>
 
@@ -652,6 +693,40 @@ function jc_shop_handle_admin_actions() {
 
         add_settings_error( 'jc_shop', 'reset_user', "✅ Shops von User {$discord_id} gelöscht ({$count} Einträge)!", 'updated' );
     }
+
+    // User Shop-Limit setzen
+    if ( isset( $_POST['jc_shop_set_limit'] ) && isset( $_POST['limit_discord_id'] ) && isset( $_POST['shop_limit'] ) ) {
+        check_admin_referer( 'jc_shop_set_limit' );
+
+        $discord_id = sanitize_text_field( $_POST['limit_discord_id'] );
+        $limit = intval( $_POST['shop_limit'] );
+
+        if ( $limit < 1 ) {
+            add_settings_error( 'jc_shop', 'limit_error', "❌ Limit muss mindestens 1 sein!", 'error' );
+        } else {
+            $user_limits = get_option( 'jc_shop_user_limits', array() );
+            $user_limits[$discord_id] = $limit;
+            update_option( 'jc_shop_user_limits', $user_limits );
+
+            add_settings_error( 'jc_shop', 'limit_set', "✅ Shop-Limit für Discord ID {$discord_id} auf {$limit} gesetzt!", 'updated' );
+        }
+    }
+
+    // User Shop-Limit entfernen (zurück auf Standard: 1)
+    if ( isset( $_POST['jc_shop_remove_limit'] ) && isset( $_POST['remove_limit_discord_id'] ) ) {
+        check_admin_referer( 'jc_shop_remove_limit' );
+
+        $discord_id = sanitize_text_field( $_POST['remove_limit_discord_id'] );
+        $user_limits = get_option( 'jc_shop_user_limits', array() );
+
+        if ( isset( $user_limits[$discord_id] ) ) {
+            unset( $user_limits[$discord_id] );
+            update_option( 'jc_shop_user_limits', $user_limits );
+            add_settings_error( 'jc_shop', 'limit_removed', "✅ Shop-Limit für Discord ID {$discord_id} entfernt (zurück auf Standard: 1 Shop)!", 'updated' );
+        } else {
+            add_settings_error( 'jc_shop', 'limit_not_found', "⚠️ Kein Custom-Limit für Discord ID {$discord_id} gefunden.", 'error' );
+        }
+    }
 }
 
 function jc_shop_render_admin_page() {
@@ -759,6 +834,82 @@ function jc_shop_render_admin_page() {
                     ⚠️ ALLE Shops löschen
                 </button>
             </form>
+        </div>
+
+        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ccc; border-radius: 5px;">
+            <h3 style="margin-top: 0;">👤 User Shop-Limits verwalten</h3>
+            <p style="color: #666; margin-bottom: 15px;">Standard: Jeder User darf <strong>1 Shop</strong> erstellen. Hier kannst du einzelnen Usern erlauben, mehr Shops zu erstellen.</p>
+
+            <!-- Shop-Limit setzen -->
+            <form method="post" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px;">
+                <?php wp_nonce_field( 'jc_shop_set_limit' ); ?>
+                <h4 style="margin-top: 0;">🎯 Neues Limit setzen</h4>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="limit_discord_id">Discord ID:</label>
+                    <input type="text" id="limit_discord_id" name="limit_discord_id" placeholder="Discord ID" required style="width: 250px;">
+                    <label for="shop_limit">Max. Shops:</label>
+                    <input type="number" id="shop_limit" name="shop_limit" min="1" max="99" value="2" required style="width: 80px;">
+                    <button type="submit" name="jc_shop_set_limit" class="button button-primary">
+                        ✅ Limit setzen
+                    </button>
+                </div>
+            </form>
+
+            <!-- Aktuelle Custom-Limits anzeigen -->
+            <?php
+            $user_limits = get_option( 'jc_shop_user_limits', array() );
+            if ( ! empty( $user_limits ) ) :
+            ?>
+                <h4>📋 Aktuelle Custom-Limits:</h4>
+                <table class="wp-list-table widefat fixed striped" style="max-width: 800px;">
+                    <thead>
+                        <tr>
+                            <th>Discord ID</th>
+                            <th>Creator Name</th>
+                            <th>Max. Shops</th>
+                            <th>Aktuell eingereicht</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $user_limits as $discord_id => $limit ) :
+                            $current_count = $wpdb->get_var( $wpdb->prepare(
+                                "SELECT COUNT(*) FROM {$table} WHERE discord_id = %s",
+                                $discord_id
+                            ) );
+
+                            // Hole Creator-Namen
+                            $teilnehmer_table = $wpdb->prefix . 'jc_teilnehmer';
+                            $creator_name = $wpdb->get_var( $wpdb->prepare(
+                                "SELECT display_name FROM {$teilnehmer_table}
+                                 WHERE application_id IN (
+                                     SELECT id FROM {$wpdb->prefix}jc_discord_applications
+                                     WHERE discord_id = %s
+                                 ) LIMIT 1",
+                                $discord_id
+                            ) );
+                        ?>
+                        <tr>
+                            <td><code><?php echo esc_html( $discord_id ); ?></code></td>
+                            <td><?php echo $creator_name ? esc_html( $creator_name ) : '<em style="color:#999;">Unbekannt</em>'; ?></td>
+                            <td><strong><?php echo intval( $limit ); ?></strong></td>
+                            <td><?php echo intval( $current_count ); ?> / <?php echo intval( $limit ); ?></td>
+                            <td>
+                                <form method="post" style="display: inline;">
+                                    <?php wp_nonce_field( 'jc_shop_remove_limit' ); ?>
+                                    <input type="hidden" name="remove_limit_discord_id" value="<?php echo esc_attr( $discord_id ); ?>">
+                                    <button type="submit" name="jc_shop_remove_limit" class="button button-small" onclick="return confirm('Limit für diesen User wirklich entfernen?');" style="color: #d63638;">
+                                        ✖️ Limit entfernen
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php else : ?>
+                <p style="color: #999; font-style: italic;">Keine Custom-Limits gesetzt. Alle User haben das Standard-Limit von 1 Shop.</p>
+            <?php endif; ?>
         </div>
 
         <table class="wp-list-table widefat fixed striped" style="margin-top: 20px;">
