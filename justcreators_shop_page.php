@@ -271,7 +271,7 @@ function jc_shop_render_page() {
                             'items' => $items,
                             'status' => 'draft'
                         );
-                        
+
                         $result = $wpdb->insert( $table, $insert_data, array( '%s', '%s', '%s', '%s', '%s' ) );
 
                         if ( $result === false ) {
@@ -281,8 +281,20 @@ function jc_shop_render_page() {
                             error_log( 'JC Shop Table: ' . $table );
                             echo '<div class="jc-msg jc-error">❌ Fehler beim Speichern: ' . esc_html( $wpdb->last_error ) . '</div>';
                         } else {
-                            // Erfolg - Discord Webhook senden
-                            jc_shop_send_webhook_notification( $discord_name, $shop_name, $items );
+                            // Erfolg - Discord Webhook senden mit Creator-Namen aus Teilnehmer-DB
+                            // Hole den Creator-Namen aus der Teilnehmer-DB (YouTube/Twitch Kanal-Name)
+                            $teilnehmer_table = $wpdb->prefix . 'jc_teilnehmer';
+                            $teilnehmer = $wpdb->get_row( $wpdb->prepare(
+                                "SELECT display_name FROM {$teilnehmer_table}
+                                 WHERE application_id IN (
+                                     SELECT id FROM {$wpdb->prefix}jc_discord_applications
+                                     WHERE discord_id = %s
+                                 ) LIMIT 1",
+                                $discord_id
+                            ) );
+
+                            $creator_name = $teilnehmer ? $teilnehmer->display_name : $discord_name;
+                            jc_shop_send_webhook_notification( $creator_name, $shop_name, $items );
 
                             // Seite neu laden um den Status anzuzeigen
                             echo '<script>window.location.href = window.location.pathname;</script>';
